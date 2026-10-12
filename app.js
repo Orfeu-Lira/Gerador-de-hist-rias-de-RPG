@@ -1,6 +1,7 @@
 // app.js — a parte que roda no NAVEGADOR. Ela só cuida da tela.
 // Todas as regras de verdade (limites, permissões) ficam no servidor.
 const $ = (id) => document.getElementById(id);
+const API_BASE_URL = (window.MESA_CONFIG && window.MESA_CONFIG.apiBaseUrl || '').replace(/\/+$/, '');
 const GENEROS = ['Fantasia sombria', 'Fantasia épica', 'Ficção científica', 'Terror', 'Investigação', 'Piratas e mares'];
 const TONS = ['Misterioso', 'Aventureiro', 'Sombrio', 'Leve e bem-humorado', 'Tenso'];
 let eu = { logado: false };
@@ -15,8 +16,10 @@ function el(tag, texto, classe) {
 }
 
 async function api(url, metodo = 'GET', corpo) {
-  const r = await fetch(url, {
+  if (!API_BASE_URL) throw new Error('Configure a URL do backend em config.js antes de usar a API.');
+  const r = await fetch(API_BASE_URL + url, {
     method: metodo,
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: corpo ? JSON.stringify(corpo) : undefined
   });
@@ -126,12 +129,13 @@ async function carregarHistorico() {
 // ---- Conta ----
 $('ir-cadastro').onclick = () => { $('f-login').hidden = true; $('f-cadastro').hidden = false; };
 $('ir-login').onclick = () => { $('f-cadastro').hidden = true; $('f-login').hidden = false; };
-async function entrar(url, email, senha) {
-  try { await api(url, 'POST', { email, senha }); await atualizarEu(); mostrar('gerador'); aviso('Tudo certo!', true); }
+async function entrar(url, email, senha, tokenBootstrap) {
+  try { await api(url, 'POST', { email, senha, ...(tokenBootstrap ? { tokenBootstrap } : {}) }); await atualizarEu(); mostrar('gerador'); aviso('Tudo certo!', true); }
   catch (e) { aviso(e.message); }
+  finally { if (tokenBootstrap) $('c-token-bootstrap').value = ''; }
 }
 $('f-login').onsubmit = (ev) => { ev.preventDefault(); entrar('/api/login', $('l-email').value, $('l-senha').value); };
-$('f-cadastro').onsubmit = (ev) => { ev.preventDefault(); entrar('/api/cadastro', $('c-email').value, $('c-senha').value); };
+$('f-cadastro').onsubmit = (ev) => { ev.preventDefault(); entrar('/api/cadastro', $('c-email').value, $('c-senha').value, $('c-token-bootstrap').value); };
 
 // ---- Painel do dono ----
 async function carregarResumo() {
@@ -144,4 +148,7 @@ async function carregarResumo() {
   } catch (e) { aviso(e.message); }
 }
 
-atualizarEu().then(() => mostrar('gerador'));
+atualizarEu().then(() => mostrar('gerador')).catch((e) => {
+  montarNav();
+  aviso(e.message);
+});

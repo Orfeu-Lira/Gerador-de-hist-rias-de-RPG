@@ -1,6 +1,7 @@
 // server.js — o "cérebro" do site. Aqui ficam as regras que o navegador NÃO pode burlar:
 // login, limites de uso, permissões e a chamada à IA.
 const path = require('path');
+const crypto = require('crypto');
 const express = require('express');
 const session = require('express-session');
 const helmet = require('helmet');
@@ -10,10 +11,30 @@ const db = require('./db');
 const { gerarAventura } = require('./ia');
 
 if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32) {
-  console.error('Defina SESSION_SECRET (32+ caracteres) no arquivo .env');
+  console.error('Defina SESSION_SECRET com pelo menos 32 caracteres.');
   process.exit(1);
 }
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+const PRODUCAO = process.env.NODE_ENV === 'production';
+const ORIGEM_FRONTEND = (process.env.FRONTEND_ORIGIN || '').replace(/\/+$/, '');
+if (PRODUCAO && !ORIGEM_FRONTEND) {
+  console.error('Defina FRONTEND_ORIGIN com a origem HTTPS exata do GitHub Pages.');
+  process.exit(1);
+}
+const ADMIN_BOOTSTRAP_TOKEN = process.env.ADMIN_BOOTSTRAP_TOKEN || '';
+const ADMINISTRADOR_INICIALIZADO = !!db.prepare("SELECT 1 FROM usuarios WHERE papel = 'admin' LIMIT 1").get();
+if (PRODUCAO && !ADMINISTRADOR_INICIALIZADO && ADMIN_BOOTSTRAP_TOKEN.length < 32) {
+  console.error('Defina ADMIN_BOOTSTRAP_TOKEN com pelo menos 32 caracteres.');
+  process.exit(1);
+}
+if (ORIGEM_FRONTEND) {
+  try {
+    const origem = new URL(ORIGEM_FRONTEND);
+    if (origem.origin !== ORIGEM_FRONTEND || (PRODUCAO && origem.protocol !== 'https:')) throw new Error();
+  } catch {
+    console.error('FRONTEND_ORIGIN deve conter apenas protocolo e host, sem caminho.');
+    process.exit(1);
+  }
+}
 const LIMITE_USUARIO_DIA = 5; // gerações por dia no plano grátis
 const LIMITE_VISITANTE = 1;   // gerações de quem testa sem login
 const GENEROS = ['Fantasia sombria', 'Fantasia épica', 'Ficção científica', 'Terror', 'Investigação', 'Piratas e mares'];
@@ -25,15 +46,69 @@ const app = express();
 
 // --- Camadas de proteção (middlewares) ---
 app.use(helmet({ contentSecurityPolicy: { useDefaults: true, directives: { 'upgrade-insecure-requests': null } } }));
+if (PRODUCAO) app.set('trust proxy', 1);
+app.use((req, res, next) => {
+  const origem = req.get('Origin');
+  res.vary('Origin');
+  if (origem && ORIGEM_FRONTEND && origem !== ORIGEM_FRONTEND) {
+    return res.status(403).json({ erro: 'Origem não permitida.' });
+  }
+  if (origem && origem === ORIGEM_FRONTEND) {
+    res.set({
+      'Access-Control-Allow-Origin': ORIGEM_FRONTEND,
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    });
+  }
+  if (req.method === 'OPTIONS') return res.sendStatus(origem === ORIGEM_FRONTEND ? 204 : 403);
+  if (PRODUCAO && ['POST', 'DELETE'].includes(req.method) && req.path.startsWith('/api/') && origem !== ORIGEM_FRONTEND) {
+    return res.status(403).json({ erro: 'Origem não permitida.' });
+  }
+  next();
+});
 app.use(express.json({ limit: '10kb' }));
+class SQLiteSessionStore extends session.Store {
+  get(sid, callback) {
+    try {
+      const row = db.prepare('SELECT sessao FROM sessoes WHERE sid = ? AND expira_em > ?').get(sid, Date.now());
+      callback(null, row ? JSON.parse(row.sessao) : null);
+    } catch (err) { callback(err); }
+  }
+  set(sid, sessao, callback) {
+    try {
+      const cookie = sessao.cookie || {};
+      const expiraEm = cookie.expires ? new Date(cookie.expires).getTime() : Date.now() + (cookie.originalMaxAge || 7 * 24 * 3600 * 1000);
+      db.prepare('INSERT INTO sessoes (sid, sessao, expira_em) VALUES (?, ?, ?) ON CONFLICT(sid) DO UPDATE SET sessao = excluded.sessao, expira_em = excluded.expira_em')
+        .run(sid, JSON.stringify(sessao), expiraEm);
+      if (callback) callback(null);
+    } catch (err) { if (callback) callback(err); }
+  }
+  destroy(sid, callback) {
+    try {
+      db.prepare('DELETE FROM sessoes WHERE sid = ?').run(sid);
+      if (callback) callback(null);
+    } catch (err) { if (callback) callback(err); }
+  }
+  touch(sid, sessao, callback) {
+    try {
+      const cookie = sessao.cookie || {};
+      const expiraEm = cookie.expires ? new Date(cookie.expires).getTime() : Date.now() + (cookie.originalMaxAge || 7 * 24 * 3600 * 1000);
+      db.prepare('UPDATE sessoes SET expira_em = ? WHERE sid = ?').run(expiraEm, sid);
+      if (callback) callback(null);
+    } catch (err) { if (callback) callback(err); }
+  }
+}
+db.prepare('DELETE FROM sessoes WHERE expira_em <= ?').run(Date.now());
+const limpezaSessoes = setInterval(() => db.prepare('DELETE FROM sessoes WHERE expira_em <= ?').run(Date.now()), 60 * 60 * 1000);
+limpezaSessoes.unref();
 app.use(session({
   name: 'mesa.sid',
   secret: process.env.SESSION_SECRET,
+  store: new SQLiteSessionStore(),
   resave: false,
   saveUninitialized: false,
-  // httpOnly: o JavaScript da página não consegue ler o cookie. sameSite: ajuda contra CSRF.
-  // Ao colocar o site na internet com HTTPS, troque secure para true.
-  cookie: { httpOnly: true, sameSite: 'lax', secure: false, maxAge: 7 * 24 * 3600 * 1000 }
+  cookie: { httpOnly: true, sameSite: PRODUCAO ? 'none' : 'lax', secure: PRODUCAO, maxAge: 7 * 24 * 3600 * 1000 }
 }));
 const limiteLogin = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, message: { erro: 'Muitas tentativas. Aguarde alguns minutos.' } });
 const limiteGerar = rateLimit({ windowMs: 60 * 1000, limit: 10, message: { erro: 'Muitos pedidos. Aguarde um minuto.' } });
@@ -57,6 +132,13 @@ function restantes(req, usuario) {
 
 const emailValido = (e) => typeof e === 'string' && e.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 const senhaValida = (s) => typeof s === 'string' && s.length >= 8 && s.length <= 72; // bcrypt só usa 72 caracteres
+const administradorExiste = () => !!db.prepare("SELECT 1 FROM usuarios WHERE papel = 'admin' LIMIT 1").get();
+function tokenBootstrapValido(token) {
+  if (!ADMIN_BOOTSTRAP_TOKEN || typeof token !== 'string') return false;
+  const informado = Buffer.from(token);
+  const esperado = Buffer.from(ADMIN_BOOTSTRAP_TOKEN);
+  return informado.length === esperado.length && crypto.timingSafeEqual(informado, esperado);
+}
 
 function exigirAdmin(req, res, next) {
   const u = usuarioAtual(req);
@@ -66,12 +148,12 @@ function exigirAdmin(req, res, next) {
 
 // --- Rotas de conta ---
 app.post('/api/cadastro', limiteLogin, (req, res) => {
-  const { email, senha } = req.body || {};
+  const { email, senha, tokenBootstrap } = req.body || {};
   if (!emailValido(email) || !senhaValida(senha)) {
     return res.status(400).json({ erro: 'Use um e-mail válido e uma senha de 8 a 72 caracteres.' });
   }
   const emailLimpo = email.trim().toLowerCase();
-  const papel = ADMIN_EMAIL && emailLimpo === ADMIN_EMAIL ? 'admin' : 'usuario';
+  const papel = !administradorExiste() && tokenBootstrapValido(tokenBootstrap) ? 'admin' : 'usuario';
   try {
     // "?" = parâmetro: o valor vai separado do SQL. Isso impede SQL injection.
     const r = db.prepare('INSERT INTO usuarios (email, senha_hash, papel) VALUES (?, ?, ?)')

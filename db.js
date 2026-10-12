@@ -2,7 +2,10 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
-const db = new Database(path.join(__dirname, 'mesa.db'));
+const databasePath = path.resolve(process.env.DATABASE_PATH || path.join(__dirname, 'mesa.db'));
+require('fs').mkdirSync(path.dirname(databasePath), { recursive: true });
+
+const db = new Database(databasePath);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON'); // faz o banco respeitar as chaves estrangeiras
 
@@ -31,6 +34,13 @@ db.exec(`
     ip    TEXT PRIMARY KEY,
     total INTEGER NOT NULL DEFAULT 0
   );
+
+  CREATE TABLE IF NOT EXISTS sessoes (
+    sid       TEXT PRIMARY KEY,
+    sessao    TEXT NOT NULL,
+    expira_em INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_sessoes_expira_em ON sessoes(expira_em);
 `);
 
 module.exports = db;

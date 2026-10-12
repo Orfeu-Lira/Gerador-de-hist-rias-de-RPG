@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mesa – ferramentas para mestres de RPG</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="./style.css">
 </head>
 <body>
 <main>
@@ -62,6 +62,9 @@
       <label for="c-senha">Senha</label>
       <input id="c-senha" type="password" autocomplete="new-password" minlength="8" maxlength="72" required>
       <p class="suave">Mínimo de 8 caracteres.</p>
+      <label for="c-token-bootstrap">Token inicial do administrador (opcional)</label>
+      <input id="c-token-bootstrap" type="password" autocomplete="off">
+      <p class="suave">Só o primeiro administrador precisa informar o token secreto configurado no Render.</p>
       <p class="acoes"><button class="principal" type="submit">Criar conta</button></p>
       <p class="suave">Já tem conta? <button type="button" class="link" id="ir-login">Entrar</button></p>
     </form>
@@ -71,6 +74,7 @@
     <div class="folha" id="resumo"></div>
   </section>
 </main>
-<script src="/app.js"></script>
+<script src="./config.js"></script>
+<script src="./app.js"></script>
 </body>
 </html>

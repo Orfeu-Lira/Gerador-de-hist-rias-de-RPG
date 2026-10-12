@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: mesa-rpg-api
+    runtime: node
+    plan: starter
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/eu
+    disk:
+      name: mesa-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FRONTEND_ORIGIN
+        value: https://orfeu-lira.github.io
+      - key: DATABASE_PATH
+        value: /var/data/mesa.db
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_BOOTSTRAP_TOKEN
+        generateValue: true
