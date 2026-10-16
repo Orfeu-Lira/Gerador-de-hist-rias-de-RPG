@@ -409,6 +409,7 @@ $('p-remover').onclick=async()=>{
 };
 atualizarPontosDnd();
 atualizarSugestaoClasse();
+atualizarContextoDnd();
 // ---- Tutor com IA, sem execução automática de mudanças nas fichas ----
 $('f-ajuda-dnd').onsubmit=async ev=>{
   ev.preventDefault();
