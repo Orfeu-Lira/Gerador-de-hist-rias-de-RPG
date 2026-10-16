@@ -38,7 +38,7 @@ function mostrar(tela) {
   document.querySelectorAll('#nav button[data-tela]').forEach((b) => b.setAttribute('aria-current', b.dataset.tela === tela));
   aviso('');
   if (tela === 'historico') carregarHistorico();
-  if (tela === 'personagens') { carregarAventurasDaFicha().then(carregarPersonagens); }
+  if (tela === 'personagens') { consultarAvatarIa(); carregarAventurasDaFicha().then(carregarPersonagens); }
   if (tela === 'admin') carregarResumo();
 }
 
@@ -473,6 +473,14 @@ for (const [sigla,nome] of atributosDnd) {
   item.append(rotulo,campo,modificador);$('p-atributos').appendChild(item);
 }
 // Avatares ficam em um bucket privado. Somente a própria conta pode carregá-los.
+let avatarIaDisponivel=false;
+async function consultarAvatarIa(){
+  try{
+    const status=await api('/api/avatar-ia/status');
+    avatarIaDisponivel=status.habilitado===true;
+  }catch{ avatarIaDisponivel=false; }
+  atualizarEstadoAvatar();
+}
 let avatarObjectUrl=null;
 function limparPreviewAvatar(){
   if(avatarObjectUrl)URL.revokeObjectURL(avatarObjectUrl);
@@ -485,7 +493,11 @@ function limparPreviewAvatar(){
 function atualizarEstadoAvatar(){
   const salvo=Boolean(fichaAbertaId);
   $('p-avatar-file').disabled=!salvo;
-  $('p-avatar-gerar').disabled=true; // Recurso premium em preparação
+  $('p-avatar-gerar').disabled=!salvo||!avatarIaDisponivel;
+  $('p-avatar-gerar').textContent=avatarIaDisponivel?'✦ Gerar avatar com IA':'✦ Gerar avatar com IA — Em breve';
+  $('p-avatar-ia-nota').textContent=avatarIaDisponivel
+    ? 'Teste de IA habilitado no Preview. O Gemini pode cobrar por imagem; respeite seu orçamento. O limite provisório é de 2 por dia (6 para administrador).'
+    : 'A geração por IA precisa ser habilitada pelo responsável no Vercel Preview. Enviar imagem continua disponível.';
   $('p-avatar-info').textContent=salvo
     ? 'Envie um retrato. Ele será visível somente para você ao abrir esta ficha.'
     : 'Salve a ficha primeiro e reabra-a para enviar um avatar.';
