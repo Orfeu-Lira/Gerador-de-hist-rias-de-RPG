@@ -419,8 +419,8 @@ async function avatarDono(req,res) {
 // A imagem retorna para o navegador, é comprimida para WebP e então salva no mesmo bucket privado.
 const avatarEstilos=['Fantasia ilustrada','Realismo cinematográfico','Anime','Pintura clássica'];
 const gerarAvatarLimite=require('express-rate-limit').rateLimit({
-  windowMs:15*60*1000,limit:3,standardHeaders:'draft-7',legacyHeaders:false,
-  message:{erro:'Aguarde antes de solicitar outra geração de avatar.'}
+  windowMs:15*60*1000,limit:10,skipFailedRequests:true,standardHeaders:'draft-7',legacyHeaders:false,
+  message:{erro:'Muitas solicitações em sequência. Aguarde 15 minutos antes de tentar novamente.'}
 });
 app.post('/api/personagens/:id/avatar/gerar',gerarAvatarLimite,asyncHandler(async(req,res)=>{
   const acesso=await avatarDono(req,res);if(!acesso)return;
@@ -470,8 +470,20 @@ app.post('/api/personagens/:id/avatar/gerar',gerarAvatarLimite,asyncHandler(asyn
       })
     });
     if(!apiResponse.ok){
-      console.error('Gemini avatar API:',apiResponse.status,modelo);
-      return res.status(503).json({erro:'O modelo de imagens não está disponível nesta chave Gemini. Confira o acesso ao modelo de geração de imagens e tente novamente.'});
+      const detalhe=await apiResponse.json().catch(()=>({}));
+      const msg=String(detalhe?.error?.message||'').slice(0,600);
+      const status=apiResponse.status;
+      const categoria=status===429?'QUOTA_OU_FATURAMENTO':
+        (status===401||status===403)?'CREDENCIAIS_OU_PERMISSOES':
+        status===404?'MODELO_INDISPONIVEL':
+        status===400?'REQUISICAO_INVALIDA':'SERVICO_INDISPONIVEL';
+      console.error('Gemini avatar diagnóstico:',JSON.stringify({httpStatus:status,categoria,modelo,mensagem:msg.slice(0,200)}));
+      const erro=status===429?'O Gemini limitou as gerações de imagem (cota ou faturamento). Verifique seu plano no Google AI Studio.':
+        status===403||status===401?'A chave Gemini não tem acesso à geração de imagens. Confira as permissões e o projeto da chave.':
+        status===404?'O modelo de imagens configurado não foi encontrado. Confira GEMINI_IMAGE_MODEL.':
+        status===400?'O Gemini recusou os parâmetros de geração de imagens. Confira o modelo configurado e os logs do Vercel.':
+        'O Gemini está temporariamente indisponível para gerar imagens.';
+      return res.status(503).json({erro});
     }
     const resposta=await apiResponse.json();
     const parte=resposta.candidates?.[0]?.content?.parts?.find(p=>p.inlineData?.data);
