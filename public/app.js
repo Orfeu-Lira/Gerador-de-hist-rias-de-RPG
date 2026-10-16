@@ -188,10 +188,12 @@ const generosNarrativos = new Set(['Piratas e mares','Investigação','Terror','
 const fichaNarrativa = () => generosNarrativos.has($('p-cenario').value);
 function atualizarModoFicha() {
   const narrativa=fichaNarrativa();
-  for(const campo of document.querySelectorAll('.campo-dnd')) campo.hidden=narrativa;
-  $('p-regras-dnd').hidden=narrativa;
+  const fantasia=['Fantasia épica','Fantasia sombria'].includes($('p-cenario').value);
+  for(const campo of document.querySelectorAll('.campo-dnd')) campo.hidden=!fantasia;
+  $('p-regras-dnd').hidden=!fantasia;
   $('p-perfil-narrativo').hidden=!narrativa;
   $('campo-especialidade').hidden=!narrativa;
+  $('p-selecione-cenario').hidden=Boolean(fantasia||narrativa);
   $('campo-funcao').hidden=true;
   if(narrativa) {
     $('p-classe').value='';
@@ -200,7 +202,7 @@ function atualizarModoFicha() {
     $('p-antecedente').value='';
   }
   atualizarSugestaoClasse();
-  atualizarResumoDnd();
+  atualizarPontosDnd();
 }
 function atualizarRecomendacaoNarrativa(){
   const contexto=contextosDnd[$('p-cenario').value];
@@ -316,7 +318,7 @@ function atualizarPontosDnd() {
     const valor = Number($('at-'+sigla).value);
     $('mod-'+sigla).textContent = 'Mod. '+(modDnd(valor)>=0?'+':'')+modDnd(valor);
   }
-  $('f-personagem').querySelector('button[type="submit"]').disabled = restante < 0;
+  $('f-personagem').querySelector('button[type="submit"]').disabled = restante < 0 || !$('p-cenario').value;
   atualizarResumoDnd();
 }
 for (const [sigla,nome] of atributosDnd) {
@@ -377,6 +379,7 @@ async function carregarPersonagens(){
 $('f-personagem').onsubmit=async ev=>{
   ev.preventDefault();
   const narrativa=fichaNarrativa();
+  if(!$('p-cenario').value){aviso('Escolha primeiro o cenário da personagem.');return;}
   if(!narrativa && pontosDnd()>27){aviso('Você ultrapassou 27 pontos. Ajuste os atributos.');return;}
   if(narrativa && !$('p-especialidade').value){aviso('Selecione a especialidade da personagem neste cenário.');return;}
   const dados={
