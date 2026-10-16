@@ -92,6 +92,12 @@ const compareSecret = (received, secret) => {
   return a.length === b.length && crypto.timingSafeEqual(a,b);
 };
 
+app.get('/api/health',(req,res)=>res.json({ok:true,service:'mesa-api'}));
+app.get('/api/db-health',asyncHandler(async(req,res)=>{
+  if (process.env.VERCEL_ENV === 'production') return res.status(404).json({erro:'Não encontrado.'});
+  await query('SELECT 1'); res.json({ok:true,database:'connected'});
+}));
+
 app.post('/api/cadastro', asyncHandler(async(req,res) => {
   const {email,senha,tokenBootstrap} = req.body || {};
   if (!emailValido(email) || !senhaValida(senha)) return res.status(400).json({erro:'Use um e-mail válido e senha de 8 a 72 caracteres.'});
