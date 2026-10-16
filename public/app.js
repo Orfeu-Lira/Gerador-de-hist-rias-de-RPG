@@ -38,7 +38,7 @@ function mostrar(tela) {
   document.querySelectorAll('#nav button[data-tela]').forEach((b) => b.setAttribute('aria-current', b.dataset.tela === tela));
   aviso('');
   if (tela === 'historico') carregarHistorico();
-  if (tela === 'personagens') carregarPersonagens();
+  if (tela === 'personagens') { carregarAventurasDaFicha().then(carregarPersonagens); }
   if (tela === 'admin') carregarResumo();
 }
 
@@ -132,6 +132,96 @@ async function carregarHistorico() {
       linha.append(abrir, apagar); lista.appendChild(linha);
     });
   } catch (e) { aviso(e.message); }
+}
+
+// Cenários e especialidades NARRATIVAS: não são classes, talentos ou proficiências oficiais.
+const contextosDnd = {
+  'Piratas e mares': {
+    papeis: ['Capitão', 'Navegador', 'Artilheiro', 'Médico de bordo', 'Espião do porto', 'Caçador de tesouros'],
+    dicas: {
+      'Capitão': ['Bardo','Paladino','Guerreiro'], 'Navegador':['Patrulheiro','Druida','Ladino'],
+      'Artilheiro':['Guerreiro','Patrulheiro'], 'Médico de bordo':['Clérigo','Druida','Bardo'],
+      'Espião do porto':['Ladino','Bardo'], 'Caçador de tesouros':['Ladino','Patrulheiro']
+    }, texto:'Uma tripulação pode contar com líder, navegação, combate, cura ou investigação. Essas funções são opções de história, não regras de classe.'
+  },
+  'Fantasia épica': {
+    papeis:['Cavaleiro', 'Guardião', 'Batedor', 'Diplomata', 'Erudito arcano', 'Curandeiro itinerante'],
+    dicas:{'Cavaleiro':['Paladino','Guerreiro'],'Guardião':['Guerreiro','Bárbaro'],'Batedor':['Patrulheiro','Ladino'],'Diplomata':['Bardo','Paladino'],'Erudito arcano':['Mago','Feiticeiro'],'Curandeiro itinerante':['Clérigo','Druida']},
+    texto:'Escolha uma função no reino ou na jornada para dar personalidade ao herói.'
+  },
+  'Fantasia sombria': {
+    papeis:['Caçador de monstros', 'Ocultista', 'Inquisidor', 'Sobrevivente', 'Médico de campanha', 'Investigador de maldições'],
+    dicas:{'Caçador de monstros':['Patrulheiro','Guerreiro'],'Ocultista':['Bruxo','Mago'],'Inquisidor':['Clérigo','Paladino'],'Sobrevivente':['Ladino','Bárbaro'],'Médico de campanha':['Clérigo','Druida'],'Investigador de maldições':['Mago','Ladino']},
+    texto:'A especialidade descreve o papel do personagem perante os perigos, não concede poderes extras.'
+  },
+  'Investigação': {
+    papeis:['Detetive', 'Infiltrador', 'Perito', 'Interrogador', 'Pesquisador', 'Protetor da equipe'],
+    dicas:{'Detetive':['Ladino','Patrulheiro'],'Infiltrador':['Ladino','Monge'],'Perito':['Mago','Ladino'],'Interrogador':['Bardo','Paladino'],'Pesquisador':['Mago','Clérigo'],'Protetor da equipe':['Guerreiro','Paladino']},
+    texto:'Um mistério funciona melhor com perfis complementares de análise, exploração e negociação.'
+  },
+  'Terror': {
+    papeis:['Sobrevivente', 'Especialista em rituais', 'Protetor', 'Investigador', 'Socorrista', 'Explorador de ruínas'],
+    dicas:{'Sobrevivente':['Ladino','Patrulheiro'],'Especialista em rituais':['Clérigo','Mago'],'Protetor':['Guerreiro','Paladino'],'Investigador':['Ladino','Mago'],'Socorrista':['Clérigo','Bardo'],'Explorador de ruínas':['Patrulheiro','Druida']},
+    texto:'Destaque o papel dramático de cada pessoa do grupo para criar tensão e cooperação.'
+  },
+  'Ficção científica': {
+    papeis:['Piloto', 'Engenheiro', 'Diplomata', 'Batedor', 'Médico', 'Oficial de segurança'],
+    dicas:{'Piloto':['Ladino','Patrulheiro'],'Engenheiro':['Mago','Ladino'],'Diplomata':['Bardo','Paladino'],'Batedor':['Patrulheiro','Monge'],'Médico':['Clérigo','Druida'],'Oficial de segurança':['Guerreiro','Paladino']},
+    texto:'Tema futurista com adaptação narrativa de D&D 2024. Tecnologia, armas de fogo e veículos precisam de regras específicas aprovadas pelo mestre.'
+  }
+};
+let aventurasFicha = [];
+function definirOpcoes(select, valores, vazio) {
+  select.replaceChildren(new Option(vazio,''));
+  for (const valor of valores) select.appendChild(new Option(valor,valor));
+}
+definirOpcoes($('p-cenario'),Object.keys(contextosDnd),'Escolha um cenário');
+function atualizarContextoDnd() {
+  const contexto=contextosDnd[$('p-cenario').value];
+  const atual=$('p-especialidade').value;
+  definirOpcoes($('p-especialidade'),contexto?.papeis||[],'Escolha a especialidade');
+  if (contexto?.papeis.includes(atual)) $('p-especialidade').value=atual;
+  atualizarRecomendacaoNarrativa();
+}
+function atualizarRecomendacaoNarrativa(){
+  const contexto=contextosDnd[$('p-cenario').value];
+  const especialidade=$('p-especialidade').value;
+  const classe=$('p-classe').value;
+  const sugeridas=contexto?.dicas[especialidade]||[];
+  let texto=contexto?.texto||'Escolha um cenário para receber sugestões relacionadas à aventura.';
+  if(especialidade) texto+=' Para '+especialidade.toLowerCase()+', considere '+sugeridas.join(', ')+'.';
+  if(classe && sugeridas.length) texto+=' Sua classe atual ('+classe+') '+(sugeridas.includes(classe)?'é uma opção coerente.':'também pode funcionar com uma interpretação própria.');
+  $('p-contexto').textContent=texto+' A escolha narrativa não concede bônus mecânicos.';
+  $('p-aplicar-contexto').disabled=!sugeridas.length;
+  atualizarSugestaoClasse();
+}
+$('p-cenario').onchange=atualizarContextoDnd;
+$('p-especialidade').onchange=atualizarRecomendacaoNarrativa;
+$('p-classe').addEventListener('change',atualizarRecomendacaoNarrativa);
+$('p-aplicar-contexto').onclick=()=>{
+  const sugeridas=contextosDnd[$('p-cenario').value]?.dicas[$('p-especialidade').value]||[];
+  if (!sugeridas.length)return;
+  if ($('p-classe').value && $('p-classe').value !== sugeridas[0] &&
+      !confirm('Trocar a classe para '+sugeridas[0]+'? Isso altera a previsão de PV.')) return;
+  $('p-classe').value=sugeridas[0];
+  atualizarSugestaoClasse();atualizarResumoDnd();atualizarRecomendacaoNarrativa();
+};
+$('p-aventura').onchange=()=>{
+  const a=aventurasFicha.find(x=>String(x.id)===$('p-aventura').value);
+  if (a && contextosDnd[a.genero]) {
+    $('p-cenario').value=a.genero;
+    atualizarContextoDnd();
+  }
+};
+async function carregarAventurasDaFicha(){
+  const op=$('p-aventura');
+  const escolhido=op.value;
+  try{
+    aventurasFicha=await api('/api/aventuras');
+    op.replaceChildren(new Option('Nenhuma aventura vinculada',''));
+    for(const a of aventurasFicha) op.appendChild(new Option((a.conteudo?.titulo||a.genero||'Aventura').slice(0,70),String(a.id)));
+    if([...op.options].some(o=>o.value===escolhido))op.value=escolhido;
+  }catch(e){aventurasFicha=[];op.replaceChildren(new Option('Aventuras indisponíveis',''));}
 }
 
 // ---- Fichas D&D 5e 2024: atributos-base e compra com 27 pontos ----
@@ -235,6 +325,7 @@ function limparFicha(){
   $('p-remover').hidden=true;
   atualizarPontosDnd();
   atualizarSugestaoClasse();
+  $('p-cenario').value='';atualizarContextoDnd();$('p-aventura').value='';$('p-funcao').value='';
 }
 $('nova-ficha').onclick=limparFicha;
 async function carregarPersonagens(){
@@ -254,6 +345,12 @@ async function carregarPersonagens(){
         $('p-antecedente').value=d.antecedente||'';
         $('p-nivel').value=d.nivel||1;
         $('p-notas').value=d.notas||'';
+        $('p-cenario').value=contextosDnd[d.cenario]?d.cenario:'';
+        atualizarContextoDnd();
+        $('p-especialidade').value=contextosDnd[d.cenario]?.papeis.includes(d.especialidade)?d.especialidade:'';
+        $('p-funcao').value=d.funcao||'';
+        $('p-aventura').value=String(d.aventuraId||'');
+        atualizarRecomendacaoNarrativa();
         for(const [sigla] of atributosDnd) $('at-'+sigla).value=String(d.atributos[sigla]||8);
         $('ficha-form-titulo').textContent='Editar personagem';
         $('p-remover').hidden=false;
@@ -270,7 +367,9 @@ $('f-personagem').onsubmit=async ev=>{
   if(pontosDnd()>27){aviso('Você ultrapassou 27 pontos. Ajuste os atributos.');return;}
   const dados={edicao:'2024',metodo:'compra27',nome:$('p-nome').value.trim(),classe:$('p-classe').value.trim(),
     especie:$('p-especie').value.trim(),antecedente:$('p-antecedente').value.trim(),
-    nivel:Number($('p-nivel').value),notas:$('p-notas').value.trim(),atributos:{}};
+    nivel:Number($('p-nivel').value),notas:$('p-notas').value.trim(),
+    cenario:$('p-cenario').value,especialidade:$('p-especialidade').value,funcao:$('p-funcao').value,
+    aventuraId:$('p-aventura').value?Number($('p-aventura').value):null,atributos:{}};
   for(const [sigla] of atributosDnd)dados.atributos[sigla]=Number($('at-'+sigla).value);
   const botao=$('f-personagem').querySelector('button[type="submit"]');botao.disabled=true;
   try{
