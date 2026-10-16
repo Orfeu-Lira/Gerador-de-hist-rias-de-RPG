@@ -79,17 +79,11 @@
       <div class="folha"><div class="painel-titulo"><h2>Minha biblioteca</h2><button id="nova-ficha" class="guia-abrir" type="button">+ Nova ficha</button></div><div id="personagens-lista"></div><p class="suave">As fichas são privadas e ficam vinculadas à sua conta.</p></div>
       <form id="f-personagem" class="folha" autocomplete="off">
         <h2 id="ficha-form-titulo">Nova personagem</h2>
-        <div class="grade grade-ficha">
-          <div><label for="p-nome">Nome</label><input id="p-nome" maxlength="100" required placeholder="Nome da personagem"></div>
-          <div class="campo-dnd"><label for="p-classe">Classe para o cálculo de PV</label><select id="p-classe"><option value="">Selecione uma classe</option><option>Bárbaro</option><option>Bardo</option><option>Bruxo</option><option>Clérigo</option><option>Druida</option><option>Feiticeiro</option><option>Guerreiro</option><option>Ladino</option><option>Mago</option><option>Monge</option><option>Paladino</option><option>Patrulheiro</option></select></div>
-          <div class="campo-dnd"><label for="p-nivel">Nível</label><input id="p-nivel" type="number" min="1" max="20" value="1" required></div>
-          <div class="campo-dnd"><label for="p-especie">Espécie</label><input id="p-especie" maxlength="70" placeholder="Ex.: Humano"></div>
-          <div class="campo-dnd"><label for="p-antecedente">Antecedente</label><input id="p-antecedente" maxlength="70" placeholder="Ex.: Sábio"></div>
-        </div>
         <div class="cenario-ficha">
           <span class="sobretitulo">PERSONAGEM & HISTÓRIA</span><h3>Onde essa personagem se encaixa?</h3>
           <p class="suave">Associe a uma aventura ou escolha o cenário primeiro. O Mesa mostrará apenas as escolhas adequadas a esse universo.</p>
-          <div class="grade grade-ficha">
+          <p id="p-selecione-cenario" class="contexto-ajuda">Comece escolhendo o tipo de história ou vinculando uma aventura do seu histórico.</p>
+        <div class="grade grade-ficha">
             <div><label for="p-aventura">Aventura do Mesa (opcional)</label><select id="p-aventura"><option value="">Nenhuma aventura vinculada</option></select></div>
             <div><label for="p-cenario">Tipo de história</label><select id="p-cenario"><option value="">Escolha um cenário</option></select></div>
             <div id="campo-especialidade"><label for="p-especialidade">Especialidade da história</label><select id="p-especialidade"><option value="">Escolha a especialidade</option></select></div>
@@ -97,6 +91,13 @@
           </div>
           <p id="p-contexto" class="contexto-ajuda">Escolha uma história para receber sugestões de funções e estilos que combinem com ela.</p>
           <button id="p-aplicar-contexto" type="button" class="guia-abrir" hidden disabled>Usar sugestão para esta história</button>
+        </div>
+        <div class="grade grade-ficha">
+          <div><label for="p-nome">Nome</label><input id="p-nome" maxlength="100" required placeholder="Nome da personagem"></div>
+          <div class="campo-dnd"><label for="p-classe">Classe para o cálculo de PV</label><select id="p-classe"><option value="">Selecione uma classe</option><option>Bárbaro</option><option>Bardo</option><option>Bruxo</option><option>Clérigo</option><option>Druida</option><option>Feiticeiro</option><option>Guerreiro</option><option>Ladino</option><option>Mago</option><option>Monge</option><option>Paladino</option><option>Patrulheiro</option></select></div>
+          <div class="campo-dnd"><label for="p-nivel">Nível</label><input id="p-nivel" type="number" min="1" max="20" value="1" required></div>
+          <div class="campo-dnd"><label for="p-especie">Espécie</label><input id="p-especie" maxlength="70" placeholder="Ex.: Humano"></div>
+          <div class="campo-dnd"><label for="p-antecedente">Antecedente</label><input id="p-antecedente" maxlength="70" placeholder="Ex.: Sábio"></div>
         </div>
         <div id="p-regras-dnd"><div class="painel-titulo"><div><h3>Compra de atributos</h3><p class="suave">27 pontos para os seis atributos. Valores iniciais de 8 a 15.</p></div><div id="p-pontos" class="pontos-contador" aria-live="polite">0 gastos • 27 restantes</div></div>
         <div class="sugestao-classe"><div><span class="sobretitulo">DISTRIBUIÇÃO RECOMENDADA</span><h3>Sugestão para sua classe</h3><p id="p-recomendacao" class="suave" aria-live="polite">Escolha uma classe para ver os atributos que vale a pena priorizar.</p></div><button type="button" id="p-aplicar-sugestao" class="guia-abrir" disabled>Aplicar sugestão de 27 pontos</button></div>
