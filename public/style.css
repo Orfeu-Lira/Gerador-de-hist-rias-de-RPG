@@ -210,3 +210,12 @@ body.tela-acesso .menu-legenda,body.tela-acesso .menu-rodape{display:none}
 .avatar-upload{display:inline-flex;cursor:pointer;margin:9px 12px 8px 0}
 .avatar-acoes:has(input:disabled) .avatar-upload{opacity:.5;cursor:not-allowed}
 @media(max-width:560px){.avatar-painel{justify-content:center;text-align:center}.avatar-moldura{margin:auto}.avatar-acoes{min-width:100%}}
+
+/* Geração de retrato por IA */
+.avatar-ia-editor{display:grid;gap:7px;margin:13px 0;padding:13px;border-radius:10px;border:1px solid #d5bd90;background:#faf0d9}
+.avatar-ia-editor label{font-size:.82rem;font-weight:700;color:#69422b}
+.avatar-ia-editor textarea{resize:vertical;min-height:65px}
+.avatar-ia-editor select,.avatar-ia-editor textarea{width:100%;max-width:100%}
+.avatar-ia-editor button{justify-self:start;margin-top:7px;white-space:normal}
+.avatar-ia-editor button:disabled{opacity:.6;cursor:wait}
+.avatar-ia-editor .suave{margin-top:4px;font-size:.75rem}
