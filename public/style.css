@@ -114,3 +114,26 @@ body.tela-acesso .menu-legenda,body.tela-acesso .menu-rodape{display:none}
 .admin-explicacao label{margin-top:12px}
 .recuperar-atalho{text-align:right;font-size:.86rem;margin:9px 0}
 @media(max-width:620px){.guia-grade{grid-template-columns:repeat(2,minmax(0,1fr))}.guia-abertura{align-items:flex-start}.guia-abrir{width:100%}}
+
+/* D&D 2024 — biblioteca e editor de personagens */
+.ficha-layout{display:grid;grid-template-columns:minmax(250px,.75fr) minmax(0,1.7fr);gap:18px;align-items:start}
+.painel-titulo{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:20px;flex-wrap:wrap}
+.painel-titulo h2,.painel-titulo h3{margin:0}
+.painel-titulo p{margin:6px 0}
+.personagem-item{display:block;width:100%;margin:9px 0;padding:13px 14px;background:#fffaf1;color:#433323;border:1px solid #d4c29f;border-radius:9px;text-align:left;cursor:pointer;font-weight:600}
+.personagem-item:hover{border-color:#a95036;background:#fff}
+.grade-ficha{grid-template-columns:repeat(2,minmax(0,1fr))}
+.atributos-grade{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;margin:22px 0}
+.atributo-item{background:#fffaf0;border:1px solid #d8c7a5;border-radius:11px;padding:13px}
+.atributo-item label{text-align:center}
+.atributo-item select{min-height:42px;padding:8px}
+.atributo-mod{display:block;text-align:center;font-weight:700;color:#864634}
+.pontos-contador{background:#e5ddc8;border:1px solid #cbbb9c;padding:10px;border-radius:10px;font-weight:700;color:#345448}
+.pontos-contador.invalido{background:#f8d8d4;color:#9b302a}
+.ficha-ajuda{border-left:3px solid #a95036;background:#fff7e9;padding:15px;border-radius:5px;margin-bottom:22px;color:#5b4a33;font-size:.9rem}
+.apagar-ficha{background:transparent;color:#96462d;border:1px solid #b78e7a;padding:11px 15px;border-radius:9px;cursor:pointer}
+.assistente-painel{max-width:850px}
+.assistente-painel>p{color:#71614e}
+.assistente-resposta:not(:empty){white-space:pre-wrap;margin-top:22px;border:1px solid #d9c6a5;background:#fffbf2;border-radius:12px;padding:24px;color:#423525;line-height:1.75}
+@media(max-width:1030px){.ficha-layout{grid-template-columns:1fr}}
+@media(max-width:650px){.atributos-grade{grid-template-columns:repeat(2,minmax(0,1fr))}.grade-ficha{grid-template-columns:1fr}}
