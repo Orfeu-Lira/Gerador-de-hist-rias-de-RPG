@@ -86,6 +86,18 @@
           <div><label for="p-especie">Espécie</label><input id="p-especie" maxlength="70" placeholder="Ex.: Humano"></div>
           <div><label for="p-antecedente">Antecedente</label><input id="p-antecedente" maxlength="70" placeholder="Ex.: Sábio"></div>
         </div>
+        <div class="cenario-ficha">
+          <span class="sobretitulo">PERSONAGEM & HISTÓRIA</span><h3>Onde essa personagem se encaixa?</h3>
+          <p class="suave">Associe a uma aventura que você criou ou escolha um cenário. A especialidade define o papel na história, sem mudar as regras oficiais de classe do D&D.</p>
+          <div class="grade grade-ficha">
+            <div><label for="p-aventura">Aventura do Mesa (opcional)</label><select id="p-aventura"><option value="">Nenhuma aventura vinculada</option></select></div>
+            <div><label for="p-cenario">Tipo de história</label><select id="p-cenario"><option value="">Escolha um cenário</option></select></div>
+            <div><label for="p-especialidade">Especialidade narrativa</label><select id="p-especialidade"><option value="">Escolha a especialidade</option></select></div>
+            <div><label for="p-funcao">Função no grupo (opcional)</label><select id="p-funcao"><option value="">Sem função definida</option><option value="Defensor">Defensor</option><option value="Explorador">Explorador</option><option value="Investigador">Investigador</option><option value="Negociador">Negociador</option><option value="Curandeiro">Curandeiro</option><option value="Especialista em combate">Especialista em combate</option></select></div>
+          </div>
+          <p id="p-contexto" class="contexto-ajuda">Escolha uma história para receber sugestões de funções e estilos que combinem com ela.</p>
+          <button id="p-aplicar-contexto" type="button" class="guia-abrir" disabled>Usar sugestão para esta história</button>
+        </div>
         <div class="painel-titulo"><div><h3>Compra de atributos</h3><p class="suave">27 pontos para os seis atributos. Valores iniciais de 8 a 15.</p></div><div id="p-pontos" class="pontos-contador" aria-live="polite">0 gastos • 27 restantes</div></div>
         <div class="sugestao-classe"><div><span class="sobretitulo">DISTRIBUIÇÃO RECOMENDADA</span><h3>Sugestão para sua classe</h3><p id="p-recomendacao" class="suave" aria-live="polite">Escolha uma classe para ver os atributos que vale a pena priorizar.</p></div><button type="button" id="p-aplicar-sugestao" class="guia-abrir" disabled>Aplicar sugestão de 27 pontos</button></div>
         <div id="p-atributos" class="atributos-grade"></div>
