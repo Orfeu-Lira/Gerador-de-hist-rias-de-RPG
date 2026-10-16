@@ -174,3 +174,14 @@ body.tela-acesso .menu-legenda,body.tela-acesso .menu-rodape{display:none}
 .manter-conectado input{min-height:18px;height:18px;width:18px;accent-color:#a74f35;margin:0;flex-shrink:0}
 .opcoes-login .link{font-size:.84rem}
 .nota-senha{font-size:.77rem;line-height:1.45;margin-bottom:6px}
+
+/* Trilha pesquisada no Google com auxílio do Gemini */
+.musica-recomendacao{background:#fff8e8;border:1px solid #d9c7a7;border-radius:12px;padding:17px 20px;margin-top:14px}
+.musica-recomendacao .guia-abrir{margin:14px 0}
+.musica-recomendacao .guia-abrir:disabled{opacity:.65;cursor:wait}
+.musica-links:not(:empty){border-top:1px solid #d9c7a7;padding-top:14px;margin-top:3px}
+.musica-links p{color:#574735}
+.musica-links ul{padding-left:18px}
+.musica-links li{margin:7px 0}
+.musica-links a{color:#864431;font-weight:700;overflow-wrap:anywhere;text-decoration:underline}
+.musica-links a:hover{color:#a95036}
