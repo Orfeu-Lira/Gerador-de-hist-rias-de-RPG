@@ -33,6 +33,7 @@ function aviso(texto, bom) { const a = $('aviso'); a.textContent = texto || ''; 
 // ---- Navegação entre telas ----
 const TELAS = ['gerador', 'dados', 'historico', 'conta', 'admin'];
 function mostrar(tela) {
+  document.body.classList.toggle('tela-acesso', tela === 'conta');
   TELAS.forEach((t) => { $('v-' + t).hidden = t !== tela; });
   document.querySelectorAll('#nav button[data-tela]').forEach((b) => b.setAttribute('aria-current', b.dataset.tela === tela));
   aviso('');
@@ -127,6 +128,7 @@ async function carregarHistorico() {
 }
 
 // ---- Conta ----
+$('voltar-inicio').onclick = () => mostrar('gerador');
 $('ir-cadastro').onclick = () => { $('f-login').hidden = true; $('f-cadastro').hidden = false; };
 $('ir-login').onclick = () => { $('f-cadastro').hidden = true; $('f-login').hidden = false; };
 async function entrar(url, email, senha, tokenBootstrap) {
