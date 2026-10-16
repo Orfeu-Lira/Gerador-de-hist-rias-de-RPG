@@ -444,6 +444,7 @@ app.post('/api/personagens/:id/avatar/gerar',gerarAvatarLimite,asyncHandler(asyn
   const maximo=acesso.u.papel==='admin'?6:2;
   const uso=await query('INSERT INTO public.geracoes_limite(identificador,total) VALUES($1,1) ON CONFLICT(identificador) DO UPDATE SET total=public.geracoes_limite.total+1 WHERE public.geracoes_limite.total<$2 RETURNING total',[chave,maximo]);
   if(!uso.rowCount)return res.status(429).json({erro:'Você atingiu o limite de avatares gerados com IA hoje.'});
+  let geracaoConcluida=false;
   try {
     const prompt=[
       'Crie UMA imagem quadrada (proporção 1:1) para um avatar de personagem fictício de RPG.',
@@ -477,12 +478,15 @@ app.post('/api/personagens/:id/avatar/gerar',gerarAvatarLimite,asyncHandler(asyn
     const img=parte?.inlineData?.data, mime=parte?.inlineData?.mimeType;
     if(!img||!['image/png','image/jpeg','image/webp'].includes(mime)||img.length>4300000)
       return res.status(503).json({erro:'A IA não retornou uma imagem compatível. Tente novamente.'});
+    geracaoConcluida=true;
     res.json({imagem:img,mimeType:mime});
   }catch(e){
     console.error('Falha avatar IA:',e.name);
     res.status(503).json({erro:'A geração demorou ou ficou indisponível. Tente novamente mais tarde.'});
   }
-  // O consumo foi contabilizado para evitar solicitações ilimitadas.
+  finally {
+    if(!geracaoConcluida) await query('UPDATE public.geracoes_limite SET total=GREATEST(0,total-1) WHERE identificador=$1',[chave]).catch(()=>{});
+  }
 }));
 app.post('/api/personagens/:id/avatar',asyncHandler(async(req,res)=>{
   const acesso=await avatarDono(req,res);if(!acesso)return;
