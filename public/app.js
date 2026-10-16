@@ -485,6 +485,7 @@ function limparPreviewAvatar(){
 function atualizarEstadoAvatar(){
   const salvo=Boolean(fichaAbertaId);
   $('p-avatar-file').disabled=!salvo;
+  $('p-avatar-gerar').disabled=!salvo;
   $('p-avatar-info').textContent=salvo
     ? 'Envie um retrato. Ele será visível somente para você ao abrir esta ficha.'
     : 'Salve a ficha primeiro e reabra-a para enviar um avatar.';
@@ -530,6 +531,39 @@ async function prepararWebpAvatar(arquivo){
     return base64;
   }finally{URL.revokeObjectURL(url);}
 }
+// IA devolve imagem em formato nativo; o navegador converte para WebP antes
+// de salvar no mesmo bucket privado usado pelo upload manual.
+$('p-avatar-gerar').onclick=async()=>{
+  const id=fichaAbertaId;
+  if(!id)return;
+  const botao=$('p-avatar-gerar');
+  botao.disabled=true;
+  botao.textContent='✦ Criando retrato...';
+  $('p-avatar-info').textContent='A IA está desenhando o retrato; isso pode levar alguns segundos.';
+  try{
+    const gerado=await api('/api/personagens/'+id+'/avatar/gerar','POST',{
+      estilo:$('p-avatar-estilo').value,aparencia:$('p-avatar-aparencia').value.trim()
+    });
+    if(fichaAbertaId!==id)throw new Error('A ficha foi alterada durante a geração. Reabra a personagem.');
+    if(!gerado.imagem||!['image/jpeg','image/png','image/webp'].includes(gerado.mimeType))
+      throw new Error('A IA não retornou uma imagem válida.');
+    const bytes=atob(gerado.imagem);
+    const blob=new Uint8Array(bytes.length);
+    for(let i=0;i<bytes.length;i++)blob[i]=bytes.charCodeAt(i);
+    const arquivo=new File([blob],'avatar-gerado',{type:gerado.mimeType});
+    const imagem=await prepararWebpAvatar(arquivo);
+    if(fichaAbertaId!==id)throw new Error('A ficha foi alterada durante o processamento.');
+    await api('/api/personagens/'+id+'/avatar','POST',{imagem});
+    await carregarAvatar();
+    aviso('Avatar criado com IA e salvo na ficha!',true);
+  }catch(e){
+    aviso(e.message);
+    $('p-avatar-info').textContent='Não foi possível concluir a geração. O avatar anterior foi preservado.';
+  }finally{
+    botao.textContent='✦ Gerar avatar com IA';
+    atualizarEstadoAvatar();
+  }
+};
 $('p-avatar-file').onchange=async()=>{
   const arquivo=$('p-avatar-file').files?.[0],id=fichaAbertaId;
   if(!arquivo||!id)return;
