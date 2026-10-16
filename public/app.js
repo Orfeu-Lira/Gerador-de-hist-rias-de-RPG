@@ -74,38 +74,58 @@ function desenharAventura(a, alvo) {
   if (a.npcs && a.npcs.length) { f.appendChild(el('h3', 'NPCs')); const ul = el('ul'); a.npcs.forEach((n) => ul.appendChild(el('li', n.nome + ': ' + n.descricao))); f.appendChild(ul); }
   if (a.vilao) { f.appendChild(el('h3', 'Vilão')); f.appendChild(el('p', a.vilao)); }
   if (a.trilha) {
-    f.appendChild(el('h3', 'Trilha sonora'));
-    f.appendChild(el('p', a.trilha));
+    f.appendChild(el('h3','Trilha sonora'));
+    f.appendChild(el('p',a.trilha));
     const musica=el('section','','musica-recomendacao');
-    musica.appendChild(el('p','O Mesa pode pesquisar no Google uma trilha que combine com a atmosfera da sua aventura. A busca é opcional e usa a IA.','suave'));
-    const botao=el('button','♫ Encontrar música para esta aventura','guia-abrir');
+    musica.appendChild(el('p','Busque trilhas para a atmosfera da aventura. Links de busca disponíveis mesmo sem IA ou login.','suave'));
+    // Links são PESQUISAS, não faixas verificadas. Não dependem da API Gemini.
+    const termos=('RPG instrumental ambience playlist '+a.trilha).slice(0,170);
+    const opcoes=el('div','','musica-buscas');
+    for(const [nome,base] of [
+      ['♫ Pesquisar no YouTube','https://www.youtube.com/results?search_query='],
+      ['♫ Pesquisar no Spotify','https://open.spotify.com/search/'],
+      ['⌕ Pesquisar no Google','https://www.google.com/search?q=']
+    ]){
+      const link=el('a',nome,'guia-abrir');
+      link.href=base+encodeURIComponent(termos);
+      link.target='_blank';
+      link.rel='noopener noreferrer';
+      opcoes.appendChild(link);
+    }
+    musica.appendChild(opcoes);
+    musica.appendChild(el('p','Esses botões abrem buscas com termos sugeridos pelo Mesa; não são links de músicas verificadas.','suave'));
+    const botao=el('button','✦ Refinar trilha com pesquisa por IA','guia-abrir');
     botao.type='button';
-    const resultado=el('div','','musica-links');resultado.setAttribute('aria-live','polite');
+    const resultado=el('div','','musica-links');
+    resultado.setAttribute('aria-live','polite');
     botao.onclick=async()=>{
+      if(!eu.logado){
+        resultado.replaceChildren(el('p','A pesquisa com IA requer login. Você já pode usar os três links de busca acima.','suave'));
+        return;
+      }
       botao.disabled=true;
-      resultado.replaceChildren(el('p','Pesquisando opções musicais...','suave'));
+      resultado.replaceChildren(el('p','Pesquisando playlists com a IA...','suave'));
       try{
-        const dados=await api('/api/musicas','POST',{estilo:a.trilha,genero:$('genero').value,titulo:a.titulo||''});
+        const dados=await api('/api/musicas','POST',{estilo:a.trilha,titulo:a.titulo||''});
         resultado.replaceChildren();
         if(dados.explicacao)resultado.appendChild(el('p',dados.explicacao));
-        if(Array.isArray(dados.links) && dados.links.length){
+        if(Array.isArray(dados.links)&&dados.links.length){
           const ul=el('ul');
           for(const item of dados.links){
-            if(typeof item.url!=='string' || !item.url.startsWith('https://'))continue;
-            const li=el('li'),link=el('a',item.titulo||'Abrir opção musical');
-            link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';
-            li.appendChild(link);ul.appendChild(li);
+            try{
+              const url=new URL(item.url);
+              if(url.protocol!=='https:')continue;
+              const link=el('a',item.titulo||'Abrir resultado musical');
+              link.href=url.href;link.target='_blank';link.rel='noopener noreferrer';
+              const li=el('li');li.appendChild(link);ul.appendChild(li);
+            }catch{}
           }
           resultado.appendChild(ul);
         }
-        if(dados.buscaGoogle && dados.buscaGoogle.startsWith('https://www.google.com/search?')){
-          const link=el('a','Pesquisar mais opções no Google ↗');
-          link.href=dados.buscaGoogle;link.target='_blank';link.rel='noopener noreferrer';
-          resultado.appendChild(link);
-        }
         if(dados.aviso)resultado.appendChild(el('p',dados.aviso,'suave'));
-      }catch(e){resultado.replaceChildren(el('p',e.message,'suave'));}
-      finally{botao.disabled=false;}
+      }catch(e){
+        resultado.replaceChildren(el('p',e.message+' Você ainda pode pesquisar pelo YouTube, Spotify ou Google nos links acima.','suave'));
+      }finally{botao.disabled=false;}
     };
     musica.append(botao,resultado);
     f.appendChild(musica);
