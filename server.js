@@ -1,255 +1,189 @@
-// server.js — o "cérebro" do site. Aqui ficam as regras que o navegador NÃO pode burlar:
-// login, limites de uso, permissões e a chamada à IA.
-const path = require('path');
+// Mesa — backend Express preparado para Vercel com PostgreSQL/Supabase.
 const crypto = require('crypto');
 const express = require('express');
 const session = require('express-session');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
-const db = require('./db');
+const { query } = require('./postgres');
 const { gerarAventura } = require('./ia');
 
-if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32) {
-  console.error('Defina SESSION_SECRET com pelo menos 32 caracteres.');
-  process.exit(1);
-}
 const PRODUCAO = process.env.NODE_ENV === 'production';
-const ORIGEM_FRONTEND = (process.env.FRONTEND_ORIGIN || '').replace(/\/+$/, '');
-if (PRODUCAO && !ORIGEM_FRONTEND) {
-  console.error('Defina FRONTEND_ORIGIN com a origem HTTPS exata do GitHub Pages.');
-  process.exit(1);
+const ORIGEM = (process.env.FRONTEND_ORIGIN || '').replace(/\/+$/, '');
+if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32) {
+  throw new Error('Configure SESSION_SECRET com no mínimo 32 caracteres.');
 }
-const ADMIN_BOOTSTRAP_TOKEN = process.env.ADMIN_BOOTSTRAP_TOKEN || '';
-const ADMINISTRADOR_INICIALIZADO = !!db.prepare("SELECT 1 FROM usuarios WHERE papel = 'admin' LIMIT 1").get();
-if (PRODUCAO && !ADMINISTRADOR_INICIALIZADO && ADMIN_BOOTSTRAP_TOKEN.length < 32) {
-  console.error('Defina ADMIN_BOOTSTRAP_TOKEN com pelo menos 32 caracteres.');
-  process.exit(1);
+if (PRODUCAO && (!ORIGEM || new URL(ORIGEM).origin !== ORIGEM || !ORIGEM.startsWith('https://'))) {
+  throw new Error('Configure FRONTEND_ORIGIN com a origem HTTPS do GitHub Pages.');
 }
-if (ORIGEM_FRONTEND) {
-  try {
-    const origem = new URL(ORIGEM_FRONTEND);
-    if (origem.origin !== ORIGEM_FRONTEND || (PRODUCAO && origem.protocol !== 'https:')) throw new Error();
-  } catch {
-    console.error('FRONTEND_ORIGIN deve conter apenas protocolo e host, sem caminho.');
-    process.exit(1);
+if (PRODUCAO && (!process.env.ADMIN_BOOTSTRAP_TOKEN || process.env.ADMIN_BOOTSTRAP_TOKEN.length < 32)) {
+  throw new Error('Configure ADMIN_BOOTSTRAP_TOKEN (32+ caracteres).');
+}
+if (!process.env.GEMINI_API_KEY) throw new Error('Configure GEMINI_API_KEY.');
+
+class PostgresSessionStore extends session.Store {
+  get(sid, cb) {
+    query('SELECT sessao FROM public.sessoes WHERE sid=$1 AND expira_em>$2', [sid, Date.now()])
+      .then(r => cb(null, r.rows[0] ? r.rows[0].sessao : null)).catch(cb);
   }
+  set(sid, sessao, cb) {
+    const cookie = sessao.cookie || {};
+    const expira = cookie.expires ? new Date(cookie.expires).getTime() : Date.now() + (cookie.originalMaxAge || 604800000);
+    query('INSERT INTO public.sessoes(sid,sessao,expira_em) VALUES($1,$2::jsonb,$3) ON CONFLICT(sid) DO UPDATE SET sessao=EXCLUDED.sessao, expira_em=EXCLUDED.expira_em',
+      [sid, JSON.stringify(sessao), expira]).then(() => cb && cb(null)).catch(e => cb && cb(e));
+  }
+  destroy(sid, cb) {
+    query('DELETE FROM public.sessoes WHERE sid=$1', [sid]).then(() => cb && cb(null)).catch(e => cb && cb(e));
+  }
+  touch(sid, sessao, cb) { this.set(sid, sessao, cb); }
 }
-const LIMITE_USUARIO_DIA = 5; // gerações por dia no plano grátis
-const LIMITE_VISITANTE = 1;   // gerações de quem testa sem login
-const GENEROS = ['Fantasia sombria', 'Fantasia épica', 'Ficção científica', 'Terror', 'Investigação', 'Piratas e mares'];
-const TONS = ['Misterioso', 'Aventureiro', 'Sombrio', 'Leve e bem-humorado', 'Tenso'];
-// Hash falso, usado para o login demorar o mesmo tempo quando o e-mail não existe.
-const HASH_FALSO = bcrypt.hashSync('senha-falsa-para-igualar-o-tempo', 12);
 
 const app = express();
-
-// --- Camadas de proteção (middlewares) ---
-app.use(helmet({ contentSecurityPolicy: { useDefaults: true, directives: { 'upgrade-insecure-requests': null } } }));
-if (PRODUCAO) app.set('trust proxy', 1);
-app.use((req, res, next) => {
-  const origem = req.get('Origin');
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use((req,res,next) => {
+  const origin = req.get('Origin');
   res.vary('Origin');
-  if (origem && ORIGEM_FRONTEND && origem !== ORIGEM_FRONTEND) {
-    return res.status(403).json({ erro: 'Origem não permitida.' });
-  }
-  if (origem && origem === ORIGEM_FRONTEND) {
+  if (origin && origin !== ORIGEM) return res.status(403).json({ erro: 'Origem não permitida.' });
+  if (origin && origin === ORIGEM) {
     res.set({
-      'Access-Control-Allow-Origin': ORIGEM_FRONTEND,
+      'Access-Control-Allow-Origin': ORIGEM,
       'Access-Control-Allow-Credentials': 'true',
-      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type'
     });
   }
-  if (req.method === 'OPTIONS') return res.sendStatus(origem === ORIGEM_FRONTEND ? 204 : 403);
-  if (PRODUCAO && ['POST', 'DELETE'].includes(req.method) && req.path.startsWith('/api/') && origem !== ORIGEM_FRONTEND) {
+  if (req.method === 'OPTIONS') return res.sendStatus(origin === ORIGEM ? 204 : 403);
+  if (PRODUCAO && ['POST', 'DELETE'].includes(req.method) && req.path.startsWith('/api/') && origin !== ORIGEM) {
     return res.status(403).json({ erro: 'Origem não permitida.' });
   }
   next();
 });
 app.use(express.json({ limit: '10kb' }));
-class SQLiteSessionStore extends session.Store {
-  get(sid, callback) {
-    try {
-      const row = db.prepare('SELECT sessao FROM sessoes WHERE sid = ? AND expira_em > ?').get(sid, Date.now());
-      callback(null, row ? JSON.parse(row.sessao) : null);
-    } catch (err) { callback(err); }
-  }
-  set(sid, sessao, callback) {
-    try {
-      const cookie = sessao.cookie || {};
-      const expiraEm = cookie.expires ? new Date(cookie.expires).getTime() : Date.now() + (cookie.originalMaxAge || 7 * 24 * 3600 * 1000);
-      db.prepare('INSERT INTO sessoes (sid, sessao, expira_em) VALUES (?, ?, ?) ON CONFLICT(sid) DO UPDATE SET sessao = excluded.sessao, expira_em = excluded.expira_em')
-        .run(sid, JSON.stringify(sessao), expiraEm);
-      if (callback) callback(null);
-    } catch (err) { if (callback) callback(err); }
-  }
-  destroy(sid, callback) {
-    try {
-      db.prepare('DELETE FROM sessoes WHERE sid = ?').run(sid);
-      if (callback) callback(null);
-    } catch (err) { if (callback) callback(err); }
-  }
-  touch(sid, sessao, callback) {
-    try {
-      const cookie = sessao.cookie || {};
-      const expiraEm = cookie.expires ? new Date(cookie.expires).getTime() : Date.now() + (cookie.originalMaxAge || 7 * 24 * 3600 * 1000);
-      db.prepare('UPDATE sessoes SET expira_em = ? WHERE sid = ?').run(expiraEm, sid);
-      if (callback) callback(null);
-    } catch (err) { if (callback) callback(err); }
-  }
-}
-db.prepare('DELETE FROM sessoes WHERE expira_em <= ?').run(Date.now());
-const limpezaSessoes = setInterval(() => db.prepare('DELETE FROM sessoes WHERE expira_em <= ?').run(Date.now()), 60 * 60 * 1000);
-limpezaSessoes.unref();
 app.use(session({
-  name: 'mesa.sid',
-  secret: process.env.SESSION_SECRET,
-  store: new SQLiteSessionStore(),
-  resave: false,
-  saveUninitialized: false,
-  cookie: { httpOnly: true, sameSite: PRODUCAO ? 'none' : 'lax', secure: PRODUCAO, maxAge: 7 * 24 * 3600 * 1000 }
+  name: 'mesa.sid', secret: process.env.SESSION_SECRET,
+  store: new PostgresSessionStore(), resave: false, saveUninitialized: false,
+  cookie: { httpOnly: true, secure: PRODUCAO, sameSite: PRODUCAO ? 'none' : 'lax', maxAge: 604800000 }
 }));
-const limiteLogin = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, message: { erro: 'Muitas tentativas. Aguarde alguns minutos.' } });
-const limiteGerar = rateLimit({ windowMs: 60 * 1000, limit: 10, message: { erro: 'Muitos pedidos. Aguarde um minuto.' } });
 
-// --- Funções de apoio ---
-const usuarioAtual = (req) =>
-  req.session.userId ? db.prepare('SELECT id, email, papel FROM usuarios WHERE id = ?').get(req.session.userId) : null;
-
-const usadasHoje = (id) =>
-  db.prepare("SELECT COUNT(*) AS n FROM aventuras WHERE usuario_id = ? AND date(criado_em) = date('now')").get(id).n;
-
-const visitanteUsou = (req) => {
-  const linha = db.prepare('SELECT total FROM testes_visitante WHERE ip = ?').get(req.ip);
-  return Math.max(req.session.testes || 0, linha ? linha.total : 0); // vale o maior: cookie OU IP
+const GENEROS = ['Fantasia sombria','Fantasia épica','Ficção científica','Terror','Investigação','Piratas e mares'];
+const TONS = ['Misterioso','Aventureiro','Sombrio','Leve e bem-humorado','Tenso'];
+const HASH_FALSO = bcrypt.hashSync('senha-falsa-para-proteger-tempo-de-resposta', 12);
+const emailValido = s => typeof s === 'string' && s.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+const senhaValida = s => typeof s === 'string' && s.length >= 8 && s.length <= 72;
+const asyncHandler = f => (req,res,next) => Promise.resolve(f(req,res,next)).catch(next);
+const atual = async req => {
+  if (!req.session.userId) return null;
+  const r = await query('SELECT id,email,papel FROM public.usuarios WHERE id=$1', [req.session.userId]);
+  return r.rows[0] || null;
+};
+const quotaKey = (req,u) => u
+  ? 'usuario:' + u.id + ':' + new Date().toISOString().slice(0,10)
+  : 'visitante:' + (req.ip || 'desconhecido');
+const usadas = async chave => Number((await query('SELECT total FROM public.geracoes_limite WHERE identificador=$1',[chave])).rows[0]?.total || 0);
+const restantes = async (req,u) => u && u.papel === 'admin' ? null : Math.max(0,(u ? 5 : 1) - await usadas(quotaKey(req,u)));
+const refreshSession = (req, userId) => new Promise((resolve,reject) => req.session.regenerate(err => {
+  if (err) return reject(err);
+  req.session.userId = userId; req.session.save(err2 => err2 ? reject(err2) : resolve());
+}));
+const compareSecret = (received, secret) => {
+  if (typeof received !== 'string' || !secret || !received) return false;
+  const a = Buffer.from(received), b = Buffer.from(secret);
+  return a.length === b.length && crypto.timingSafeEqual(a,b);
 };
 
-function restantes(req, usuario) {
-  if (usuario) return usuario.papel === 'admin' ? null : Math.max(0, LIMITE_USUARIO_DIA - usadasHoje(usuario.id));
-  return Math.max(0, LIMITE_VISITANTE - visitanteUsou(req));
-}
-
-const emailValido = (e) => typeof e === 'string' && e.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
-const senhaValida = (s) => typeof s === 'string' && s.length >= 8 && s.length <= 72; // bcrypt só usa 72 caracteres
-const administradorExiste = () => !!db.prepare("SELECT 1 FROM usuarios WHERE papel = 'admin' LIMIT 1").get();
-function tokenBootstrapValido(token) {
-  if (!ADMIN_BOOTSTRAP_TOKEN || typeof token !== 'string') return false;
-  const informado = Buffer.from(token);
-  const esperado = Buffer.from(ADMIN_BOOTSTRAP_TOKEN);
-  return informado.length === esperado.length && crypto.timingSafeEqual(informado, esperado);
-}
-
-function exigirAdmin(req, res, next) {
-  const u = usuarioAtual(req);
-  if (!u || u.papel !== 'admin') return res.status(403).json({ erro: 'Acesso negado.' });
-  next();
-}
-
-// --- Rotas de conta ---
-app.post('/api/cadastro', limiteLogin, (req, res) => {
-  const { email, senha, tokenBootstrap } = req.body || {};
-  if (!emailValido(email) || !senhaValida(senha)) {
-    return res.status(400).json({ erro: 'Use um e-mail válido e uma senha de 8 a 72 caracteres.' });
-  }
-  const emailLimpo = email.trim().toLowerCase();
-  const papel = !administradorExiste() && tokenBootstrapValido(tokenBootstrap) ? 'admin' : 'usuario';
+app.post('/api/cadastro', asyncHandler(async(req,res) => {
+  const {email,senha,tokenBootstrap} = req.body || {};
+  if (!emailValido(email) || !senhaValida(senha)) return res.status(400).json({erro:'Use um e-mail válido e senha de 8 a 72 caracteres.'});
+  const hash = await bcrypt.hash(senha,12);
+  const { pool } = require('./postgres');
+  const client = await pool.connect();
+  let id;
   try {
-    // "?" = parâmetro: o valor vai separado do SQL. Isso impede SQL injection.
-    const r = db.prepare('INSERT INTO usuarios (email, senha_hash, papel) VALUES (?, ?, ?)')
-      .run(emailLimpo, bcrypt.hashSync(senha, 12), papel);
-    req.session.regenerate(() => { req.session.userId = Number(r.lastInsertRowid); res.json({ ok: true }); });
-  } catch (e) {
-    res.status(409).json({ erro: 'Não foi possível criar a conta com esses dados.' });
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(18452)');
+    const {rows} = await client.query("SELECT 1 FROM public.usuarios WHERE papel='admin' LIMIT 1");
+    const admin = !rows.length && compareSecret(tokenBootstrap,process.env.ADMIN_BOOTSTRAP_TOKEN);
+    const r = await client.query('INSERT INTO public.usuarios(email,senha_hash,papel) VALUES($1,$2,$3) RETURNING id',
+      [email.trim().toLowerCase(),hash,admin ? 'admin':'usuario']);
+    id = Number(r.rows[0].id);
+    await client.query('COMMIT');
+  } catch(e) {
+    await client.query('ROLLBACK');
+    if (e.code === '23505') return res.status(409).json({erro:'Já existe uma conta com esse e-mail.'});
+    throw e;
+  } finally { client.release(); }
+  await refreshSession(req,id);
+  res.json({ok:true});
+}));
+app.post('/api/login',asyncHandler(async(req,res) => {
+  const {email,senha} = req.body || {};
+  const r = typeof email === 'string' && email.length <= 254
+    ? await query('SELECT id,senha_hash FROM public.usuarios WHERE email=$1',[email.trim().toLowerCase()])
+    : {rows:[]};
+  const u = r.rows[0];
+  const ok = await bcrypt.compare(typeof senha === 'string' ? senha : '',u ? u.senha_hash : HASH_FALSO);
+  if (!u || !ok) return res.status(401).json({erro:'E-mail ou senha incorretos.'});
+  await refreshSession(req,Number(u.id)); res.json({ok:true});
+}));
+app.post('/api/logout', (req,res,next) => {
+  req.session.destroy(e => e ? next(e) : (res.clearCookie('mesa.sid',{sameSite:PRODUCAO?'none':'lax',secure:PRODUCAO}),res.json({ok:true})));
+});
+app.get('/api/eu',asyncHandler(async(req,res) => {
+  const u = await atual(req);
+  res.json({logado:!!u,email:u?.email||null,papel:u?.papel||null,restantes:await restantes(req,u)});
+}));
+app.post('/api/gerar',asyncHandler(async(req,res) => {
+  const {genero,tom,ideia} = req.body || {};
+  const jogadores=Number(req.body?.jogadores);
+  if (!GENEROS.includes(genero)||!TONS.includes(tom)||!Number.isInteger(jogadores)||jogadores<1||jogadores>20) {
+    return res.status(400).json({erro:'Dados inválidos.'});
   }
-});
-
-app.post('/api/login', limiteLogin, (req, res) => {
-  const { email, senha } = req.body || {};
-  const u = typeof email === 'string' ? db.prepare('SELECT * FROM usuarios WHERE email = ?').get(email.trim().toLowerCase()) : null;
-  const ok = bcrypt.compareSync(typeof senha === 'string' ? senha : '', u ? u.senha_hash : HASH_FALSO);
-  if (!u || !ok) return res.status(401).json({ erro: 'E-mail ou senha incorretos.' }); // mensagem genérica de propósito
-  req.session.regenerate(() => { req.session.userId = u.id; res.json({ ok: true }); });
-});
-
-app.post('/api/logout', (req, res) => {
-  req.session.destroy(() => { res.clearCookie('mesa.sid'); res.json({ ok: true }); });
-});
-
-app.get('/api/eu', (req, res) => {
-  const u = usuarioAtual(req);
-  res.json({ logado: !!u, email: u ? u.email : null, papel: u ? u.papel : null, restantes: restantes(req, u) });
-});
-
-// --- Gerador ---
-const ocupados = new Set(); // impede dois pedidos ao mesmo tempo da mesma pessoa (burlaria o limite)
-
-app.post('/api/gerar', limiteGerar, async (req, res) => {
-  const { genero, tom, ideia } = req.body || {};
-  const jogadores = Number((req.body || {}).jogadores);
-  // Nunca confie no que vem do navegador: valide tudo de novo aqui.
-  if (!GENEROS.includes(genero) || !TONS.includes(tom) || !Number.isInteger(jogadores) || jogadores < 1 || jogadores > 20) {
-    return res.status(400).json({ erro: 'Dados inválidos.' });
+  const u=await atual(req);
+  const key=quotaKey(req,u);
+  const limit=u?5:1;
+  const bypass=u?.papel==='admin';
+  if (!bypass) {
+    const claimed=await query(
+      'INSERT INTO public.geracoes_limite(identificador,total) VALUES($1,1) ON CONFLICT(identificador) DO UPDATE SET total=public.geracoes_limite.total+1 WHERE public.geracoes_limite.total<$2 RETURNING total',
+      [key,limit]);
+    if (!claimed.rowCount) return res.status(403).json({erro:u?'Você usou todas as gerações de hoje.':'O teste grátis acabou. Crie uma conta para continuar.',codigo:u?'limite_diario':'limite_visitante'});
   }
-  const ideiaLimpa = typeof ideia === 'string' ? ideia.trim().slice(0, 200) : '';
-
-  const usuario = usuarioAtual(req);
-  if (restantes(req, usuario) === 0) {
-    return res.status(403).json({ erro: usuario ? 'Você usou todas as gerações de hoje.' : 'O teste grátis acabou. Crie uma conta para continuar.', codigo: usuario ? 'limite_diario' : 'limite_visitante' });
-  }
-  const chave = usuario ? 'u' + usuario.id : 'ip' + req.ip;
-  if (ocupados.has(chave)) return res.status(429).json({ erro: 'Aguarde a geração anterior terminar.' });
-
-  ocupados.add(chave);
   try {
-    const aventura = await gerarAventura({ genero, tom, jogadores, ideia: ideiaLimpa });
-    if (usuario) {
-      db.prepare('INSERT INTO aventuras (usuario_id, genero, tom, jogadores, conteudo) VALUES (?, ?, ?, ?, ?)')
-        .run(usuario.id, genero, tom, jogadores, JSON.stringify(aventura));
-    } else {
-      req.session.testes = (req.session.testes || 0) + 1;
-      db.prepare('INSERT INTO testes_visitante (ip, total) VALUES (?, 1) ON CONFLICT(ip) DO UPDATE SET total = total + 1').run(req.ip);
-    }
-    res.json({ aventura, restantes: restantes(req, usuario) });
-  } catch (e) {
-    console.error('Falha ao gerar:', e.message); // o detalhe fica no servidor, não vai para o usuário
-    res.status(502).json({ erro: 'Não consegui gerar agora. Tente novamente.' });
-  } finally {
-    ocupados.delete(chave);
+    const aventura=await gerarAventura({genero,tom,jogadores,ideia:typeof ideia==='string'?ideia.trim().slice(0,200):''});
+    if (u) await query('INSERT INTO public.aventuras(usuario_id,genero,tom,jogadores,conteudo) VALUES($1,$2,$3,$4,$5::jsonb)',
+      [u.id,genero,tom,jogadores,JSON.stringify(aventura)]);
+    res.json({aventura,restantes:await restantes(req,u)});
+  } catch(e) {
+    if (!bypass) await query('UPDATE public.geracoes_limite SET total=GREATEST(0,total-1) WHERE identificador=$1',[key]).catch(err=>console.error('Falha ao devolver cota',err.code));
+    throw e;
   }
+}));
+app.get('/api/aventuras',asyncHandler(async(req,res)=>{
+  const u=await atual(req);
+  if (!u) return res.status(401).json({erro:'Entre para ver seu histórico.'});
+  const r=await query('SELECT id,genero,tom,jogadores,conteudo,criado_em FROM public.aventuras WHERE usuario_id=$1 ORDER BY id DESC LIMIT 30',[u.id]);
+  res.json(r.rows);
+}));
+app.delete('/api/aventuras/:id',asyncHandler(async(req,res)=>{
+  const u=await atual(req);
+  if(!u) return res.status(401).json({erro:'Entre para continuar.'});
+  const id=Number(req.params.id);
+  if(!Number.isSafeInteger(id)||id<1) return res.status(400).json({erro:'Pedido inválido.'});
+  await query('DELETE FROM public.aventuras WHERE id=$1 AND usuario_id=$2',[id,u.id]);
+  res.json({ok:true});
+}));
+app.get('/api/admin/resumo',asyncHandler(async(req,res)=>{
+  const u=await atual(req);
+  if(u?.papel!=='admin') return res.status(403).json({erro:'Acesso negado.'});
+  const r=await query("SELECT (SELECT COUNT(*) FROM public.usuarios)::int AS usuarios,(SELECT COUNT(*) FROM public.aventuras)::int AS aventuras,(SELECT COUNT(*) FROM public.aventuras WHERE criado_em::date=(now() AT TIME ZONE 'UTC')::date)::int AS hoje");
+  res.json({usuarios:r.rows[0].usuarios,aventuras:r.rows[0].aventuras,aventurasHoje:r.rows[0].hoje});
+}));
+app.use('/api',(req,res)=>res.status(404).json({erro:'Rota não encontrada.'}));
+app.use((err,req,res,next)=>{
+  console.error('Mesa API error:',err.code||err.message);
+  if(res.headersSent) return next(err);
+  res.status(500).json({erro:'Não foi possível concluir a solicitação agora.'});
 });
-
-// --- Histórico (só do próprio usuário) ---
-app.get('/api/aventuras', (req, res) => {
-  const u = usuarioAtual(req);
-  if (!u) return res.status(401).json({ erro: 'Entre para ver seu histórico.' });
-  const linhas = db.prepare('SELECT id, genero, tom, jogadores, conteudo, criado_em FROM aventuras WHERE usuario_id = ? ORDER BY id DESC LIMIT 30').all(u.id);
-  res.json(linhas.map((l) => ({ ...l, conteudo: JSON.parse(l.conteudo) })));
-});
-
-app.delete('/api/aventuras/:id', (req, res) => {
-  const u = usuarioAtual(req);
-  if (!u) return res.status(401).json({ erro: 'Entre para continuar.' });
-  const id = Number(req.params.id);
-  if (!Number.isInteger(id)) return res.status(400).json({ erro: 'Pedido inválido.' });
-  db.prepare('DELETE FROM aventuras WHERE id = ? AND usuario_id = ?').run(id, u.id); // "AND usuario_id" = só apaga o que é seu
-  res.json({ ok: true });
-});
-
-// --- Painel do dono ---
-app.get('/api/admin/resumo', exigirAdmin, (req, res) => {
-  res.json({
-    usuarios: db.prepare('SELECT COUNT(*) AS n FROM usuarios').get().n,
-    aventuras: db.prepare('SELECT COUNT(*) AS n FROM aventuras').get().n,
-    aventurasHoje: db.prepare("SELECT COUNT(*) AS n FROM aventuras WHERE date(criado_em) = date('now')").get().n
-  });
-});
-
-app.use('/api', (req, res) => res.status(404).json({ erro: 'Rota não encontrada.' }));
-app.use(express.static(path.join(__dirname, 'public')));
-app.use((err, req, res, next) => { // qualquer erro inesperado cai aqui, sem vazar detalhes
-  console.error(err.message);
-  res.status(err.status || 500).json({ erro: 'Pedido inválido.' });
-});
-
-app.listen(process.env.PORT || 3000, () => console.log('Mesa rodando em http://localhost:' + (process.env.PORT || 3000)));
+if (require.main === module) app.listen(process.env.PORT||3000,()=>console.log('Mesa API pronta.'));
+module.exports=app;
