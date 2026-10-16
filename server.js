@@ -423,6 +423,10 @@ const gerarAvatarLimite=require('express-rate-limit').rateLimit({
   message:{erro:'Muitas solicitações em sequência. Aguarde 15 minutos antes de tentar novamente.'}
 });
 app.post('/api/personagens/:id/avatar/gerar',gerarAvatarLimite,asyncHandler(async(req,res)=>{
+  // Desativado por padrão até que haja faturamento e controle de assinatura.
+  // Proteção no servidor: não depende do botão estar desabilitado no navegador.
+  if(process.env.MESA_AVATAR_AI_ENABLED!=='true')
+    return res.status(503).json({erro:'Geração de avatares por IA em preparação. Por enquanto, use Enviar imagem.'});
   const acesso=await avatarDono(req,res);if(!acesso)return;
   const estilo=req.body?.estilo||'Fantasia ilustrada';
   const aparencia=req.body?.aparencia||'';
