@@ -55,7 +55,27 @@ async function gerarAventura({ genero, tom, jogadores, ideia }) {
         })
       }
     );
-    if (!r.ok) throw new Error('A API Gemini respondeu com status ' + r.status);
+    if (!r.ok) {
+      const payload = await r.json().catch(() => ({}));
+      const googleError = payload?.error || {};
+      const details = Array.isArray(googleError.details) ? googleError.details : [];
+      const reasons = details.map(d => d?.reason).filter(x => typeof x === 'string');
+      const msg = String(googleError.message || '');
+      const categoria =
+        /api key not valid|api_key_invalid|invalid api key|invalid authentication/i.test(msg + ' ' + reasons.join(' ')) ? 'CHAVE_API_INVALIDA' :
+        /json mode|responsemime|response_mime|response schema/i.test(msg) ? 'FORMATO_JSON_NAO_SUPORTADO' :
+        /model.*(not found|not supported|not available)/i.test(msg) ? 'MODELO_INDISPONIVEL' :
+        /location|region|country/i.test(msg) ? 'RESTRICAO_REGIONAL' :
+        /quota|rate limit/i.test(msg) ? 'COTA_OU_LIMITE' : 'OUTRO';
+      // Apenas informações categorizadas: nunca registrar URL com chave, corpo completo ou credenciais.
+      console.error('Gemini diagnóstico:', JSON.stringify({
+        httpStatus: r.status,
+        googleStatus: typeof googleError.status === 'string' ? googleError.status.slice(0, 50) : 'desconhecido',
+        categoria,
+        modelo
+      }));
+      throw new Error('A API Gemini respondeu com status ' + r.status + ' (' + categoria + ')');
+    }
     const dados = await r.json();
     const texto = (dados.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
     if (!texto) throw new Error('A API Gemini não retornou texto.');
