@@ -79,6 +79,15 @@
       <div class="folha"><div class="painel-titulo"><h2>Minha biblioteca</h2><button id="nova-ficha" class="guia-abrir" type="button">+ Nova ficha</button></div><div id="personagens-lista"></div><p class="suave">As fichas são privadas e ficam vinculadas à sua conta.</p></div>
       <form id="f-personagem" class="folha" autocomplete="off">
         <h2 id="ficha-form-titulo">Nova personagem</h2>
+        <section class="avatar-painel" aria-label="Avatar da personagem">
+          <div class="avatar-moldura"><img id="p-avatar-img" alt="Retrato da personagem" hidden><span id="p-avatar-vazio" aria-hidden="true">♙</span></div>
+          <div class="avatar-acoes"><h3>Retrato da personagem</h3><p id="p-avatar-info" class="suave">Salve a ficha antes de enviar uma imagem. O avatar ficará privado na sua conta.</p>
+            <label class="guia-abrir avatar-upload" for="p-avatar-file">↑ Enviar imagem</label>
+            <input id="p-avatar-file" type="file" accept="image/jpeg,image/png,image/webp" hidden disabled>
+            <button type="button" id="p-avatar-remover" class="link" hidden>Remover avatar</button>
+            <p class="suave">JPG, PNG ou WebP. A foto será recortada em quadrado e otimizada antes de enviar.</p>
+          </div>
+        </section>
         <div class="cenario-ficha">
           <span class="sobretitulo">PERSONAGEM & HISTÓRIA</span><h3>Onde essa personagem se encaixa?</h3>
           <p class="suave">Associe a uma aventura ou escolha o cenário primeiro. O Mesa mostrará apenas as escolhas adequadas a esse universo.</p>
