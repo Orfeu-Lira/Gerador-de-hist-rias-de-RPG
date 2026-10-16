@@ -3,33 +3,43 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mesa – ferramentas para mestres de RPG</title>
+<meta name="theme-color" content="#102928">
+<meta name="description" content="Crie histórias inesquecíveis para suas mesas de RPG.">
+<title>Mesa | Suas histórias começam aqui</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./style.css">
 </head>
 <body>
 <main>
-  <header>
-    <h1>Mesa</h1>
+  <header class="topo">
+    <a href="/" class="marca" aria-label="Mesa, voltar ao início"><span class="marca-emblema" aria-hidden="true">✦</span><span><strong>MESA</strong><small>FERRAMENTAS PARA MESTRES</small></span></a>
     <nav id="nav" aria-label="Principal"></nav>
   </header>
   <p id="aviso" role="status"></p>
 
   <!-- Gerador: qualquer visitante vê; o servidor aplica os limites -->
   <section id="v-gerador">
-    <form id="f-gerar" class="folha">
+    <div class="hero"><div class="hero-copia"><span class="sobretitulo">✧ O ATELIÊ DE AVENTURAS</span><h1>Grandes histórias <em>começam aqui.</em></h1><p>Transforme uma ideia em uma jornada inesquecível. Escolha o mundo, reúna seu grupo e deixe a imaginação conduzir o próximo capítulo.</p><div class="hero-tracos"><span>✦ Histórias com IA</span><span>✦ Feito para mestres</span><span>✦ Suas aventuras salvas</span></div></div><div class="hero-arte" aria-hidden="true"><span>✧</span></div></div>
+    <div class="secao-intro"><span class="sobretitulo">01 / CRIAÇÃO</span><h2>Crie uma aventura</h2><p>Os primeiros detalhes de uma história extraordinária.</p></div>
+    <form id="f-gerar" class="folha formulario">
       <div class="grade">
-        <div><label for="genero">Gênero</label><select id="genero"></select></div>
+        <div><label for="genero">Gênero da aventura</label><select id="genero"></select></div>
         <div><label for="tom">Tom</label><select id="tom"></select></div>
-        <div><label for="jogadores">Jogadores</label><input id="jogadores" type="number" min="1" max="20" value="4" required></div>
+        <div><label for="jogadores">Quantidade de jogadores</label><input id="jogadores" type="number" min="1" max="20" value="4" required></div>
       </div>
-      <label for="ideia">Ideia extra (opcional)</label>
-      <input id="ideia" type="text" maxlength="200" placeholder="Ex.: a história começa em uma taverna à beira de um lago">
-      <p class="acoes"><button class="principal" id="b-gerar" type="submit">Gerar aventura</button> <span id="info" class="suave"></span></p>
+      <label for="ideia">Sua inspiração <span class="opcional">(opcional)</span></label>
+      <textarea id="ideia" maxlength="200" rows="3" placeholder="Uma vila desaparece durante um eclipse, e apenas um viajante se lembra dela..."></textarea>
+      <p class="suave">Dê à IA uma pista, um mistério ou um lugar para começar.</p>
+      <div class="acoes gerador-acoes"><span id="info" class="cota"></span><button class="principal" id="b-gerar" type="submit">✦ Gerar minha aventura <span aria-hidden="true">↗</span></button></div>
     </form>
     <div id="saida"></div>
+    <div class="como-funciona"><span class="sobretitulo">O PRÓXIMO CAPÍTULO</span><h2>Seu universo em três passos</h2><div class="passos"><article><b>01</b><h3>Escolha o mundo</h3><p>Defina o gênero e a atmosfera.</p></article><article><b>02</b><h3>Compartilhe uma ideia</h3><p>Dê vida à sua inspiração.</p></article><article><b>03</b><h3>Viva a história</h3><p>Receba aventuras, locais e personagens.</p></article></div></div>
   </section>
 
   <section id="v-dados" hidden>
+    <div class="pagina-intro"><span class="sobretitulo">FERRAMENTAS DO MESTRE</span><h1>Oráculo dos dados</h1><p>Um pouco de sorte para escrever o próximo destino.</p></div>
     <div class="folha">
       <label for="qtd">Quantidade de dados</label>
       <input id="qtd" type="number" min="1" max="20" value="1" class="curto">
@@ -41,11 +51,14 @@
   </section>
 
   <section id="v-historico" hidden>
-    <div id="lista"></div>
+    <div class="pagina-intro"><span class="sobretitulo">SUA BIBLIOTECA</span><h1>Histórico de aventuras</h1><p>Reviva cada universo criado para sua mesa.</p></div>
+    <div id="lista" class="historico-grade"></div>
     <div id="saida-hist"></div>
   </section>
 
   <section id="v-conta" hidden>
+    <div class="acesso-intro"><span class="acesso-simbolo" aria-hidden="true">✦</span><span class="sobretitulo">SEU PORTAL DE AVENTURAS</span><h1>Bem-vindo ao Mesa</h1><p>Entre na sua conta para continuar criando histórias.</p></div>
+    <div class="acesso-cartao">
     <form id="f-login" class="folha estreita">
       <h2>Entrar</h2>
       <label for="l-email">E-mail</label>
@@ -64,13 +77,16 @@
       <p class="suave">Mínimo de 8 caracteres.</p>
       <label for="c-token-bootstrap">Token inicial do administrador (opcional)</label>
       <input id="c-token-bootstrap" type="password" autocomplete="off">
-      <p class="suave">Só o primeiro administrador precisa informar o token secreto configurado no Render.</p>
+      <p class="suave">Esse campo é exclusivo da configuração inicial de administrador.</p>
       <p class="acoes"><button class="principal" type="submit">Criar conta</button></p>
       <p class="suave">Já tem conta? <button type="button" class="link" id="ir-login">Entrar</button></p>
     </form>
+    </div>
+    <button id="voltar-inicio" class="voltar-inicio" type="button">← Voltar ao início</button>
   </section>
 
   <section id="v-admin" hidden>
+    <div class="pagina-intro"><span class="sobretitulo">VISÃO GERAL</span><h1>Painel do administrador</h1></div>
     <div class="folha" id="resumo"></div>
   </section>
 </main>
