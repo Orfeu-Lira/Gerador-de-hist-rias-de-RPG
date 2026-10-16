@@ -137,6 +137,95 @@ app.post('/api/login',asyncHandler(async(req,res) => {
   if (!u || !ok) return res.status(401).json({erro:'E-mail ou senha incorretos.'});
   await refreshSession(req,Number(u.id)); res.json({ok:true});
 }));
+// Recuperação de senha: links únicos por 20 min, enviados pelo Resend.
+// A URL pública deve ser definida pelo responsável, jamais inferida de Host/Origin.
+const limiteRecuperacao = require('express-rate-limit').rateLimit({
+  windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: 'draft-7', legacyHeaders: false,
+  message: { erro: 'Muitas tentativas. Aguarde alguns minutos e tente novamente.' }
+});
+const resetConfigurado = () =>
+  Boolean(process.env.RESEND_API_KEY && process.env.RESET_EMAIL_FROM && process.env.PASSWORD_RESET_URL);
+const urlRecuperacao = () => {
+  const destino = new URL(process.env.PASSWORD_RESET_URL);
+  if (destino.protocol !== 'https:' || destino.username || destino.password || destino.search || destino.hash) {
+    throw new Error('PASSWORD_RESET_URL deve ser HTTPS e não conter parâmetros.');
+  }
+  return destino;
+};
+app.post('/api/senha/solicitar', limiteRecuperacao, asyncHandler(async (req,res) => {
+  if (!resetConfigurado()) return res.status(503).json({erro:'A recuperação por e-mail está sendo configurada. Tente novamente mais tarde.'});
+  const email = req.body?.email;
+  if (!emailValido(email)) return res.status(400).json({erro:'Informe um e-mail válido.'});
+  const mensagem = 'Se este e-mail estiver cadastrado, você receberá instruções para redefinir sua senha.';
+  const r = await query('SELECT id,email FROM public.usuarios WHERE email=$1', [email.trim().toLowerCase()]);
+  const usuario = r.rows[0];
+  if (!usuario) return res.json({mensagem});
+  const recente = await query(
+    "SELECT 1 FROM public.redefinicoes_senha WHERE usuario_id=$1 AND criado_em > NOW() - INTERVAL '60 seconds' LIMIT 1",
+    [usuario.id]
+  );
+  if (recente.rowCount) return res.json({mensagem});
+  const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const destino = urlRecuperacao();
+  destino.searchParams.set('reset_token', token);
+  await query(
+    "INSERT INTO public.redefinicoes_senha(token_hash,usuario_id,expira_em) VALUES($1,$2,NOW() + INTERVAL '20 minutes')",
+    [tokenHash,usuario.id]
+  );
+  let enviado = false;
+  try {
+    const resposta = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + process.env.RESEND_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: process.env.RESET_EMAIL_FROM, to: [usuario.email],
+        subject: 'Mesa | Redefinição de senha',
+        text: 'Você solicitou uma nova senha para o Mesa. Acesse o link (válido por 20 minutos e uso único): ' +
+          destino.toString() + '\\nSe não foi você, ignore esta mensagem.'
+      }),
+      signal: AbortSignal.timeout(10000)
+    });
+    enviado = resposta.ok;
+  } catch (erro) {
+    console.error('Falha de envio de recuperação:', erro.name);
+  }
+  if (!enviado) {
+    await query('DELETE FROM public.redefinicoes_senha WHERE token_hash=$1',[tokenHash]);
+    return res.status(503).json({erro:'O serviço de e-mail está indisponível. Tente novamente mais tarde.'});
+  }
+  res.json({mensagem});
+}));
+app.post('/api/senha/redefinir', limiteRecuperacao, asyncHandler(async(req,res) => {
+  const {token,senha} = req.body || {};
+  if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token) || !senhaValida(senha)) {
+    return res.status(400).json({erro:'Link inválido ou senha fora do limite de 8 a 72 caracteres.'});
+  }
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const hash = await bcrypt.hash(senha,12);
+  const {pool} = require('./postgres');
+  const cliente = await pool.connect();
+  try {
+    await cliente.query('BEGIN');
+    const r = await cliente.query(
+      'SELECT usuario_id FROM public.redefinicoes_senha WHERE token_hash=$1 AND expira_em>NOW() FOR UPDATE',
+      [tokenHash]
+    );
+    if (!r.rowCount) {
+      await cliente.query('ROLLBACK');
+      return res.status(400).json({erro:'O link expirou ou já foi utilizado. Solicite um novo.'});
+    }
+    const usuarioId = r.rows[0].usuario_id;
+    await cliente.query('UPDATE public.usuarios SET senha_hash=$1 WHERE id=$2',[hash,usuarioId]);
+    await cliente.query('DELETE FROM public.redefinicoes_senha WHERE usuario_id=$1',[usuarioId]);
+    await cliente.query("DELETE FROM public.sessoes WHERE sessao->>'userId'=$1::text",[String(usuarioId)]);
+    await cliente.query('COMMIT');
+  } catch (e) {
+    await cliente.query('ROLLBACK');
+    throw e;
+  } finally {cliente.release();}
+  res.json({ok:true});
+}));
 app.post('/api/logout', (req,res,next) => {
   req.session.destroy(e => e ? next(e) : (res.clearCookie('mesa.sid',{sameSite:PRODUCAO?'none':'lax',secure:PRODUCAO}),res.json({ok:true})));
 });
