@@ -153,3 +153,11 @@ body.tela-acesso .menu-legenda,body.tela-acesso .menu-rodape{display:none}
 .sugestao-classe p{max-width:520px;margin:0}
 .sugestao-classe button:disabled{opacity:.5;cursor:not-allowed}
 @media(max-width:680px){.sugestao-classe button{width:100%}}
+
+/* Personagem vinculado ao contexto da aventura */
+.cenario-ficha{margin:23px 0 26px;background:#fff8eb;border:1px solid #d8c09a;border-left:4px solid #be8b51;border-radius:12px;padding:22px}
+.cenario-ficha h3{margin:7px 0}
+.cenario-ficha>.suave{margin-bottom:17px}
+.cenario-ficha .grade{margin-bottom:10px}
+.contexto-ajuda{background:#ede1c7;color:#5b4732;padding:14px 15px;border-radius:9px;font-size:.9rem;line-height:1.55}
+.cenario-ficha .guia-abrir:disabled{opacity:.55;cursor:not-allowed}
