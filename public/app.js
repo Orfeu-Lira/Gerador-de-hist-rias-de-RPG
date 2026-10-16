@@ -127,10 +127,47 @@ async function carregarHistorico() {
   } catch (e) { aviso(e.message); }
 }
 
-// ---- Conta ----
-$('voltar-inicio').onclick = () => mostrar('gerador');
-$('ir-cadastro').onclick = () => { $('f-login').hidden = true; $('f-cadastro').hidden = false; };
-$('ir-login').onclick = () => { $('f-cadastro').hidden = true; $('f-login').hidden = false; };
+// ---- Conta e recuperação de acesso ----
+const formulariosConta = ['f-login','f-cadastro','f-recuperar','f-redefinir'];
+function abrirFormularioConta(id) {
+  formulariosConta.forEach(chave => { $(chave).hidden = chave !== id; });
+}
+function limparTokenDaUrl() {
+  const u = new URL(window.location.href);
+  if (u.searchParams.has('reset_token')) {
+    u.searchParams.delete('reset_token');
+    history.replaceState(null, '', u.pathname + u.search + u.hash);
+  }
+}
+$('voltar-inicio').onclick = () => { limparTokenDaUrl(); abrirFormularioConta('f-login'); mostrar('gerador'); };
+$('ir-cadastro').onclick = () => abrirFormularioConta('f-cadastro');
+$('ir-login').onclick = () => abrirFormularioConta('f-login');
+$('ir-recuperar').onclick = () => { $('r-email').value = $('l-email').value; abrirFormularioConta('f-recuperar'); aviso(''); };
+$('recuperar-voltar').onclick = () => { abrirFormularioConta('f-login'); aviso(''); };
+$('redefinir-voltar').onclick = () => { limparTokenDaUrl(); abrirFormularioConta('f-login'); aviso(''); };
+$('f-recuperar').onsubmit = async ev => {
+  ev.preventDefault();
+  const botao = $('f-recuperar').querySelector('button[type="submit"]');
+  botao.disabled = true;
+  try {
+    const resultado = await api('/api/senha/solicitar', 'POST', { email: $('r-email').value.trim() });
+    aviso(resultado.mensagem || 'Se houver uma conta, enviaremos as instruções por e-mail.', true);
+  } catch (e) { aviso(e.message); }
+  finally { botao.disabled = false; }
+};
+$('f-redefinir').onsubmit = async ev => {
+  ev.preventDefault();
+  if ($('nova-senha').value !== $('nova-senha-confirmacao').value) { aviso('As senhas digitadas não coincidem.'); return; }
+  const botao = $('f-redefinir').querySelector('button[type="submit"]');
+  botao.disabled = true;
+  try {
+    await api('/api/senha/redefinir', 'POST', { token: new URL(location.href).searchParams.get('reset_token'), senha: $('nova-senha').value });
+    $('nova-senha').value = ''; $('nova-senha-confirmacao').value = '';
+    limparTokenDaUrl(); abrirFormularioConta('f-login');
+    aviso('Senha atualizada. Entre com sua nova senha.', true);
+  } catch (e) { aviso(e.message); }
+  finally { botao.disabled = false; }
+};
 async function entrar(url, email, senha, tokenBootstrap) {
   try { await api(url, 'POST', { email, senha, ...(tokenBootstrap ? { tokenBootstrap } : {}) }); await atualizarEu(); mostrar('gerador'); aviso('Tudo certo!', true); }
   catch (e) { aviso(e.message); }
@@ -150,7 +187,14 @@ async function carregarResumo() {
   } catch (e) { aviso(e.message); }
 }
 
-atualizarEu().then(() => mostrar('gerador')).catch((e) => {
+atualizarEu().then(() => {
+  if (new URL(location.href).searchParams.has('reset_token')) {
+    abrirFormularioConta('f-redefinir'); mostrar('conta');
+  } else mostrar('gerador');
+}).catch((e) => {
   montarNav();
+  if (new URL(location.href).searchParams.has('reset_token')) {
+    abrirFormularioConta('f-redefinir'); mostrar('conta');
+  }
   aviso(e.message);
 });
