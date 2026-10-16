@@ -8,7 +8,7 @@
 - Armazenamento em bucket **privado** `mesa-avatares` do Supabase Storage, com metadados na tabela `public.personagem_avatares`.
 - Ao excluir uma ficha, o servidor tenta apagar também o arquivo do Storage.
 - Nenhum avatar prévio ou alteração de ficha necessária; dados JSONB das fichas antigas continuam intactos.
-- **Gerar avatar com IA ainda não está implementado** (etapa 2).
+- **Gerar avatar com IA implementado nesta branch (ainda pendente de teste com API real).** Estilos: Fantasia ilustrada, Realismo cinematográfico, Anime ou Pintura clássica. A aparência é opcional. O Gemini usa nome, cenário, classe/especialidade, espécie e resumo da aventura. O navegador otimiza para WebP e envia ao armazenamento privado após uma geração bem-sucedida. Limite de 2 gerações diárias por usuário (6 para admin).
 
 ## Ativação necessária antes de testar
 1. Supabase Dashboard > SQL Editor: executar `supabase/005_avatar_storage.sql` no mesmo projeto do Mesa. O SQL cria um bucket privado e a tabela de vínculo.
@@ -18,10 +18,19 @@
 5. Recarregar navegador, reabrir a mesma ficha, conferir avatar; testar remover, substituir, excluir a ficha e abrir outra conta para confirmar acesso negado.
 6. Publicar apenas após testes. **Produção main não foi modificada.**
 
+## Geração de avatar por IA — teste no Preview
+1. Confirme que a variável `GEMINI_API_KEY` está configurada no ambiente Preview do Vercel e tem acesso ao modelo de imagens `gemini-2.5-flash-image`.
+2. **Opcional**: `GEMINI_IMAGE_MODEL=gemini-2.5-flash-image` para selecionar o modelo independentemente daquele usado nas aventuras (`GEMINI_MODEL`).
+3. No Preview, abra **Personagens**, selecione uma ficha salva, escolha **Estilo do avatar**, descreva a aparência se quiser e clique em **Gerar avatar com IA**.
+4. Aguarde; se a API retornar imagem, ela será otimizada e salva automaticamente. Recarregue a tela e confira se o avatar persiste.
+5. Faça o teste com uma ficha narrativa de outro gênero e confirme que o resultado corresponde ao cenário.
+6. Erros de falta de quota, modelo não habilitado ou timeout devem exibir aviso legível. Revise os logs do Vercel para o HTTP status do Gemini sem expor a chave.
+7. **Atenção aos custos:** o modelo de imagens pode ser cobrado separadamente. Não compartilhar chaves nem usar produção antes de validar despesas e testes.
+
 ## Privacidade
 A aplicação não coloca a chave do Storage no navegador, não gera links públicos, não aceita caminhos arbitrários no upload e usa sessão para carregar o avatar. O upload é convertido pelo navegador; o backend confere cabeçalho WebP e tamanho em bytes. A atualização ou remoção do arquivo é limitada à ficha pertencente ao usuário.
 
 ## Observações
 - O recorte inicial é central e automático; ajuste interativo com zoom e posicionamento fica para futura melhoria.
 - O botão só é habilitado após salvar/reabrir a ficha, para que já exista um ID válido.
-- No futuro, geração de avatar por IA poderá salvar no mesmo bucket por uma API de imagem, mantendo upload manual.
+- A geração por IA agora usa o mesmo bucket do upload manual, sem disponibilizar o avatar publicamente. O usuário pode substituir o retrato por upload ou gerar um novo avatar.
