@@ -140,16 +140,47 @@ const custosDnd = {8:0,9:1,10:2,11:3,12:4,13:5,14:7,15:9};
 let fichaAbertaId = null;
 const pontosDnd = () => atributosDnd.reduce((s,[sigla]) => s + custosDnd[Number($('at-'+sigla).value)],0);
 const modDnd = n => Math.floor((n - 10)/2);
+// Dados de vida do D&D 5e revisado 2024 (classe única; avanço com valor fixo).
+const classesVidaDnd = {
+  'Bárbaro':[12,7], 'Guerreiro':[10,6], 'Paladino':[10,6], 'Patrulheiro':[10,6],
+  'Bardo':[8,5], 'Clérigo':[8,5], 'Druida':[8,5], 'Monge':[8,5],
+  'Ladino':[8,5], 'Bruxo':[8,5], 'Feiticeiro':[6,4], 'Mago':[6,4]
+};
+function atualizarResumoDnd() {
+  const gastos = pontosDnd();
+  $('p-gastos').textContent = gastos + ' / 27';
+  const nivel = Number($('p-nivel').value);
+  $('p-proficiencia').textContent = Number.isInteger(nivel) && nivel>=1 && nivel<=20
+    ? '+' + (2 + Math.floor((nivel-1)/4)) : '—';
+  const config = classesVidaDnd[$('p-classe').value];
+  const pv = $('p-pv'), dado = $('p-dado-vida'), nota = $('p-pv-nota');
+  if (!config || !Number.isInteger(nivel) || nivel<1 || nivel>20) {
+    pv.textContent = 'Selecione classe e nível'; dado.textContent='—';
+    nota.textContent = 'Escolha uma das classes disponíveis e um nível de 1 a 20.';
+    return;
+  }
+  const [faces,fixo] = config;
+  const con = Number($('at-con').value);
+  const mod = modDnd(con);
+  const vidaInicial = Math.max(1,faces+mod);
+  const porNivel = Math.max(1,fixo+mod);
+  pv.textContent = String(vidaInicial + (nivel-1)*porNivel);
+  dado.textContent='d'+faces;
+  nota.textContent = 'PV: '+vidaInicial+' no nível 1 + '+(nivel-1)+' × '+porNivel+' por nível seguinte. CON '+con+' (modificador '+(mod>=0?'+':'')+mod+'). Cálculo base, sem talentos, bônus de antecedente, multiclasses ou rolagens de PV.';
+}
+$('p-classe').addEventListener('change',atualizarResumoDnd);
+$('p-nivel').addEventListener('input',atualizarResumoDnd);
 function atualizarPontosDnd() {
   const usados = pontosDnd();
   const restante = 27-usados;
-  $('p-pontos').textContent = restante + ' pontos restantes';
+  $('p-pontos').textContent = usados + ' gastos • ' + restante + ' restantes';
   $('p-pontos').classList.toggle('invalido', restante < 0);
   for(const [sigla] of atributosDnd) {
     const valor = Number($('at-'+sigla).value);
     $('mod-'+sigla).textContent = 'Mod. '+(modDnd(valor)>=0?'+':'')+modDnd(valor);
   }
   $('f-personagem').querySelector('button[type="submit"]').disabled = restante < 0;
+  atualizarResumoDnd();
 }
 for (const [sigla,nome] of atributosDnd) {
   const item=el('div','','atributo-item');
