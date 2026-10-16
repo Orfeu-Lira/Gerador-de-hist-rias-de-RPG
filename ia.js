@@ -39,7 +39,7 @@ async function gerarAventura({ genero, tom, jogadores, ideia }) {
   const controle = new AbortController();
   const timer = setTimeout(() => controle.abort(), 30000);
   try {
-    const modelo = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const modelo = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
     const r = await fetch(
       'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(modelo) + ':generateContent',
       {
