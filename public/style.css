@@ -185,3 +185,9 @@ body.tela-acesso .menu-legenda,body.tela-acesso .menu-rodape{display:none}
 .musica-links li{margin:7px 0}
 .musica-links a{color:#864431;font-weight:700;overflow-wrap:anywhere;text-decoration:underline}
 .musica-links a:hover{color:#a95036}
+
+/* Buscas musicais imediatas, independentes do serviço de IA */
+.musica-buscas{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+.musica-buscas a.guia-abrir{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;color:#603f2b;font-weight:700}
+.musica-buscas a.guia-abrir:hover{color:#603f2b;background:#fff}
+@media(max-width:550px){.musica-buscas{flex-direction:column}.musica-buscas a.guia-abrir{width:100%}}
