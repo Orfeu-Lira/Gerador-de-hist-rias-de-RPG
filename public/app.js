@@ -226,6 +226,87 @@ const contextosDnd = {
     texto:'Tema futurista com adaptação narrativa de D&D 2024. Tecnologia, armas de fogo e veículos precisam de regras específicas aprovadas pelo mestre.'
   }
 };
+const kitsDnd={
+'Bárbaro':['Arma marcial à escolha','Duas machadinhas ou arma simples','Mochila de aventureiro'],
+'Bardo':['Instrumento musical','Arma simples','Armadura leve','Caderno de canções'],
+'Bruxo':['Foco arcano ou bolsa de componentes','Arma simples','Armadura leve'],
+'Clérigo':['Símbolo sagrado','Arma adequada à proficiência','Escudo se aplicável'],
+'Druida':['Foco druídico','Cajado','Bolsa de ervas'],
+'Feiticeiro':['Foco arcano ou componentes','Adaga','Bolsa de viagem'],
+'Guerreiro':['Arma principal à escolha','Arma secundária','Armadura adequada à proficiência'],
+'Ladino':['Arma de finesse ou à distância','Adaga','Ferramentas de ladrão','Armadura leve'],
+'Mago':['Grimório','Foco arcano ou componentes','Adaga'],
+'Monge':['Bastão ou arma simples apropriada','Roupas de viagem'],
+'Paladino':['Arma marcial','Armadura adequada','Símbolo sagrado'],
+'Patrulheiro':['Arma à distância ou duas armas leves','Armadura adequada','Kit de exploração']
+};
+const kitsPorPapel={
+'Capitão':['Mapa náutico','Bússola','Luneta','Diário de bordo'],
+'Navegador':['Bússola','Cartas náuticas','Sextante','Caderno de rotas'],
+'Artilheiro':['Kit de manutenção de canhões','Ferramentas de carregamento','Caderno de munições'],
+'Médico de bordo':['Estojo de primeiros socorros','Bandagens','Instrumentos médicos'],
+'Espião do porto':['Documentos de cobertura','Kit de disfarce','Caderno codificado'],
+'Caçador de tesouros':['Mapa antigo','Pá pequena','Corda e gancho'],
+'Piloto':['Manual de navegação','Comunicador','Kit de emergência'],
+'Engenheiro':['Ferramentas técnicas','Manual de manutenção','Peças de reposição'],
+'Diplomata':['Credenciais','Comunicador ou pergaminhos','Caderno de acordos'],
+'Batedor':['Binóculos','Mapa','Kit de sobrevivência'],
+'Médico':['Estojo médico','Suprimentos de primeiros socorros'],
+'Oficial de segurança':['Comunicador','Equipamento de proteção','Lanterna'],
+'Detetive':['Bloco de anotações','Lupa','Lanterna'],
+'Infiltrador':['Roupas discretas','Kit de disfarce'],
+'Perito':['Maleta de análise','Luvas','Câmera'],
+'Interrogador':['Gravador','Caderno de depoimentos'],
+'Pesquisador':['Caderno de campo','Material de pesquisa'],
+'Protetor da equipe':['Kit de proteção','Lanterna'],
+'Sobrevivente':['Mochila de emergência','Cantil','Lanterna'],
+'Especialista em rituais':['Anotações de símbolos','Velas','Kit de pesquisa'],
+'Protetor':['Lanterna','Kit de sobrevivência'],
+'Investigador':['Caderno de pistas','Equipamento fotográfico'],
+'Socorrista':['Kit de primeiros socorros','Bolsa de suprimentos'],
+'Explorador de ruínas':['Corda','Mapa','Lanterna'],
+'Caçador de monstros':['Kit de rastreamento','Caderno de observações'],
+'Ocultista':['Livro de símbolos','Kit de anotações'],
+'Inquisidor':['Insígnia','Material de investigação'],
+'Médico de campanha':['Bolsa de primeiros socorros','Bandagens'],
+'Investigador de maldições':['Grimório de notas','Lanterna'],
+'Cavaleiro':['Equipamento de montaria','Kit de manutenção'],
+'Guardião':['Kit de vigia','Lanterna'],
+'Erudito arcano':['Cadernos de estudo','Tinta e pena'],
+'Curandeiro itinerante':['Bolsa de primeiros socorros','Ervas']
+};
+const kitPorCenario={
+'Piratas e mares':['Cantil de água','Capa impermeável'],
+'Fantasia épica':['Rações de viagem','Tocha ou lanterna'],
+'Fantasia sombria':['Lanterna','Manta de viagem'],
+'Investigação':['Bloco de pistas','Lanterna'],
+'Terror':['Lanterna','Kit de emergência'],
+'Ficção científica':['Comunicador do cenário','Identificação']
+};
+function sugerirEquipamentos(){
+ const cenario=$('p-cenario').value, aventura=aventurasFicha.find(a=>String(a.id)===$('p-aventura').value);
+ const nome=fichaNarrativa() ? $('p-especialidade').value : $('p-classe').value;
+ const base=fichaNarrativa()?kitsPorPapel[nome]:kitsDnd[nome];
+ if(!cenario || !base)return null;
+ const itens=[...base,...(kitPorCenario[cenario]||[])];
+ const local=aventura?.conteudo?.locais?.[0];
+ if(typeof local==='string' && local.trim())itens.push('Anotações sobre '+local.trim().slice(0,70));
+ return {itens:[...new Set(itens)],descricao:nome+' • '+cenario+(aventura?' • '+(aventura.conteudo?.titulo||'aventura'):'')};
+}
+function atualizarKit(){
+ const kit=sugerirEquipamentos();
+ $('p-gerar-kit').disabled=!kit;
+ $('p-kit-origem').textContent=kit
+ ? 'Sugestão para '+kit.descricao+'. Revise os itens com o mestre.'
+ : 'Selecione cenário e classe ou especialidade para sugerir equipamentos.';
+}
+$('p-gerar-kit').onclick=()=>{
+ const kit=sugerirEquipamentos();
+ if(!kit)return;
+ if($('p-equipamentos').value.trim()&&!confirm('Substituir os equipamentos atuais pela nova sugestão?'))return;
+ $('p-equipamentos').value=kit.itens.join('\n');
+};
+
 let aventurasFicha = [];
 function definirOpcoes(select, valores, vazio) {
   select.replaceChildren(new Option(vazio,''));
@@ -259,6 +340,7 @@ function atualizarModoFicha() {
   }
   atualizarSugestaoClasse();
   atualizarPontosDnd();
+  atualizarKit();
 }
 function atualizarRecomendacaoNarrativa(){
   const contexto=contextosDnd[$('p-cenario').value];
@@ -270,6 +352,7 @@ function atualizarRecomendacaoNarrativa(){
     : 'Escolha uma especialidade da história. '+texto;
   else if(contexto) texto='Esta aventura usa o caminho D&D 2024. Escolha sua classe acima; não precisa selecionar outra especialidade.';
   $('p-contexto').textContent=texto;
+  atualizarKit();
   $('p-aplicar-contexto').hidden=true;
   $('p-aplicar-contexto').disabled=true;
   atualizarModoFicha();
@@ -282,6 +365,7 @@ $('p-aventura').onchange=()=>{
     $('p-cenario').value=a.genero;
     atualizarContextoDnd();
   }
+  atualizarKit();
 };
 async function carregarAventurasDaFicha(){
   const op=$('p-aventura');
@@ -396,6 +480,7 @@ function limparFicha(){
   atualizarPontosDnd();
   atualizarSugestaoClasse();
   $('p-cenario').value='';atualizarContextoDnd();$('p-aventura').value='';$('p-funcao').value='';
+  atualizarKit();
 }
 $('nova-ficha').onclick=limparFicha;
 async function carregarPersonagens(){
@@ -415,17 +500,20 @@ async function carregarPersonagens(){
         $('p-antecedente').value=d.antecedente||'';
         $('p-nivel').value=d.nivel||1;
         $('p-notas').value=d.notas||'';
+        $('p-equipamentos').value=d.equipamentos||'';
         $('p-cenario').value=contextosDnd[d.cenario]?d.cenario:'';
         atualizarContextoDnd();
         $('p-especialidade').value=contextosDnd[d.cenario]?.papeis.includes(d.especialidade)?d.especialidade:'';
         $('p-funcao').value=d.funcao||'';
         $('p-aventura').value=String(d.aventuraId||'');
         atualizarRecomendacaoNarrativa();
+        atualizarKit();
         for(const [sigla] of atributosDnd) $('at-'+sigla).value=String(d.atributos?.[sigla]||8);
         $('ficha-form-titulo').textContent='Editar personagem';
         $('p-remover').hidden=false;
         atualizarPontosDnd();
         atualizarSugestaoClasse();
+        atualizarKit();
         $('f-personagem').scrollIntoView({behavior:'smooth',block:'start'});
       };
       lista.appendChild(botao);
@@ -443,6 +531,7 @@ $('f-personagem').onsubmit=async ev=>{
     nome:$('p-nome').value.trim(),classe:narrativa?'':$('p-classe').value.trim(),
     especie:narrativa?'':$('p-especie').value.trim(),antecedente:narrativa?'':$('p-antecedente').value.trim(),
     nivel:narrativa?1:Number($('p-nivel').value),notas:$('p-notas').value.trim(),
+    equipamentos:$('p-equipamentos').value.trim(),
     cenario:$('p-cenario').value,especialidade:narrativa?$('p-especialidade').value:'',
     funcao:'',aventuraId:$('p-aventura').value?Number($('p-aventura').value):null
   };
