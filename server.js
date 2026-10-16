@@ -44,17 +44,21 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use((req,res,next) => {
   const origin = req.get('Origin');
   res.vary('Origin');
-  if (origin && origin !== ORIGEM) return res.status(403).json({ erro: 'Origem não permitida.' });
-  if (origin && origin === ORIGEM) {
+  const host = req.get('host') || '';
+  const previewOrigem = process.env.VERCEL_ENV === 'preview' &&
+    host.endsWith('.vercel.app') && origin === 'https://' + host;
+  const origemPermitida = origin === ORIGEM || previewOrigem;
+  if (origin && !origemPermitida) return res.status(403).json({ erro: 'Origem não permitida.' });
+  if (origin && origemPermitida) {
     res.set({
-      'Access-Control-Allow-Origin': ORIGEM,
+      'Access-Control-Allow-Origin': origin,
       'Access-Control-Allow-Credentials': 'true',
       'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type'
     });
   }
-  if (req.method === 'OPTIONS') return res.sendStatus(origin === ORIGEM ? 204 : 403);
-  if (PRODUCAO && ['POST', 'DELETE'].includes(req.method) && req.path.startsWith('/api/') && origin !== ORIGEM) {
+  if (req.method === 'OPTIONS') return res.sendStatus(origemPermitida ? 204 : 403);
+  if (PRODUCAO && ['POST', 'DELETE'].includes(req.method) && req.path.startsWith('/api/') && !origemPermitida) {
     return res.status(403).json({ erro: 'Origem não permitida.' });
   }
   next();
