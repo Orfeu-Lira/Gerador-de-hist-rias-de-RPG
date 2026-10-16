@@ -45,9 +45,10 @@ app.use((req,res,next) => {
   const origin = req.get('Origin');
   res.vary('Origin');
   const host = req.get('host') || '';
-  const previewOrigem = process.env.VERCEL_ENV === 'preview' &&
-    host.endsWith('.vercel.app') && origin === 'https://' + host;
-  const origemPermitida = origin === ORIGEM || previewOrigem;
+  // Permite chamadas do próprio site do Vercel em Preview e Production.
+  // Domínios externos continuam restritos a FRONTEND_ORIGIN.
+  const mesmaOrigemVercel = host.endsWith('.vercel.app') && origin === 'https://' + host;
+  const origemPermitida = origin === ORIGEM || mesmaOrigemVercel;
   if (origin && !origemPermitida) return res.status(403).json({ erro: 'Origem não permitida.' });
   if (origin && origemPermitida) {
     res.set({
