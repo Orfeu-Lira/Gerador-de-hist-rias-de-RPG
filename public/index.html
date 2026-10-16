@@ -104,10 +104,22 @@
         <div id="p-atributos" class="atributos-grade"></div>
         <div class="ficha-resumo" id="p-resumo" aria-live="polite"><div><span>Pontos usados</span><strong id="p-gastos">0 / 27</strong></div><div><span>PV máximos estimados</span><strong id="p-pv">Selecione uma classe</strong></div><div><span>Dado de vida</span><strong id="p-dado-vida">—</strong></div><div><span>Bônus de proficiência</span><strong id="p-proficiencia">+2</strong></div><p id="p-pv-nota" class="suave">Os PV consideram apenas atributos base, uma única classe e o valor fixo por nível.</p></div>
         <div class="ficha-ajuda"><strong>Como calcular o modificador?</strong> A fórmula é ⌊(atributo − 10) ÷ 2⌋. Por exemplo, 14 equivale a +2. Os bônus do antecedente de 2024 ainda não são somados nesta versão inicial.</div>
+        </div>
+        <div id="p-perfil-narrativo" class="perfil-narrativo" hidden><h3>Ficha narrativa</h3><p>Neste cenário, seu personagem é definido pela especialidade, pelo vínculo com a aventura e por sua história. Não vamos atribuir classes, pontos de vida ou bônus de D&D a um mundo que não utiliza essas regras.</p><p>Descreva recursos, habilidades, equipamentos ou limitações no campo de anotações. Regras próprias de combate e evolução poderão ser configuradas depois.</p></div>
+        <section class="equipamento-ficha" aria-labelledby="equipamento-titulo">
+          <div class="painel-titulo">
+            <div><span class="sobretitulo">INVENTÁRIO INICIAL</span><h3 id="equipamento-titulo">Equipamentos da personagem</h3></div>
+            <button id="p-gerar-kit" type="button" class="guia-abrir">✦ Sugerir kit inicial</button>
+          </div>
+          <p id="p-kit-origem" class="suave">Selecione uma história e uma classe ou especialidade para receber uma sugestão contextual.</p>
+          <label for="p-equipamentos">Itens do inventário (um por linha)</label>
+          <textarea id="p-equipamentos" rows="7" maxlength="1800" placeholder="Ex.: Mochila de viagem&#10;Corda&#10;Lanterna"></textarea>
+          <p class="suave">Você pode adicionar, remover ou substituir itens. A lista é uma sugestão narrativa — equipamento inicial oficial, moedas, proficiências e bônus devem ser conferidos nas regras aplicáveis.</p>
+        </section>
         <label for="p-notas">Anotações da personagem</label><textarea id="p-notas" maxlength="1500" rows="4" placeholder="História, equipamento, perícias e observações..."></textarea>
         <div class="acoes"><button type="submit" class="principal">Salvar ficha</button><button id="p-remover" type="button" class="apagar-ficha" hidden>Excluir ficha</button></div>
-        <p class="suave">Os PV mostrados são uma estimativa para personagem de classe única, com progressão fixa, sem bônus de antecedente, talentos ou efeitos especiais. A CA, perícias e características de classe ainda não são calculadas.</p></div>
-        <div id="p-perfil-narrativo" class="perfil-narrativo" hidden><h3>Ficha narrativa</h3><p>Neste cenário, seu personagem é definido pela especialidade, pelo vínculo com a aventura e por sua história. Não vamos atribuir classes, pontos de vida ou bônus de D&D a um mundo que não utiliza essas regras.</p><p>Descreva recursos, habilidades, equipamentos ou limitações no campo de anotações. Regras próprias de combate e evolução poderão ser configuradas depois.</p></div>
+        <p class="suave" id="p-dnd-ressalva">Os PV mostrados são uma estimativa para personagem de classe única, com progressão fixa, sem bônus de antecedente, talentos ou efeitos especiais. A CA, perícias e características de classe ainda não são calculadas.</p>
+
       </form>
     </div>
   </section>
