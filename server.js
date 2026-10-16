@@ -281,7 +281,9 @@ const CUSTOS_DND = {8:0,9:1,10:2,11:3,12:4,13:5,14:7,15:9};
 const CHAVES_DND = ['for','des','con','int','sab','car'];
 function validarFichaDnd(dados) {
   if (!dados || typeof dados !== 'object' || Array.isArray(dados)) return false;
-  if (dados.edicao !== '2024' || dados.metodo !== 'compra27') return false;
+  const narrativa = dados.edicao === 'narrativo' && dados.metodo === 'livre';
+  const dnd = dados.edicao === '2024' && dados.metodo === 'compra27';
+  if (!narrativa && !dnd) return false;
   if (typeof dados.nome !== 'string' || dados.nome.trim().length < 1 || dados.nome.length > 100) return false;
   if (typeof dados.classe !== 'string' || dados.classe.length > 70 ||
       typeof dados.especie !== 'string' || dados.especie.length > 70 ||
@@ -304,6 +306,14 @@ function validarFichaDnd(dados) {
   if(dados.aventuraId !== undefined && dados.aventuraId !== null &&
      (!Number.isSafeInteger(dados.aventuraId) || dados.aventuraId < 1)) return false;
   if (!Number.isInteger(dados.nivel) || dados.nivel < 1 || dados.nivel > 20) return false;
+  if (narrativa) {
+    const generosNarrativos = ['Piratas e mares','Investigação','Terror','Ficção científica'];
+    if (!generosNarrativos.includes(dados.cenario)) return false;
+    if (!dados.especialidade || dados.classe || dados.nivel !== 1) return false;
+    // Narrativas não usam point buy nem HP de D&D. Os atributos não são necessários.
+    if (dados.atributos !== undefined) return false;
+    return true;
+  }
   if (!dados.atributos || typeof dados.atributos !== 'object') return false;
   const valores = CHAVES_DND.map(k => dados.atributos[k]);
   if (!valores.every(v => Number.isInteger(v) && Object.hasOwn(CUSTOS_DND,v))) return false;
