@@ -472,8 +472,90 @@ for (const [sigla,nome] of atributosDnd) {
   const modificador=el('span','Mod. -1','atributo-mod');modificador.id='mod-'+sigla;
   item.append(rotulo,campo,modificador);$('p-atributos').appendChild(item);
 }
+// Avatares ficam em um bucket privado. Somente a própria conta pode carregá-los.
+let avatarObjectUrl=null;
+function limparPreviewAvatar(){
+  if(avatarObjectUrl)URL.revokeObjectURL(avatarObjectUrl);
+  avatarObjectUrl=null;
+  $('p-avatar-img').removeAttribute('src');
+  $('p-avatar-img').hidden=true;
+  $('p-avatar-vazio').hidden=false;
+  $('p-avatar-remover').hidden=true;
+}
+function atualizarEstadoAvatar(){
+  const salvo=Boolean(fichaAbertaId);
+  $('p-avatar-file').disabled=!salvo;
+  $('p-avatar-info').textContent=salvo
+    ? 'Envie um retrato. Ele será visível somente para você ao abrir esta ficha.'
+    : 'Salve a ficha primeiro e reabra-a para enviar um avatar.';
+}
+async function carregarAvatar(){
+  limparPreviewAvatar();
+  atualizarEstadoAvatar();
+  if(!fichaAbertaId)return;
+  const id=fichaAbertaId;
+  try{
+    const response=await fetch(API_BASE_URL+'/api/personagens/'+id+'/avatar',{credentials:'include'});
+    if(!response.ok)return;
+    const blob=await response.blob();
+    if(fichaAbertaId!==id)return;
+    avatarObjectUrl=URL.createObjectURL(blob);
+    $('p-avatar-img').src=avatarObjectUrl;
+    $('p-avatar-img').hidden=false;
+    $('p-avatar-vazio').hidden=true;
+    $('p-avatar-remover').hidden=false;
+  }catch{ /* Avatar é opcional; erro não impede edição da ficha. */ }
+}
+async function prepararWebpAvatar(arquivo){
+  if(!['image/jpeg','image/png','image/webp'].includes(arquivo.type))
+    throw new Error('Escolha uma imagem JPG, PNG ou WebP.');
+  if(arquivo.size>8*1024*1024)throw new Error('Arquivo original acima de 8 MB.');
+  const url=URL.createObjectURL(arquivo);
+  try{
+    const foto=new Image();
+    foto.src=url;
+    await foto.decode();
+    if(foto.width<32||foto.height<32)throw new Error('Imagem pequena demais.');
+    const tamanho=400;
+    const canvas=document.createElement('canvas');
+    canvas.width=tamanho;canvas.height=tamanho;
+    const ctx=canvas.getContext('2d');
+    if(!ctx)throw new Error('Seu navegador não suporta o processamento desta imagem.');
+    const recorte=Math.min(foto.width,foto.height);
+    ctx.drawImage(foto,(foto.width-recorte)/2,(foto.height-recorte)/2,recorte,recorte,0,0,tamanho,tamanho);
+    const resultado=canvas.toDataURL('image/webp',0.8);
+    if(!resultado.startsWith('data:image/webp;base64,'))throw new Error('Seu navegador não conseguiu converter a imagem para WebP.');
+    const base64=resultado.split(',')[1];
+    if(base64.length>525000)throw new Error('A imagem resultante ultrapassou 384 KB.');
+    return base64;
+  }finally{URL.revokeObjectURL(url);}
+}
+$('p-avatar-file').onchange=async()=>{
+  const arquivo=$('p-avatar-file').files?.[0],id=fichaAbertaId;
+  if(!arquivo||!id)return;
+  $('p-avatar-file').disabled=true;
+  $('p-avatar-info').textContent='Processando e enviando o retrato...';
+  try{
+    const imagem=await prepararWebpAvatar(arquivo);
+    if(fichaAbertaId!==id)throw new Error('Reabra a ficha para concluir o envio.');
+    await api('/api/personagens/'+id+'/avatar','POST',{imagem});
+    await carregarAvatar();
+    aviso('Avatar salvo com sucesso!',true);
+  }catch(e){aviso(e.message);}
+  finally{$('p-avatar-file').value='';atualizarEstadoAvatar();}
+};
+$('p-avatar-remover').onclick=async()=>{
+  if(!fichaAbertaId||!confirm('Remover o avatar desta personagem?'))return;
+  try{
+    await api('/api/personagens/'+fichaAbertaId+'/avatar','DELETE');
+    limparPreviewAvatar();
+    aviso('Avatar removido.',true);
+  }catch(e){aviso(e.message);}
+};
 function limparFicha(){
   fichaAbertaId=null;
+  limparPreviewAvatar();
+  atualizarEstadoAvatar();
   $('f-personagem').reset();
   atributosDnd.forEach(([sigla])=>$('at-'+sigla).value='8');
   $('ficha-form-titulo').textContent='Nova personagem';
@@ -494,6 +576,7 @@ async function carregarPersonagens(){
       botao.type='button';
       botao.onclick=()=>{
         fichaAbertaId=item.id;
+        carregarAvatar();
         const d=item.dados;
         $('p-nome').value=d.nome||'';
         $('p-classe').value=d.classe||'';
