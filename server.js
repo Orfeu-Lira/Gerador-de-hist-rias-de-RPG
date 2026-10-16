@@ -135,7 +135,16 @@ app.post('/api/login',asyncHandler(async(req,res) => {
   const u = r.rows[0];
   const ok = await bcrypt.compare(typeof senha === 'string' ? senha : '',u ? u.senha_hash : HASH_FALSO);
   if (!u || !ok) return res.status(401).json({erro:'E-mail ou senha incorretos.'});
-  await refreshSession(req,Number(u.id)); res.json({ok:true});
+  await refreshSession(req,Number(u.id));
+  // Sessão persistente apenas quando solicitada pelo usuário.
+  // Nunca armazenamos a senha no cookie ou no armazenamento do navegador.
+  if (req.body?.manterConectado === true) {
+    req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000;
+  } else {
+    req.session.cookie.maxAge = null; // cookie de sessão: fecha ao encerrar navegador
+  }
+  await new Promise((resolve,reject) => req.session.save(err => err ? reject(err) : resolve()));
+  res.json({ok:true});
 }));
 // Recuperação de senha: links únicos por 20 min, enviados pelo Resend.
 // A URL pública deve ser definida pelo responsável, jamais inferida de Host/Origin.
