@@ -166,6 +166,9 @@ app.post('/api/gerar',asyncHandler(async(req,res) => {
     res.json({aventura,restantes:await restantes(req,u)});
   } catch(e) {
     if (!bypass) await query('UPDATE public.geracoes_limite SET total=GREATEST(0,total-1) WHERE identificador=$1',[key]).catch(err=>console.error('Falha ao devolver cota',err.code));
+    if (e.upstreamStatus || e.name === 'AbortError') {
+      return res.status(503).json({ erro: 'A IA está temporariamente indisponível. Sua tentativa gratuita não foi consumida; tente novamente mais tarde.' });
+    }
     throw e;
   }
 }));
