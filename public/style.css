@@ -191,3 +191,10 @@ body.tela-acesso .menu-legenda,body.tela-acesso .menu-rodape{display:none}
 .musica-buscas a.guia-abrir{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;color:#603f2b;font-weight:700}
 .musica-buscas a.guia-abrir:hover{color:#603f2b;background:#fff}
 @media(max-width:550px){.musica-buscas{flex-direction:column}.musica-buscas a.guia-abrir{width:100%}}
+
+/* Inventário editável contextual da ficha */
+.equipamento-ficha{background:#fff7e8;border:1px solid #d9c19a;border-left:4px solid #a86d40;border-radius:12px;padding:22px;margin:22px 0}
+.equipamento-ficha .painel-titulo h3{margin:6px 0;color:#69422b}
+.equipamento-ficha textarea{width:100%;min-height:135px;resize:vertical}
+.equipamento-ficha .guia-abrir:disabled{opacity:.5;cursor:not-allowed}
+.equipamento-ficha .suave{line-height:1.6}
