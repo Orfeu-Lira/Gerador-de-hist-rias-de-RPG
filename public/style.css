@@ -161,3 +161,9 @@ body.tela-acesso .menu-legenda,body.tela-acesso .menu-rodape{display:none}
 .cenario-ficha .grade{margin-bottom:10px}
 .contexto-ajuda{background:#ede1c7;color:#5b4732;padding:14px 15px;border-radius:9px;font-size:.9rem;line-height:1.55}
 .cenario-ficha .guia-abrir:disabled{opacity:.55;cursor:not-allowed}
+
+/* A ficha narrativa tem um caminho próprio, sem herdar cálculos do D&D. */
+.perfil-narrativo{background:#fff8eb;border:1px solid #d6c09b;border-radius:12px;padding:22px;margin:22px 0;color:#594831}
+.perfil-narrativo h3{margin:0 0 12px;color:#8e4a34}
+.perfil-narrativo p:last-child{margin-bottom:0}
+#p-selecione-cenario{margin:16px 0 22px}
