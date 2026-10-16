@@ -183,29 +183,41 @@ function atualizarContextoDnd() {
   if (contexto?.papeis.includes(atual)) $('p-especialidade').value=atual;
   atualizarRecomendacaoNarrativa();
 }
+// Fantasia usa as classes e atributos D&D 2024. Outros gêneros usam só papel narrativo.
+const generosNarrativos = new Set(['Piratas e mares','Investigação','Terror','Ficção científica']);
+const fichaNarrativa = () => generosNarrativos.has($('p-cenario').value);
+function atualizarModoFicha() {
+  const narrativa=fichaNarrativa();
+  for(const campo of document.querySelectorAll('.campo-dnd')) campo.hidden=narrativa;
+  $('p-regras-dnd').hidden=narrativa;
+  $('p-perfil-narrativo').hidden=!narrativa;
+  $('campo-especialidade').hidden=!narrativa;
+  $('campo-funcao').hidden=true;
+  if(narrativa) {
+    $('p-classe').value='';
+    $('p-nivel').value=1;
+    $('p-especie').value='';
+    $('p-antecedente').value='';
+  }
+  atualizarSugestaoClasse();
+  atualizarResumoDnd();
+}
 function atualizarRecomendacaoNarrativa(){
   const contexto=contextosDnd[$('p-cenario').value];
   const especialidade=$('p-especialidade').value;
-  const classe=$('p-classe').value;
-  const sugeridas=contexto?.dicas[especialidade]||[];
-  let texto=contexto?.texto||'Escolha um cenário para receber sugestões relacionadas à aventura.';
-  if(especialidade) texto+=' Para '+especialidade.toLowerCase()+', considere '+sugeridas.join(', ')+'.';
-  if(classe && sugeridas.length) texto+=' Sua classe atual ('+classe+') '+(sugeridas.includes(classe)?'é uma opção coerente.':'também pode funcionar com uma interpretação própria.');
-  $('p-contexto').textContent=texto+' A escolha narrativa não concede bônus mecânicos.';
-  $('p-aplicar-contexto').disabled=!sugeridas.length;
-  atualizarSugestaoClasse();
+  const narrativa=fichaNarrativa();
+  let texto=contexto?.texto||'Escolha uma aventura ou cenário para definir seu personagem.';
+  if(narrativa) texto=especialidade
+    ? 'Seu papel na história é '+especialidade+'. '+texto+' Esse papel não impõe uma classe de D&D.'
+    : 'Escolha uma especialidade da história. '+texto;
+  else if(contexto) texto='Esta aventura usa o caminho D&D 2024. Escolha sua classe acima; não precisa selecionar outra especialidade.';
+  $('p-contexto').textContent=texto;
+  $('p-aplicar-contexto').hidden=true;
+  $('p-aplicar-contexto').disabled=true;
+  atualizarModoFicha();
 }
 $('p-cenario').onchange=atualizarContextoDnd;
 $('p-especialidade').onchange=atualizarRecomendacaoNarrativa;
-$('p-classe').addEventListener('change',atualizarRecomendacaoNarrativa);
-$('p-aplicar-contexto').onclick=()=>{
-  const sugeridas=contextosDnd[$('p-cenario').value]?.dicas[$('p-especialidade').value]||[];
-  if (!sugeridas.length)return;
-  if ($('p-classe').value && $('p-classe').value !== sugeridas[0] &&
-      !confirm('Trocar a classe para '+sugeridas[0]+'? Isso altera a previsão de PV.')) return;
-  $('p-classe').value=sugeridas[0];
-  atualizarSugestaoClasse();atualizarResumoDnd();atualizarRecomendacaoNarrativa();
-};
 $('p-aventura').onchange=()=>{
   const a=aventurasFicha.find(x=>String(x.id)===$('p-aventura').value);
   if (a && contextosDnd[a.genero]) {
@@ -255,7 +267,7 @@ const sugestoesDnd = {
 function atualizarSugestaoClasse() {
   const classe = $('p-classe').value;
   const sugerida = sugestoesDnd[classe];
-  $('p-aplicar-sugestao').disabled = !sugerida;
+  $('p-aplicar-sugestao').disabled = fichaNarrativa() || !sugerida;
   $('p-recomendacao').textContent = sugerida
     ? sugerida.dica+' A sugestão usa os 27 pontos e ainda não inclui bônus de antecedente. Você pode modificá-la.'
     : 'Escolha uma classe para ver os atributos que vale a pena priorizar.';
@@ -263,7 +275,7 @@ function atualizarSugestaoClasse() {
 $('p-aplicar-sugestao').onclick = () => {
   const classe = $('p-classe').value;
   const sugerida = sugestoesDnd[classe];
-  if (!sugerida) return;
+  if (fichaNarrativa() || !sugerida) return;
   const atual = atributosDnd.map(([sigla]) => Number($('at-'+sigla).value));
   if (atual.some((valor,i) => valor !== 8 && valor !== sugerida.valores[i]) &&
       !confirm('Aplicar a sugestão substituirá os atributos atuais. Continuar?')) return;
@@ -334,7 +346,7 @@ async function carregarPersonagens(){
     const itens=await api('/api/personagens');
     if(!itens.length){lista.appendChild(el('p','Nenhuma ficha salva ainda. Comece criando sua primeira personagem.','suave'));return;}
     for(const item of itens) {
-      const botao=el('button',(item.nome||'Personagem')+' · Nível '+item.dados.nivel,'personagem-item');
+      const botao=el('button',(item.nome||'Personagem')+(item.dados.metodo==='livre'?' · '+(item.dados.especialidade||'Narrativa'):' · Nível '+item.dados.nivel),'personagem-item');
       botao.type='button';
       botao.onclick=()=>{
         fichaAbertaId=item.id;
@@ -351,7 +363,7 @@ async function carregarPersonagens(){
         $('p-funcao').value=d.funcao||'';
         $('p-aventura').value=String(d.aventuraId||'');
         atualizarRecomendacaoNarrativa();
-        for(const [sigla] of atributosDnd) $('at-'+sigla).value=String(d.atributos[sigla]||8);
+        for(const [sigla] of atributosDnd) $('at-'+sigla).value=String(d.atributos?.[sigla]||8);
         $('ficha-form-titulo').textContent='Editar personagem';
         $('p-remover').hidden=false;
         atualizarPontosDnd();
@@ -364,13 +376,21 @@ async function carregarPersonagens(){
 }
 $('f-personagem').onsubmit=async ev=>{
   ev.preventDefault();
-  if(pontosDnd()>27){aviso('Você ultrapassou 27 pontos. Ajuste os atributos.');return;}
-  const dados={edicao:'2024',metodo:'compra27',nome:$('p-nome').value.trim(),classe:$('p-classe').value.trim(),
-    especie:$('p-especie').value.trim(),antecedente:$('p-antecedente').value.trim(),
-    nivel:Number($('p-nivel').value),notas:$('p-notas').value.trim(),
-    cenario:$('p-cenario').value,especialidade:$('p-especialidade').value,funcao:$('p-funcao').value,
-    aventuraId:$('p-aventura').value?Number($('p-aventura').value):null,atributos:{}};
-  for(const [sigla] of atributosDnd)dados.atributos[sigla]=Number($('at-'+sigla).value);
+  const narrativa=fichaNarrativa();
+  if(!narrativa && pontosDnd()>27){aviso('Você ultrapassou 27 pontos. Ajuste os atributos.');return;}
+  if(narrativa && !$('p-especialidade').value){aviso('Selecione a especialidade da personagem neste cenário.');return;}
+  const dados={
+    edicao:narrativa?'narrativo':'2024',metodo:narrativa?'livre':'compra27',
+    nome:$('p-nome').value.trim(),classe:narrativa?'':$('p-classe').value.trim(),
+    especie:narrativa?'':$('p-especie').value.trim(),antecedente:narrativa?'':$('p-antecedente').value.trim(),
+    nivel:narrativa?1:Number($('p-nivel').value),notas:$('p-notas').value.trim(),
+    cenario:$('p-cenario').value,especialidade:narrativa?$('p-especialidade').value:'',
+    funcao:'',aventuraId:$('p-aventura').value?Number($('p-aventura').value):null
+  };
+  if(!narrativa){
+    dados.atributos={};
+    for(const [sigla] of atributosDnd)dados.atributos[sigla]=Number($('at-'+sigla).value);
+  }
   const botao=$('f-personagem').querySelector('button[type="submit"]');botao.disabled=true;
   try{
     await api(fichaAbertaId?'/api/personagens/'+fichaAbertaId:'/api/personagens',fichaAbertaId?'PUT':'POST',{dados});
