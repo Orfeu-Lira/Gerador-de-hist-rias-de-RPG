@@ -44,11 +44,11 @@ function mostrar(tela) {
 function montarNav() {
   const nav = $('nav');
   nav.replaceChildren();
-  const itens = [['gerador', 'Gerador'], ['dados', 'Dados']];
-  if (eu.logado) itens.push(['historico', 'Histórico']);
-  if (eu.papel === 'admin') itens.push(['admin', 'Painel']);
-  if (!eu.logado) itens.push(['conta', 'Entrar']);
-  itens.forEach(([t, nome]) => { const b = el('button', nome); b.dataset.tela = t; b.onclick = () => mostrar(t); nav.appendChild(b); });
+  const itens = [['gerador', '✦', 'Gerador'], ['dados', '◇', 'Dados']];
+  if (eu.logado) itens.push(['historico', '▤', 'Histórico']);
+  if (eu.papel === 'admin') itens.push(['admin', '⚙', 'Painel']);
+  if (!eu.logado) itens.push(['conta', '↪', 'Entrar']);
+  itens.forEach(([t, simbolo, nome]) => { const b = el('button', simbolo + '   ' + nome); b.dataset.tela = t; b.onclick = () => mostrar(t); nav.appendChild(b); });
   if (eu.logado) {
     const s = el('button', 'Sair');
     s.onclick = async () => { await api('/api/logout', 'POST'); await atualizarEu(); mostrar('gerador'); };
@@ -97,7 +97,13 @@ $('f-gerar').onsubmit = async (ev) => {
   $('b-gerar').disabled = false;
 };
 
-// ---- Dados ----
+// ---- Dados e tutorial para iniciantes ----
+$('abrir-guia-dados').onclick = () => {
+  const painel = $('guia-dados');
+  painel.hidden = !painel.hidden;
+  $('abrir-guia-dados').setAttribute('aria-expanded', String(!painel.hidden));
+  $('abrir-guia-dados').textContent = painel.hidden ? 'Ver tutorial dos dados ↓' : 'Fechar tutorial ↑';
+};
 [4, 6, 8, 10, 12, 20, 100].forEach((lados) => {
   const b = el('button', 'd' + lados, 'dado');
   b.type = 'button';
