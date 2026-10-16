@@ -198,3 +198,15 @@ body.tela-acesso .menu-legenda,body.tela-acesso .menu-rodape{display:none}
 .equipamento-ficha textarea{width:100%;min-height:135px;resize:vertical}
 .equipamento-ficha .guia-abrir:disabled{opacity:.5;cursor:not-allowed}
 .equipamento-ficha .suave{line-height:1.6}
+
+/* Retratos particulares das fichas */
+.avatar-painel{display:flex;gap:20px;align-items:center;flex-wrap:wrap;background:#fff8ea;border:1px solid #d9c39e;border-radius:13px;padding:19px;margin:12px 0 22px}
+.avatar-moldura{flex:0 0 128px;width:128px;height:128px;display:grid;place-items:center;border-radius:14px;border:3px solid #bc9457;background:linear-gradient(145deg,#183b35,#0f2224);overflow:hidden;box-shadow:0 5px 14px #141f1f25}
+.avatar-moldura img{width:100%;height:100%;object-fit:cover}
+.avatar-moldura span{font-size:68px;line-height:1;color:#d6bb83}
+.avatar-acoes{flex:1;min-width:180px}
+.avatar-acoes h3{color:#67412d;margin:0 0 8px}
+.avatar-acoes p{margin:7px 0;font-size:.83rem}
+.avatar-upload{display:inline-flex;cursor:pointer;margin:9px 12px 8px 0}
+.avatar-acoes:has(input:disabled) .avatar-upload{opacity:.5;cursor:not-allowed}
+@media(max-width:560px){.avatar-painel{justify-content:center;text-align:center}.avatar-moldura{margin:auto}.avatar-acoes{min-width:100%}}
