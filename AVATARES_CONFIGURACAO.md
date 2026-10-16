@@ -19,8 +19,8 @@
 6. Publicar apenas após testes. **Produção main não foi modificada.**
 
 ## Geração de avatar por IA — teste no Preview
-1. Confirme que a variável `GEMINI_API_KEY` está configurada no ambiente Preview do Vercel e tem acesso ao modelo de imagens `gemini-2.5-flash-image`.
-2. **Opcional**: `GEMINI_IMAGE_MODEL=gemini-2.5-flash-image` para selecionar o modelo independentemente daquele usado nas aventuras (`GEMINI_MODEL`).
+1. Confirme que a variável `GEMINI_API_KEY` está configurada no ambiente Preview do Vercel e tem acesso faturado ao modelo de imagens `gemini-3.1-flash-lite-image`.
+2. **Opcional**: `GEMINI_IMAGE_MODEL=gemini-3.1-flash-lite-image` para selecionar o modelo independentemente daquele usado nas aventuras (`GEMINI_MODEL`).
 3. No Preview, abra **Personagens**, selecione uma ficha salva, escolha **Estilo do avatar**, descreva a aparência se quiser e clique em **Gerar avatar com IA**.
 4. Aguarde; se a API retornar imagem, ela será otimizada e salva automaticamente. Recarregue a tela e confira se o avatar persiste.
 5. Faça o teste com uma ficha narrativa de outro gênero e confirme que o resultado corresponde ao cenário.
@@ -34,3 +34,10 @@ A aplicação não coloca a chave do Storage no navegador, não gera links públ
 - O recorte inicial é central e automático; ajuste interativo com zoom e posicionamento fica para futura melhoria.
 - O botão só é habilitado após salvar/reabrir a ficha, para que já exista um ID válido.
 - A geração por IA agora usa o mesmo bucket do upload manual, sem disponibilizar o avatar publicamente. O usuário pode substituir o retrato por upload ou gerar um novo avatar.
+
+## Diagnóstico em 16/10/2026
+- A API Gemini retornou HTTP 429 para geração de imagem: não é erro do Supabase nem da ficha.
+- Conforme a tabela oficial de preços, modelos Gemini 3.1 Flash Lite Image e Flash Image **não têm modalidade gratuita de geração de imagens via API**. Pode ser necessário ativar faturamento no Google AI Studio / projeto correspondente antes de continuar. Não efetivar nenhuma cobrança sem verificar o orçamento.
+- Modelo padrão do servidor atualizado para `gemini-3.1-flash-lite-image`; se existir `GEMINI_IMAGE_MODEL` no Vercel, ela prevalece. Atualizar seu valor manualmente para o modelo atual e fazer redeploy.
+- Erros 429 dependem de cota, faturamento ou acesso na conta Google; não se corrigem redefinindo contadores do Mesa.
+- O Chrome exibiu alerta **Perigoso** no domínio Preview. Antes de logar ou inserir chaves nesse endereço, investigar o motivo do alerta no Safe Browsing/Google Search Console e verificar se a URL corresponde ao projeto Vercel legítimo. Não contornar proteção do Chrome.
