@@ -271,6 +271,72 @@ app.post('/api/gerar',asyncHandler(async(req,res) => {
     throw e;
   }
 }));
+// Pesquisa musical opcional: o Gemini escolhe a atmosfera e consulta Google Search Grounding.
+// Não inventar URLs; somente links HTTPS de resultados reais de pesquisa são apresentados.
+const musicaLimite = require('express-rate-limit').rateLimit({
+  windowMs: 15*60*1000, limit: 8, standardHeaders: 'draft-7', legacyHeaders: false,
+  message: {erro:'Muitas buscas de música em pouco tempo. Aguarde alguns minutos.'}
+});
+const dominioMusical = hostname => /(?:^|\.)(?:youtube\.com|youtu\.be|music\.youtube\.com|spotify\.com|open\.spotify\.com|soundcloud\.com|bandcamp\.com|music\.apple\.com|deezer\.com)$/i.test(hostname);
+app.post('/api/musicas',musicaLimite,asyncHandler(async(req,res)=>{
+  const u=await atual(req);
+  if(!u) return res.status(401).json({erro:'Entre na sua conta para pesquisar trilhas musicais.'});
+  const estilo=req.body?.estilo, genero=req.body?.genero, titulo=req.body?.titulo;
+  if(typeof estilo!=='string' || !estilo.trim() || estilo.length>300 ||
+    (genero!==undefined && (typeof genero!=='string'||genero.length>80)) ||
+    (titulo!==undefined && (typeof titulo!=='string'||titulo.length>120)))
+    return res.status(400).json({erro:'Informe uma descrição musical válida.'});
+  const chave='musica:'+u.id+':'+new Date().toISOString().slice(0,10);
+  const limite=u.papel==='admin'?15:4;
+  const uso=await query(
+    'INSERT INTO public.geracoes_limite(identificador,total) VALUES($1,1) ON CONFLICT(identificador) DO UPDATE SET total=public.geracoes_limite.total+1 WHERE public.geracoes_limite.total<$2 RETURNING total',
+    [chave,limite]);
+  if(!uso.rowCount) return res.status(429).json({erro:'Você atingiu o limite de pesquisas musicais de hoje.'});
+  const pesquisa=('RPG ambient soundtrack playlist '+estilo.trim()).slice(0,180);
+  const pesquisaUrl='https://www.google.com/search?q='+encodeURIComponent(pesquisa);
+  try{
+    const modelo=process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
+    const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(modelo)+':generateContent',{
+      method:'POST',
+      headers:{'content-type':'application/json','x-goog-api-key':process.env.GEMINI_API_KEY},
+      signal:AbortSignal.timeout(18000),
+      body:JSON.stringify({
+        contents:[{role:'user',parts:[{text:
+          'Você é curador musical para mesas de RPG. A atmosfera proposta para a aventura é: '+estilo.trim()+
+          '. Gênero: '+String(genero||'não informado')+'. Título: '+String(titulo||'não informado')+
+          '. PESQUISE no Google uma playlist ou música instrumental apropriada em plataformas de música, especialmente YouTube e Spotify. '+
+          'Explique em até duas frases o que ouvir. Responda apenas com texto simples, sem inventar links e sem exigir login em serviços.'
+        }]}],
+        tools:[{google_search:{}}],
+        generationConfig:{maxOutputTokens:370}
+      })
+    });
+    if(!r.ok) throw new Error('Gemini search status '+r.status);
+    const dados=await r.json();
+    const primeiro=dados.candidates?.[0]||{};
+    const chunks=primeiro.groundingMetadata?.groundingChunks||[];
+    const links=[];
+    for(const item of chunks) {
+      const uri=item.web?.uri, nome=item.web?.title;
+      if(typeof uri!=='string')continue;
+      try{
+        const parsed=new URL(uri);
+        if(parsed.protocol!=='https:'||!dominioMusical(parsed.hostname))continue;
+        const url=parsed.toString();
+        if(!links.some(x=>x.url===url))links.push({titulo:typeof nome==='string'?nome.slice(0,110):'Ouvir sugestão musical',url});
+      }catch{}
+      if(links.length>=4)break;
+    }
+    const texto=(primeiro.content?.parts||[]).map(p=>p.text||'').join('').trim();
+    res.json({explicacao:texto.slice(0,600),links,buscaGoogle:pesquisaUrl,
+      aviso:links.length?'Links identificados em resultados da pesquisa Google; confirme se correspondem à música desejada.':
+        'A pesquisa não retornou links diretos verificáveis de plataformas musicais. Use a busca sugerida no Google.'});
+  }catch(e){
+    await query('UPDATE public.geracoes_limite SET total=GREATEST(0,total-1) WHERE identificador=$1',[chave]).catch(()=>{});
+    console.error('Pesquisa musical indisponível:',e.name);
+    return res.status(503).json({erro:'Não foi possível pesquisar músicas agora. Tente novamente mais tarde.',buscaGoogle:pesquisaUrl});
+  }
+}));
 app.get('/api/aventuras',asyncHandler(async(req,res)=>{
   const u=await atual(req);
   if (!u) return res.status(401).json({erro:'Entre para ver seu histórico.'});
