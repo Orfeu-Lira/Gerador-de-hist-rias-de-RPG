@@ -17,3 +17,13 @@ O arquivo `render.yaml` original usa um disco persistente e plano pago. **Esta b
 2. Configurar variáveis de ambiente secretas no provedor.
 3. Testar geração e erros da API Gemini.
 4. Preencher `config.js` com a URL HTTPS real e testar CORS/cookies entre domínios.
+
+
+## Diagnóstico Vercel (16/10/2026)
+O deploy original da branch `main` retorna `SQLITE_CANTOPEN` ao importar `db.js`, pois tenta criar um arquivo SQLite em uma área não gravável da função Vercel.
+
+Esta branch agora contém `api/health.js`, uma função serverless isolada de diagnóstico. Em uma implantação de preview desta branch, teste `/api/health` para verificar se a função responde sem carregar SQLite.
+
+**Não publicar o backend Express atual como função de produção:** ele ainda importa SQLite, exige variáveis de ambiente e depende de sessões persistentes. **Não alterar DATABASE_PATH para /tmp como solução de produção**; isso não oferece persistência nem sessões confiáveis.
+
+A migração de contas, sessões, limites de uso e histórico requer um banco persistente e testes. Até lá, não habilitar geração pública ilimitada: a API Gemini pode consumir cota e gerar cobranças conforme o plano. Nenhuma chave secreta deve ser salva no GitHub.
