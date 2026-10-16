@@ -417,16 +417,21 @@ async function avatarDono(req,res) {
 }
 // Avatar gerado via Gemini Image. Dados da ficha são lidos do banco, não confiados ao cliente.
 // A imagem retorna para o navegador, é comprimida para WebP e então salva no mesmo bucket privado.
+// Habilitação explícita SOMENTE nas implantações de teste do Vercel.
+// Mesmo com flag configurada, produção nunca chama o modelo pago.
+const avatarIaHabilitada=()=>process.env.VERCEL_ENV==='preview' &&
+  process.env.MESA_AVATAR_AI_ENABLED==='true' &&
+  avatarConfigurado() && Boolean(process.env.GEMINI_API_KEY);
+app.get('/api/avatar-ia/status',(req,res)=>res.json({habilitado:avatarIaHabilitada()}));
 const avatarEstilos=['Fantasia ilustrada','Realismo cinematográfico','Anime','Pintura clássica'];
 const gerarAvatarLimite=require('express-rate-limit').rateLimit({
   windowMs:15*60*1000,limit:10,skipFailedRequests:true,standardHeaders:'draft-7',legacyHeaders:false,
   message:{erro:'Muitas solicitações em sequência. Aguarde 15 minutos antes de tentar novamente.'}
 });
 app.post('/api/personagens/:id/avatar/gerar',gerarAvatarLimite,asyncHandler(async(req,res)=>{
-  // Desativado por padrão até que haja faturamento e controle de assinatura.
-  // Proteção no servidor: não depende do botão estar desabilitado no navegador.
-  if(process.env.MESA_AVATAR_AI_ENABLED!=='true')
-    return res.status(503).json({erro:'Geração de avatares por IA em preparação. Por enquanto, use Enviar imagem.'});
+  // Proteção no servidor: a flag só vale em Preview, nunca em produção.
+  if(!avatarIaHabilitada())
+    return res.status(503).json({erro:'Geração com IA não habilitada neste ambiente. Habilite apenas no Preview após conferir sua cota e seus custos.'});
   const acesso=await avatarDono(req,res);if(!acesso)return;
   const estilo=req.body?.estilo||'Fantasia ilustrada';
   const aparencia=req.body?.aparencia||'';
