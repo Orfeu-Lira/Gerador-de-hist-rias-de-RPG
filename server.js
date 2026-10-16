@@ -64,6 +64,8 @@ app.use((req,res,next) => {
   }
   next();
 });
+// Só o upload de avatar aceita payload maior; demais rotas continuam limitadas a 10kb.
+app.use(/^\/api\/personagens\/\d+\/avatar$/, express.json({limit:'650kb'}));
 app.use(express.json({ limit: '10kb' }));
 app.use(session({
   name: 'mesa.sid', secret: process.env.SESSION_SECRET,
@@ -396,6 +398,63 @@ function validarFichaDnd(dados) {
   const custo = valores.reduce((s,v) => s+CUSTOS_DND[v],0);
   return custo <= 27;
 }
+// Avatar privado no Supabase Storage. A chave de serviço fica SOMENTE no servidor.
+const avatarConfigurado=()=>Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+const avatarBase=()=>{
+  const u=new URL(process.env.SUPABASE_URL);
+  if(u.protocol!=='https:' || u.username || u.password)throw new Error('URL Supabase inválida');
+  return u.origin+'/storage/v1/object/mesa-avatares/';
+};
+const avatarHeaders=()=>({Authorization:'Bearer '+process.env.SUPABASE_SERVICE_ROLE_KEY,apikey:process.env.SUPABASE_SERVICE_ROLE_KEY});
+async function avatarDono(req,res) {
+  const u=await atual(req);
+  if(!u){res.status(401).json({erro:'Faça login para acessar o avatar.'});return null;}
+  const id=Number(req.params.id);
+  if(!Number.isSafeInteger(id)||id<1){res.status(400).json({erro:'Identificador inválido.'});return null;}
+  const r=await query('SELECT id FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2',[id,u.id]);
+  if(!r.rowCount){res.status(404).json({erro:'Ficha não encontrada.'});return null;}
+  return {u,id};
+}
+app.post('/api/personagens/:id/avatar',asyncHandler(async(req,res)=>{
+  const acesso=await avatarDono(req,res);if(!acesso)return;
+  if(!avatarConfigurado())return res.status(503).json({erro:'O armazenamento de avatares ainda precisa ser configurado.'});
+  const base64=req.body?.imagem;
+  if(typeof base64!=='string'||base64.length<80||base64.length>525000||!/^[a-zA-Z0-9+/]+={0,2}$/.test(base64))
+    return res.status(400).json({erro:'Imagem inválida ou grande demais.'});
+  const imagem=Buffer.from(base64,'base64');
+  if(imagem.length>393216||imagem.length<64||imagem.toString('ascii',0,4)!=='RIFF'||imagem.toString('ascii',8,12)!=='WEBP')
+    return res.status(400).json({erro:'Use uma imagem WebP válida de até 384 KB.'});
+  const path=acesso.u.id+'/'+acesso.id+'/avatar.webp';
+  const url=avatarBase()+path;
+  const resposta=await fetch(url,{method:'POST',headers:{...avatarHeaders(),'Content-Type':'image/webp','x-upsert':'true'},body:imagem,signal:AbortSignal.timeout(15000)});
+  if(!resposta.ok){console.error('Supabase avatar upload:',resposta.status);return res.status(503).json({erro:'Não foi possível guardar o avatar agora.'});}
+  await query('INSERT INTO public.personagem_avatares(personagem_id,storage_path) VALUES($1,$2) ON CONFLICT(personagem_id) DO UPDATE SET storage_path=EXCLUDED.storage_path, atualizado_em=NOW()',[acesso.id,path]);
+  res.json({ok:true});
+}));
+app.get('/api/personagens/:id/avatar',asyncHandler(async(req,res)=>{
+  const acesso=await avatarDono(req,res);if(!acesso)return;
+  if(!avatarConfigurado())return res.status(503).json({erro:'Armazenamento não configurado.'});
+  const r=await query('SELECT storage_path FROM public.personagem_avatares WHERE personagem_id=$1',[acesso.id]);
+  if(!r.rowCount)return res.status(404).json({erro:'Esta ficha ainda não tem avatar.'});
+  const path=r.rows[0].storage_path;
+  // Não usar URL fornecida pelo usuário; sempre recuperar caminho autenticado do banco.
+  const response=await fetch(avatarBase()+path,{headers:avatarHeaders(),signal:AbortSignal.timeout(15000)});
+  if(!response.ok)return res.status(503).json({erro:'Não foi possível carregar o avatar.'});
+  const tipo=response.headers.get('content-type')||'';
+  if(!tipo.includes('image/webp'))return res.status(502).json({erro:'Formato de avatar inesperado.'});
+  const bytes=Buffer.from(await response.arrayBuffer());
+  if(bytes.length>393216)return res.status(502).json({erro:'Avatar muito grande.'});
+  res.set({'Content-Type':'image/webp','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}).send(bytes);
+}));
+app.delete('/api/personagens/:id/avatar',asyncHandler(async(req,res)=>{
+  const acesso=await avatarDono(req,res);if(!acesso)return;
+  const r=await query('DELETE FROM public.personagem_avatares WHERE personagem_id=$1 RETURNING storage_path',[acesso.id]);
+  if(r.rowCount && avatarConfigurado()){
+    fetch(avatarBase()+r.rows[0].storage_path,{method:'DELETE',headers:avatarHeaders(),signal:AbortSignal.timeout(12000)})
+      .catch(e=>console.error('Falha ao limpar avatar:',e.name));
+  }
+  res.json({ok:true});
+}));
 app.get('/api/personagens',asyncHandler(async(req,res)=>{
   const u=await atual(req);if(!u) return res.status(401).json({erro:'Entre na sua conta para consultar suas fichas.'});
   const r=await query('SELECT id,nome,dados,atualizado_em FROM public.personagens_dnd WHERE usuario_id=$1 ORDER BY atualizado_em DESC LIMIT 50',[u.id]);
