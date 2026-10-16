@@ -65,6 +65,7 @@
       <input id="l-email" type="email" autocomplete="email" required>
       <label for="l-senha">Senha</label>
       <input id="l-senha" type="password" autocomplete="current-password" required>
+      <p class="recuperar-atalho"><button type="button" class="link" id="ir-recuperar">Esqueceu sua senha?</button></p>
       <p class="acoes"><button class="principal" type="submit">Entrar</button></p>
       <p class="suave">Não tem conta? <button type="button" class="link" id="ir-cadastro">Criar conta</button></p>
     </form>
@@ -74,12 +75,24 @@
       <input id="c-email" type="email" autocomplete="email" required>
       <label for="c-senha">Senha</label>
       <input id="c-senha" type="password" autocomplete="new-password" minlength="8" maxlength="72" required>
-      <p class="suave">Mínimo de 8 caracteres.</p>
-      <label for="c-token-bootstrap">Token inicial do administrador (opcional)</label>
-      <input id="c-token-bootstrap" type="password" autocomplete="off">
-      <p class="suave">Esse campo é exclusivo da configuração inicial de administrador.</p>
+      <p class="suave" id="dica-senha">Dica: use de 8 a 72 caracteres e prefira uma frase longa, única e difícil de adivinhar. Não reutilize senhas.</p>
+      <details class="admin-explicacao"><summary>O que é o token de administrador?</summary><p>É um código secreto definido pelo responsável pelo Mesa na configuração do servidor. Serve apenas para criar a primeira conta de administrador. <strong>Se você é jogador, deixe esse campo vazio.</strong> Não é uma senha comum e nunca deve ser compartilhado.</p><label for="c-token-bootstrap">Token inicial de administrador (somente responsável)</label><input id="c-token-bootstrap" type="password" autocomplete="off"></details>
       <p class="acoes"><button class="principal" type="submit">Criar conta</button></p>
       <p class="suave">Já tem conta? <button type="button" class="link" id="ir-login">Entrar</button></p>
+    </form>
+    <form id="f-recuperar" class="folha estreita" hidden>
+      <h2>Recuperar acesso</h2>
+      <p class="suave">Informe seu e-mail cadastrado. Se houver uma conta e o serviço estiver configurado, enviaremos um link temporário para trocar a senha.</p>
+      <label for="r-email">E-mail da conta</label><input id="r-email" type="email" autocomplete="email" required>
+      <p class="acoes"><button class="principal" type="submit">Enviar link de recuperação</button></p>
+      <p class="suave"><button type="button" class="link" id="recuperar-voltar">Voltar para entrar</button></p>
+    </form>
+    <form id="f-redefinir" class="folha estreita" hidden>
+      <h2>Definir nova senha</h2><p class="suave">Escolha uma senha nova e não reutilizada.</p>
+      <label for="nova-senha">Nova senha</label><input id="nova-senha" type="password" autocomplete="new-password" minlength="8" maxlength="72" required>
+      <label for="nova-senha-confirmacao">Confirme a nova senha</label><input id="nova-senha-confirmacao" type="password" autocomplete="new-password" minlength="8" maxlength="72" required>
+      <p class="acoes"><button class="principal" type="submit">Salvar nova senha</button></p>
+      <p class="suave"><button type="button" class="link" id="redefinir-voltar">Voltar para entrar</button></p>
     </form>
     </div>
     <button id="voltar-inicio" class="voltar-inicio" type="button">← Voltar ao início</button>
