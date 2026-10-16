@@ -15,7 +15,9 @@
 <main>
   <header class="topo">
     <a href="/" class="marca" aria-label="Mesa, voltar ao início"><span class="marca-emblema" aria-hidden="true">✦</span><span><strong>MESA</strong><small>FERRAMENTAS PARA MESTRES</small></span></a>
-    <nav id="nav" aria-label="Principal"></nav>
+    <span class="menu-legenda">SUA MESA DE JOGO</span>
+    <nav id="nav" aria-label="Menu principal"></nav>
+    <p class="menu-rodape">✧ Cada história começa com uma escolha.</p>
   </header>
   <p id="aviso" role="status"></p>
 
@@ -40,6 +42,21 @@
 
   <section id="v-dados" hidden>
     <div class="pagina-intro"><span class="sobretitulo">FERRAMENTAS DO MESTRE</span><h1>Oráculo dos dados</h1><p>Um pouco de sorte para escrever o próximo destino.</p></div>
+    <div class="folha">
+      <div class="guia-abertura"><div><span class="sobretitulo">PRIMEIRA VEZ JOGANDO?</span><h2>Descubra como rolar os dados</h2><p>Em D&D, os dados ajudam a determinar resultados de ações, ataques, cura e dano.</p></div><button class="guia-abrir" id="abrir-guia-dados" type="button" aria-expanded="false" aria-controls="guia-dados">Ver tutorial dos dados ↓</button></div>
+      <div id="guia-dados" hidden>
+        <p class="guia-definicao"><strong>O que significa d20?</strong> A letra <strong>d</strong> quer dizer dado; o número indica quantas faces ele possui. Um <strong>d20</strong> tem 20 faces, e cada uma pode mostrar um número de 1 a 20.</p>
+        <div class="guia-grade">
+          <article><svg viewBox="0 0 130 115" role="img" aria-label="Ilustração de dado de quatro faces d4"><polygon points="65,9 7,104 123,104" fill="#ba7552" stroke="#6b372c" stroke-width="3"/><path d="M65 9V104M7 104 65 73 123 104" fill="none" stroke="#eccba0" stroke-width="3"/><text x="65" y="63">4</text></svg><strong>d4</strong><p>Quatro faces. Aparece em efeitos menores, como alguns danos e curas.</p></article>
+          <article><svg viewBox="0 0 130 115" role="img" aria-label="Ilustração de dado de seis faces d6"><path d="M65 8 113 34V90L65 115 17 90V34Z" fill="#a95036" stroke="#632b26" stroke-width="3"/><path d="M17 34 65 61 113 34M65 61V115" fill="none" stroke="#eac78e" stroke-width="3"/><text x="65" y="87">6</text></svg><strong>d6</strong><p>Seis faces. É comum em dano, cura e outras rolagens.</p></article>
+          <article><svg viewBox="0 0 130 115" role="img" aria-label="Ilustração de dado de oito faces d8"><polygon points="65,6 118,56 65,109 12,56" fill="#b45f43" stroke="#682f25" stroke-width="3"/><path d="M12 56H118L65 6 65 109" fill="none" stroke="#eac78e" stroke-width="3"/><text x="65" y="77">8</text></svg><strong>d8</strong><p>Oito faces. Pode ser usado em danos de armas e magias.</p></article>
+          <article><svg viewBox="0 0 130 115" role="img" aria-label="Ilustração de dado de dez faces d10"><polygon points="65,5 115,55 65,112 15,55" fill="#ab503e" stroke="#682f25" stroke-width="3"/><path d="M65 5V112M15 55 65 72 115 55" fill="none" stroke="#eac78e" stroke-width="3"/><text x="65" y="64">10</text></svg><strong>d10</strong><p>Dez faces. Usado em algumas magias, ataques e tabelas.</p></article>
+          <article><svg viewBox="0 0 130 115" role="img" aria-label="Ilustração de dado de doze faces d12"><polygon points="65,5 101,20 121,55 105,93 65,111 24,93 9,55 29,20" fill="#aa5539" stroke="#682f25" stroke-width="3"/><path d="M29 20 65 47 101 20M9 55 65 47 121 55M24 93 65 47 105 93M65 111V47" fill="none" stroke="#eac78e" stroke-width="2"/><text x="65" y="71">12</text></svg><strong>d12</strong><p>Doze faces. Aparece em algumas armas e habilidades.</p></article>
+          <article><svg viewBox="0 0 130 115" role="img" aria-label="Ilustração de dado de vinte faces d20"><polygon points="65,4 110,28 123,73 65,111 7,73 20,28" fill="#a74f35" stroke="#632b26" stroke-width="3"/><path d="M65 4 37 65 93 65ZM7 73 37 65 65 111 93 65 123 73M20 28 37 65M110 28 93 65" fill="none" stroke="#eac78e" stroke-width="2.5"/><text x="65" y="77">20</text></svg><strong>d20</strong><p>Vinte faces. É o principal dado de testes, ataques e resistências.</p></article>
+        </div>
+        <div class="guia-exemplo"><h3>Exemplo prático: o personagem tenta abrir uma porta</h3><p>O mestre pode pedir um teste. O jogador rola <strong>1d20</strong>, soma o modificador aplicável e compara o total à dificuldade (CD) definida pelo mestre. Se o resultado for igual ou maior que a CD, o teste geralmente é bem-sucedido.</p><p><strong>Exemplo:</strong> 1d20 = 12, modificador = +3, total = <strong>15</strong>. Se a CD for 14, o teste passa.</p><p><strong>2d6</strong> significa rolar dois dados de seis faces e somar os resultados. Isso não é o mesmo que rolar 1d12.</p></div>
+      </div>
+    </div>
     <div class="folha">
       <label for="qtd">Quantidade de dados</label>
       <input id="qtd" type="number" min="1" max="20" value="1" class="curto">
