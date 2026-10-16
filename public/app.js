@@ -146,6 +146,41 @@ const classesVidaDnd = {
   'Bardo':[8,5], 'Clérigo':[8,5], 'Druida':[8,5], 'Monge':[8,5],
   'Ladino':[8,5], 'Bruxo':[8,5], 'Feiticeiro':[6,4], 'Mago':[6,4]
 };
+// Sugestões não obrigatórias: distribuição padrão da criação 2024 (15,14,13,12,10,8).
+// Ordem: Força, Destreza, Constituição, Inteligência, Sabedoria, Carisma.
+const sugestoesDnd = {
+  'Bárbaro':   {valores:[15,13,14,10,12,8], dica:'Força para ataques e Constituição para resistência. Destreza também ajuda na defesa.'},
+  'Bardo':     {valores:[8,14,12,13,10,15], dica:'Carisma melhora a conjuração e habilidades sociais. Destreza é útil para defesa.'},
+  'Clérigo':   {valores:[14,8,13,10,15,12], dica:'Sabedoria alimenta suas magias. Força pode ajudar clérigos mais voltados ao combate físico.'},
+  'Druida':    {valores:[8,12,14,13,15,10], dica:'Sabedoria impulsiona as magias; Constituição ajuda a suportar danos e a manter concentração.'},
+  'Guerreiro': {valores:[15,14,13,8,10,12], dica:'Força favorece uma construção corpo a corpo; guerreiros de arco ou armas de Finesse podem preferir Destreza.'},
+  'Monge':     {valores:[12,15,13,10,14,8], dica:'Destreza é central para ataques e defesa; Sabedoria também é importante para várias habilidades de monge.'},
+  'Paladino':  {valores:[15,10,13,8,12,14], dica:'Força favorece combate com armas e Carisma sustenta suas habilidades mágicas.'},
+  'Patrulheiro':{valores:[12,15,13,8,14,10], dica:'Destreza costuma ajudar nos ataques; Sabedoria apoia conjuração e percepção.'},
+  'Ladino':    {valores:[12,15,13,14,10,8], dica:'Destreza facilita ataques com armas adequadas, furtividade e defesa. Inteligência ajuda em perícias investigativas.'},
+  'Feiticeiro':{valores:[10,13,14,8,12,15], dica:'Carisma é o atributo mágico principal. Constituição ajuda a resistir e a manter a concentração.'},
+  'Bruxo':     {valores:[8,14,13,12,10,15], dica:'Carisma é a principal escolha mágica. Destreza e Constituição contribuem para a sobrevivência.'},
+  'Mago':      {valores:[8,12,13,15,14,10], dica:'Inteligência é essencial às magias de mago. Constituição e Destreza ajudam na sobrevivência.'}
+};
+function atualizarSugestaoClasse() {
+  const classe = $('p-classe').value;
+  const sugerida = sugestoesDnd[classe];
+  $('p-aplicar-sugestao').disabled = !sugerida;
+  $('p-recomendacao').textContent = sugerida
+    ? sugerida.dica+' A sugestão usa os 27 pontos e ainda não inclui bônus de antecedente. Você pode modificá-la.'
+    : 'Escolha uma classe para ver os atributos que vale a pena priorizar.';
+}
+$('p-aplicar-sugestao').onclick = () => {
+  const classe = $('p-classe').value;
+  const sugerida = sugestoesDnd[classe];
+  if (!sugerida) return;
+  const atual = atributosDnd.map(([sigla]) => Number($('at-'+sigla).value));
+  if (atual.some((valor,i) => valor !== 8 && valor !== sugerida.valores[i]) &&
+      !confirm('Aplicar a sugestão substituirá os atributos atuais. Continuar?')) return;
+  atributosDnd.forEach(([sigla],i) => { $('at-'+sigla).value = String(sugerida.valores[i]); });
+  atualizarPontosDnd();
+};
+$('p-classe').addEventListener('change', atualizarSugestaoClasse);
 function atualizarResumoDnd() {
   const gastos = pontosDnd();
   $('p-gastos').textContent = gastos + ' / 27';
@@ -199,6 +234,7 @@ function limparFicha(){
   $('ficha-form-titulo').textContent='Nova personagem';
   $('p-remover').hidden=true;
   atualizarPontosDnd();
+  atualizarSugestaoClasse();
 }
 $('nova-ficha').onclick=limparFicha;
 async function carregarPersonagens(){
@@ -222,6 +258,7 @@ async function carregarPersonagens(){
         $('ficha-form-titulo').textContent='Editar personagem';
         $('p-remover').hidden=false;
         atualizarPontosDnd();
+        atualizarSugestaoClasse();
         $('f-personagem').scrollIntoView({behavior:'smooth',block:'start'});
       };
       lista.appendChild(botao);
@@ -249,6 +286,7 @@ $('p-remover').onclick=async()=>{
   catch(e){aviso(e.message);}
 };
 atualizarPontosDnd();
+atualizarSugestaoClasse();
 // ---- Tutor com IA, sem execução automática de mudanças nas fichas ----
 $('f-ajuda-dnd').onsubmit=async ev=>{
   ev.preventDefault();
