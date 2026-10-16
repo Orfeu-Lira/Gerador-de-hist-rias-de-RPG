@@ -74,38 +74,39 @@
   </section>
 
   <section id="v-personagens" hidden>
-    <div class="pagina-intro"><span class="sobretitulo">D&D 5e • REGRAS 2024</span><h1>Fichas de personagens</h1><p>Monte sua personagem, distribua os atributos e guarde sua jornada.</p></div>
+    <div class="pagina-intro"><span class="sobretitulo">PERSONAGENS & HISTÓRIAS</span><h1>Fichas de personagens</h1><p>O cenário define o tipo de ficha: D&D 2024 para fantasia ou perfil narrativo para outros mundos.</p></div>
     <div class="ficha-layout">
       <div class="folha"><div class="painel-titulo"><h2>Minha biblioteca</h2><button id="nova-ficha" class="guia-abrir" type="button">+ Nova ficha</button></div><div id="personagens-lista"></div><p class="suave">As fichas são privadas e ficam vinculadas à sua conta.</p></div>
       <form id="f-personagem" class="folha" autocomplete="off">
         <h2 id="ficha-form-titulo">Nova personagem</h2>
         <div class="grade grade-ficha">
           <div><label for="p-nome">Nome</label><input id="p-nome" maxlength="100" required placeholder="Nome da personagem"></div>
-          <div><label for="p-classe">Classe para o cálculo de PV</label><select id="p-classe"><option value="">Selecione uma classe</option><option>Bárbaro</option><option>Bardo</option><option>Bruxo</option><option>Clérigo</option><option>Druida</option><option>Feiticeiro</option><option>Guerreiro</option><option>Ladino</option><option>Mago</option><option>Monge</option><option>Paladino</option><option>Patrulheiro</option></select></div>
-          <div><label for="p-nivel">Nível</label><input id="p-nivel" type="number" min="1" max="20" value="1" required></div>
-          <div><label for="p-especie">Espécie</label><input id="p-especie" maxlength="70" placeholder="Ex.: Humano"></div>
-          <div><label for="p-antecedente">Antecedente</label><input id="p-antecedente" maxlength="70" placeholder="Ex.: Sábio"></div>
+          <div class="campo-dnd"><label for="p-classe">Classe para o cálculo de PV</label><select id="p-classe"><option value="">Selecione uma classe</option><option>Bárbaro</option><option>Bardo</option><option>Bruxo</option><option>Clérigo</option><option>Druida</option><option>Feiticeiro</option><option>Guerreiro</option><option>Ladino</option><option>Mago</option><option>Monge</option><option>Paladino</option><option>Patrulheiro</option></select></div>
+          <div class="campo-dnd"><label for="p-nivel">Nível</label><input id="p-nivel" type="number" min="1" max="20" value="1" required></div>
+          <div class="campo-dnd"><label for="p-especie">Espécie</label><input id="p-especie" maxlength="70" placeholder="Ex.: Humano"></div>
+          <div class="campo-dnd"><label for="p-antecedente">Antecedente</label><input id="p-antecedente" maxlength="70" placeholder="Ex.: Sábio"></div>
         </div>
         <div class="cenario-ficha">
           <span class="sobretitulo">PERSONAGEM & HISTÓRIA</span><h3>Onde essa personagem se encaixa?</h3>
-          <p class="suave">Associe a uma aventura que você criou ou escolha um cenário. A especialidade define o papel na história, sem mudar as regras oficiais de classe do D&D.</p>
+          <p class="suave">Associe a uma aventura ou escolha o cenário primeiro. O Mesa mostrará apenas as escolhas adequadas a esse universo.</p>
           <div class="grade grade-ficha">
             <div><label for="p-aventura">Aventura do Mesa (opcional)</label><select id="p-aventura"><option value="">Nenhuma aventura vinculada</option></select></div>
             <div><label for="p-cenario">Tipo de história</label><select id="p-cenario"><option value="">Escolha um cenário</option></select></div>
-            <div><label for="p-especialidade">Especialidade narrativa</label><select id="p-especialidade"><option value="">Escolha a especialidade</option></select></div>
-            <div><label for="p-funcao">Função no grupo (opcional)</label><select id="p-funcao"><option value="">Sem função definida</option><option value="Defensor">Defensor</option><option value="Explorador">Explorador</option><option value="Investigador">Investigador</option><option value="Negociador">Negociador</option><option value="Curandeiro">Curandeiro</option><option value="Especialista em combate">Especialista em combate</option></select></div>
+            <div id="campo-especialidade"><label for="p-especialidade">Especialidade da história</label><select id="p-especialidade"><option value="">Escolha a especialidade</option></select></div>
+            <div id="campo-funcao" hidden><label for="p-funcao">Função no grupo (opcional)</label><select id="p-funcao"><option value="">Sem função definida</option><option value="Defensor">Defensor</option><option value="Explorador">Explorador</option><option value="Investigador">Investigador</option><option value="Negociador">Negociador</option><option value="Curandeiro">Curandeiro</option><option value="Especialista em combate">Especialista em combate</option></select></div>
           </div>
           <p id="p-contexto" class="contexto-ajuda">Escolha uma história para receber sugestões de funções e estilos que combinem com ela.</p>
-          <button id="p-aplicar-contexto" type="button" class="guia-abrir" disabled>Usar sugestão para esta história</button>
+          <button id="p-aplicar-contexto" type="button" class="guia-abrir" hidden disabled>Usar sugestão para esta história</button>
         </div>
-        <div class="painel-titulo"><div><h3>Compra de atributos</h3><p class="suave">27 pontos para os seis atributos. Valores iniciais de 8 a 15.</p></div><div id="p-pontos" class="pontos-contador" aria-live="polite">0 gastos • 27 restantes</div></div>
+        <div id="p-regras-dnd"><div class="painel-titulo"><div><h3>Compra de atributos</h3><p class="suave">27 pontos para os seis atributos. Valores iniciais de 8 a 15.</p></div><div id="p-pontos" class="pontos-contador" aria-live="polite">0 gastos • 27 restantes</div></div>
         <div class="sugestao-classe"><div><span class="sobretitulo">DISTRIBUIÇÃO RECOMENDADA</span><h3>Sugestão para sua classe</h3><p id="p-recomendacao" class="suave" aria-live="polite">Escolha uma classe para ver os atributos que vale a pena priorizar.</p></div><button type="button" id="p-aplicar-sugestao" class="guia-abrir" disabled>Aplicar sugestão de 27 pontos</button></div>
         <div id="p-atributos" class="atributos-grade"></div>
         <div class="ficha-resumo" id="p-resumo" aria-live="polite"><div><span>Pontos usados</span><strong id="p-gastos">0 / 27</strong></div><div><span>PV máximos estimados</span><strong id="p-pv">Selecione uma classe</strong></div><div><span>Dado de vida</span><strong id="p-dado-vida">—</strong></div><div><span>Bônus de proficiência</span><strong id="p-proficiencia">+2</strong></div><p id="p-pv-nota" class="suave">Os PV consideram apenas atributos base, uma única classe e o valor fixo por nível.</p></div>
         <div class="ficha-ajuda"><strong>Como calcular o modificador?</strong> A fórmula é ⌊(atributo − 10) ÷ 2⌋. Por exemplo, 14 equivale a +2. Os bônus do antecedente de 2024 ainda não são somados nesta versão inicial.</div>
         <label for="p-notas">Anotações da personagem</label><textarea id="p-notas" maxlength="1500" rows="4" placeholder="História, equipamento, perícias e observações..."></textarea>
         <div class="acoes"><button type="submit" class="principal">Salvar ficha</button><button id="p-remover" type="button" class="apagar-ficha" hidden>Excluir ficha</button></div>
-        <p class="suave">Os PV mostrados são uma estimativa para personagem de classe única, com progressão fixa, sem bônus de antecedente, talentos ou efeitos especiais. A CA, perícias e características de classe ainda não são calculadas.</p>
+        <p class="suave">Os PV mostrados são uma estimativa para personagem de classe única, com progressão fixa, sem bônus de antecedente, talentos ou efeitos especiais. A CA, perícias e características de classe ainda não são calculadas.</p></div>
+        <div id="p-perfil-narrativo" class="perfil-narrativo" hidden><h3>Ficha narrativa</h3><p>Neste cenário, seu personagem é definido pela especialidade, pelo vínculo com a aventura e por sua história. Não vamos atribuir classes, pontos de vida ou bônus de D&D a um mundo que não utiliza essas regras.</p><p>Descreva recursos, habilidades, equipamentos ou limitações no campo de anotações. Regras próprias de combate e evolução poderão ser configuradas depois.</p></div>
       </form>
     </div>
   </section>
