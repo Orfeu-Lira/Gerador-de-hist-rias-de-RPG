@@ -287,6 +287,22 @@ function validarFichaDnd(dados) {
       typeof dados.especie !== 'string' || dados.especie.length > 70 ||
       typeof dados.antecedente !== 'string' || dados.antecedente.length > 70 ||
       typeof dados.notas !== 'string' || dados.notas.length > 1500) return false;
+  const cenarios = ['','Piratas e mares','Fantasia épica','Fantasia sombria','Investigação','Terror','Ficção científica'];
+  const especialidadesPorCenario = {
+    'Piratas e mares':['Capitão','Navegador','Artilheiro','Médico de bordo','Espião do porto','Caçador de tesouros'],
+    'Fantasia épica':['Cavaleiro','Guardião','Batedor','Diplomata','Erudito arcano','Curandeiro itinerante'],
+    'Fantasia sombria':['Caçador de monstros','Ocultista','Inquisidor','Sobrevivente','Médico de campanha','Investigador de maldições'],
+    'Investigação':['Detetive','Infiltrador','Perito','Interrogador','Pesquisador','Protetor da equipe'],
+    'Terror':['Sobrevivente','Especialista em rituais','Protetor','Investigador','Socorrista','Explorador de ruínas'],
+    'Ficção científica':['Piloto','Engenheiro','Diplomata','Batedor','Médico','Oficial de segurança']
+  };
+  const funcoes = ['','Defensor','Explorador','Investigador','Negociador','Curandeiro','Especialista em combate'];
+  if(dados.cenario !== undefined && !cenarios.includes(dados.cenario)) return false;
+  if(dados.especialidade !== undefined && 
+    !(dados.especialidade === '' || (especialidadesPorCenario[dados.cenario]||[]).includes(dados.especialidade))) return false;
+  if(dados.funcao !== undefined && !funcoes.includes(dados.funcao)) return false;
+  if(dados.aventuraId !== undefined && dados.aventuraId !== null &&
+     (!Number.isSafeInteger(dados.aventuraId) || dados.aventuraId < 1)) return false;
   if (!Number.isInteger(dados.nivel) || dados.nivel < 1 || dados.nivel > 20) return false;
   if (!dados.atributos || typeof dados.atributos !== 'object') return false;
   const valores = CHAVES_DND.map(k => dados.atributos[k]);
@@ -302,6 +318,10 @@ app.get('/api/personagens',asyncHandler(async(req,res)=>{
 app.post('/api/personagens',asyncHandler(async(req,res)=>{
   const u=await atual(req);if(!u) return res.status(401).json({erro:'Entre na sua conta para salvar uma ficha.'});
   const dados=req.body?.dados;if(!validarFichaDnd(dados)) return res.status(400).json({erro:'Ficha inválida. Use atributos base entre 8 e 15 e até 27 pontos.'});
+  if (dados.aventuraId) {
+    const a=await query('SELECT 1 FROM public.aventuras WHERE id=$1 AND usuario_id=$2',[dados.aventuraId,u.id]);
+    if(!a.rowCount) return res.status(400).json({erro:'A aventura selecionada não está disponível na sua conta.'});
+  }
   const r=await query('INSERT INTO public.personagens_dnd(usuario_id,nome,dados) VALUES($1,$2,$3::jsonb) RETURNING id',[u.id,dados.nome.trim(),JSON.stringify(dados)]);
   res.status(201).json({id:r.rows[0].id});
 }));
@@ -309,6 +329,10 @@ app.put('/api/personagens/:id',asyncHandler(async(req,res)=>{
   const u=await atual(req);if(!u) return res.status(401).json({erro:'Entre na sua conta.'});
   const id=Number(req.params.id),dados=req.body?.dados;
   if(!Number.isSafeInteger(id)||id<1||!validarFichaDnd(dados)) return res.status(400).json({erro:'Ficha inválida.'});
+  if (dados.aventuraId) {
+    const a=await query('SELECT 1 FROM public.aventuras WHERE id=$1 AND usuario_id=$2',[dados.aventuraId,u.id]);
+    if(!a.rowCount) return res.status(400).json({erro:'A aventura selecionada não está disponível na sua conta.'});
+  }
   const r=await query('UPDATE public.personagens_dnd SET nome=$1,dados=$2::jsonb,atualizado_em=NOW() WHERE id=$3 AND usuario_id=$4 RETURNING id',[dados.nome.trim(),JSON.stringify(dados),id,u.id]);
   if(!r.rowCount) return res.status(404).json({erro:'Ficha não encontrada.'});
   res.json({ok:true});
