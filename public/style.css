@@ -79,3 +79,38 @@ body.tela-acesso main{max-width:600px;padding:8px 20px 75px}
 @media(max-width:800px){.hero{grid-template-columns:1fr;padding:50px 8px 30px;min-height:auto}.hero-arte{display:none}.grade{grid-template-columns:1fr 1fr}.passos{grid-template-columns:1fr}.historico-grade{grid-template-columns:1fr}}
 @media(max-width:560px){main{padding:12px 16px 60px}.topo{padding:14px 16px;flex-wrap:wrap}.topo nav{justify-content:center;width:100%}.marca strong{font-size:20px}.marca-emblema{width:42px;height:42px}.hero{padding:38px 0 30px}.hero h1{font-size:2.45rem}.grade{grid-template-columns:1fr}.folha,.formulario{padding:23px 18px}.gerador-acoes{align-items:stretch;flex-direction:column-reverse}.gerador-acoes button{width:100%}.acesso-cartao{padding:26px 20px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+/* Navegação lateral para as ferramentas de Mestre */
+@media (min-width:950px){
+  body:not(.tela-acesso) main{max-width:1180px;margin-left:max(270px,calc((100vw - 1480px)/2 + 270px));margin-right:auto;padding:24px 40px 80px}
+  body:not(.tela-acesso) .topo{position:fixed;z-index:20;top:0;bottom:0;left:max(0px,calc((100vw - 1480px)/2));width:260px;max-width:none;padding:30px 19px;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:27px;border-bottom:0;border-right:1px solid #c8a46b45;background:linear-gradient(#0b2222,#102d2a);box-shadow:8px 0 25px #00000018}
+  body:not(.tela-acesso) nav{display:flex;flex-direction:column;align-items:stretch;gap:9px;width:100%}
+  body:not(.tela-acesso) nav button{width:100%;text-align:left;border-radius:9px;padding:12px 14px}
+  body:not(.tela-acesso) nav button[aria-current="true"]{background:#d4b77828;color:#f7dfa5;border:1px solid #d4b77865}
+  body:not(.tela-acesso) .hero{min-height:340px;padding:48px 0}
+}
+.menu-legenda{color:#c9aa73;font-size:11px;letter-spacing:.18em;font-weight:700}
+.menu-rodape{color:#a4ada5;font-size:.72rem;margin-top:auto;line-height:1.55}
+body.tela-acesso .menu-legenda,body.tela-acesso .menu-rodape{display:none}
+@media (max-width:949px){.menu-legenda,.menu-rodape{display:none}}
+/* Ajuda visual para dados: ilustrações vetoriais geradas para o próprio Mesa */
+.guia-abertura{display:flex;align-items:center;justify-content:space-between;gap:25px;flex-wrap:wrap}
+.guia-abertura h2{margin:10px 0}
+.guia-abertura p{color:#776b58;margin:0;max-width:600px}
+.guia-abrir{cursor:pointer;border-radius:9px;border:1px solid #aa8662;padding:11px 15px;color:#603f2b;background:#fff7e9;font-weight:700}
+.guia-abrir:hover{background:#fff}
+.guia-definicao,.guia-exemplo{margin:24px 0;background:#fffaf0;border:1px solid #e2d2b4;border-radius:12px;padding:20px}
+.guia-exemplo h3{color:#873e2d}
+.guia-exemplo p:last-child{margin-bottom:0}
+.guia-grade{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.guia-grade article{background:#fff9ed;border:1px solid #ddc9a7;border-radius:12px;padding:17px;text-align:center}
+.guia-grade svg{display:block;width:95px;height:90px;overflow:visible;margin:0 auto 10px}
+.guia-grade text{font:bold 24px Georgia,serif;fill:#fff1cc;text-anchor:middle;paint-order:stroke;stroke:#6f3828;stroke-width:1px}
+.guia-grade strong{display:block;color:#873e2d;font-family:Cinzel,serif;font-size:1.1rem}
+.guia-grade p{font-size:.82rem;color:#776b58;line-height:1.5;margin:8px 0 0}
+.admin-explicacao{background:#fff8e9;border:1px solid #e2d4ba;padding:13px;border-radius:9px;margin:18px 0}
+.admin-explicacao summary{cursor:pointer;font-weight:700;color:#6a4934}
+.admin-explicacao p{color:#67563f;font-size:.83rem;line-height:1.5}
+.admin-explicacao label{margin-top:12px}
+.recuperar-atalho{text-align:right;font-size:.86rem;margin:9px 0}
+@media(max-width:620px){.guia-grade{grid-template-columns:repeat(2,minmax(0,1fr))}.guia-abertura{align-items:flex-start}.guia-abrir{width:100%}}
