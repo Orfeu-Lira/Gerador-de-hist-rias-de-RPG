@@ -41,3 +41,16 @@ A aplicação não coloca a chave do Storage no navegador, não gera links públ
 - Modelo padrão do servidor atualizado para `gemini-3.1-flash-lite-image`; se existir `GEMINI_IMAGE_MODEL` no Vercel, ela prevalece. Atualizar seu valor manualmente para o modelo atual e fazer redeploy.
 - Erros 429 dependem de cota, faturamento ou acesso na conta Google; não se corrigem redefinindo contadores do Mesa.
 - O Chrome exibiu alerta **Perigoso** no domínio Preview. Antes de logar ou inserir chaves nesse endereço, investigar o motivo do alerta no Safe Browsing/Google Search Console e verificar se a URL corresponde ao projeto Vercel legítimo. Não contornar proteção do Chrome.
+
+## Reativação controlada para testes em Preview (16/10/2026)
+A geração de imagens pode gerar custos de API. Por segurança o servidor **só permite geração** quando TODOS os requisitos forem verdadeiros:
+- A implantação tem `VERCEL_ENV=preview` (variável nativa do Vercel, não altere manualmente).
+- Existe no Vercel, somente no ambiente **Preview**, `MESA_AVATAR_AI_ENABLED=true`.
+- As variáveis de Preview `GEMINI_API_KEY`, `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` estão configuradas.
+- O projeto da API Gemini tem autorização/cota e, quando exigido pelo Google, faturamento habilitado.
+
+Acesse Vercel > projeto Mesa > Settings > Environment Variables; crie `MESA_AVATAR_AI_ENABLED` com valor literal `true`, selecionando apenas **Preview**. Faça um redeploy da branch de testes. A rota `/api/avatar-ia/status` retorna `{\"habilitado\":true}` no Preview habilitado, sem revelar segredos. Ao abrir Personagens, o botão **Gerar avatar com IA** passa a ficar habilitado nas fichas salvas. A implantação **Production** nunca habilita esse recurso por essa flag.
+
+**Atenção:** o usuário encontrou resposta HTTP 429 do Google em testes anteriores; alterar a flag não desbloqueia cota/faturamento no Google AI Studio. Sem acesso a geração de imagens pela API, a solicitação continuará falhando. Não configure faturamento sem avaliar preços e orçamento. A regra atual de 2 imagens/dia por conta (6 administrador) é provisória; futuras 2 gerações grátis por conta e planos Premium ainda não foram implementados. Não exponha chaves no chat ou GitHub.
+
+**Segurança:** enquanto qualquer URL Preview continuar marcada como \"Perigoso\" pelo navegador, não faça login nem ignore o alerta de proteção; primeiro investigue a classificação e use somente uma implantação legítima sem alerta.
