@@ -485,7 +485,7 @@ function limparPreviewAvatar(){
 function atualizarEstadoAvatar(){
   const salvo=Boolean(fichaAbertaId);
   $('p-avatar-file').disabled=!salvo;
-  $('p-avatar-gerar').disabled=!salvo;
+  $('p-avatar-gerar').disabled=true; // Recurso premium em preparação
   $('p-avatar-info').textContent=salvo
     ? 'Envie um retrato. Ele será visível somente para você ao abrir esta ficha.'
     : 'Salve a ficha primeiro e reabra-a para enviar um avatar.';
