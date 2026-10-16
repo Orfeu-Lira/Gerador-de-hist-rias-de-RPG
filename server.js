@@ -192,6 +192,8 @@ app.get('/api/admin/resumo',asyncHandler(async(req,res)=>{
   const r=await query("SELECT (SELECT COUNT(*) FROM public.usuarios)::int AS usuarios,(SELECT COUNT(*) FROM public.aventuras)::int AS aventuras,(SELECT COUNT(*) FROM public.aventuras WHERE criado_em::date=(now() AT TIME ZONE 'UTC')::date)::int AS hoje");
   res.json({usuarios:r.rows[0].usuarios,aventuras:r.rows[0].aventuras,aventurasHoje:r.rows[0].hoje});
 }));
+// A raiz deve servir o frontend mesmo quando a implantação é roteada para a função serverless.
+app.get('/', (req, res) => res.sendFile(require('path').join(__dirname, 'public', 'index.html')));
 app.use('/api',(req,res)=>res.status(404).json({erro:'Rota não encontrada.'}));
 app.use((err,req,res,next)=>{
   console.error('Mesa API error:',err.code||err.message);
