@@ -137,3 +137,11 @@ body.tela-acesso .menu-legenda,body.tela-acesso .menu-rodape{display:none}
 .assistente-resposta:not(:empty){white-space:pre-wrap;margin-top:22px;border:1px solid #d9c6a5;background:#fffbf2;border-radius:12px;padding:24px;color:#423525;line-height:1.75}
 @media(max-width:1030px){.ficha-layout{grid-template-columns:1fr}}
 @media(max-width:650px){.atributos-grade{grid-template-columns:repeat(2,minmax(0,1fr))}.grade-ficha{grid-template-columns:1fr}}
+
+/* Resumo legível de atributos e cálculos da ficha */
+.ficha-resumo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0 0 20px}
+.ficha-resumo>div{background:#fff9ec;border:1px solid #d9c6a4;border-radius:11px;padding:15px;min-height:88px}
+.ficha-resumo>div>span{display:block;color:#6c5942;font-size:.78rem;font-weight:700;line-height:1.45}
+.ficha-resumo>div>strong{display:block;color:#873e2d;font:700 1.4rem Cinzel,Georgia,serif;margin-top:7px}
+.ficha-resumo>p{grid-column:1/-1;background:#f0e5d0;border-radius:9px;padding:12px;margin:0;color:#594b3a}
+@media(max-width:460px){.ficha-resumo{grid-template-columns:1fr}}
