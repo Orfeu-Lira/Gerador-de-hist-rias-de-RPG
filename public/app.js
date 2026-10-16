@@ -31,13 +31,14 @@ async function api(url, metodo = 'GET', corpo) {
 function aviso(texto, bom) { const a = $('aviso'); a.textContent = texto || ''; a.className = bom ? 'bom' : ''; }
 
 // ---- Navegação entre telas ----
-const TELAS = ['gerador', 'dados', 'historico', 'conta', 'admin'];
+const TELAS = ['gerador', 'dados', 'historico', 'personagens', 'assistente', 'conta', 'admin'];
 function mostrar(tela) {
   document.body.classList.toggle('tela-acesso', tela === 'conta');
   TELAS.forEach((t) => { $('v-' + t).hidden = t !== tela; });
   document.querySelectorAll('#nav button[data-tela]').forEach((b) => b.setAttribute('aria-current', b.dataset.tela === tela));
   aviso('');
   if (tela === 'historico') carregarHistorico();
+  if (tela === 'personagens') carregarPersonagens();
   if (tela === 'admin') carregarResumo();
 }
 
@@ -45,7 +46,7 @@ function montarNav() {
   const nav = $('nav');
   nav.replaceChildren();
   const itens = [['gerador', '✦', 'Gerador'], ['dados', '◇', 'Dados']];
-  if (eu.logado) itens.push(['historico', '▤', 'Histórico']);
+  if (eu.logado) itens.push(['historico', '▤', 'Histórico'], ['personagens', '♙', 'Personagens'], ['assistente', '✧', 'Tutor D&D']);
   if (eu.papel === 'admin') itens.push(['admin', '⚙', 'Painel']);
   if (!eu.logado) itens.push(['conta', '↪', 'Entrar']);
   itens.forEach(([t, simbolo, nome]) => { const b = el('button', simbolo + '   ' + nome); b.dataset.tela = t; b.onclick = () => mostrar(t); nav.appendChild(b); });
@@ -132,6 +133,102 @@ async function carregarHistorico() {
     });
   } catch (e) { aviso(e.message); }
 }
+
+// ---- Fichas D&D 5e 2024: atributos-base e compra com 27 pontos ----
+const atributosDnd = [['for','Força'],['des','Destreza'],['con','Constituição'],['int','Inteligência'],['sab','Sabedoria'],['car','Carisma']];
+const custosDnd = {8:0,9:1,10:2,11:3,12:4,13:5,14:7,15:9};
+let fichaAbertaId = null;
+const pontosDnd = () => atributosDnd.reduce((s,[sigla]) => s + custosDnd[Number($('at-'+sigla).value)],0);
+const modDnd = n => Math.floor((n - 10)/2);
+function atualizarPontosDnd() {
+  const usados = pontosDnd();
+  const restante = 27-usados;
+  $('p-pontos').textContent = restante + ' pontos restantes';
+  $('p-pontos').classList.toggle('invalido', restante < 0);
+  for(const [sigla] of atributosDnd) {
+    const valor = Number($('at-'+sigla).value);
+    $('mod-'+sigla).textContent = 'Mod. '+(modDnd(valor)>=0?'+':'')+modDnd(valor);
+  }
+  $('f-personagem').querySelector('button[type="submit"]').disabled = restante < 0;
+}
+for (const [sigla,nome] of atributosDnd) {
+  const item=el('div','','atributo-item');
+  const rotulo=el('label',nome);
+  rotulo.htmlFor='at-'+sigla;
+  const campo=document.createElement('select');campo.id='at-'+sigla;
+  for(let n=8;n<=15;n++){const opt=new Option(n+' • '+custosDnd[n]+' pt'+(custosDnd[n]!==1?'s':''),String(n));campo.appendChild(opt);}
+  campo.value='8';campo.onchange=atualizarPontosDnd;
+  const modificador=el('span','Mod. -1','atributo-mod');modificador.id='mod-'+sigla;
+  item.append(rotulo,campo,modificador);$('p-atributos').appendChild(item);
+}
+function limparFicha(){
+  fichaAbertaId=null;
+  $('f-personagem').reset();
+  atributosDnd.forEach(([sigla])=>$('at-'+sigla).value='8');
+  $('ficha-form-titulo').textContent='Nova personagem';
+  $('p-remover').hidden=true;
+  atualizarPontosDnd();
+}
+$('nova-ficha').onclick=limparFicha;
+async function carregarPersonagens(){
+  const lista=$('personagens-lista');lista.replaceChildren();
+  try{
+    const itens=await api('/api/personagens');
+    if(!itens.length){lista.appendChild(el('p','Nenhuma ficha salva ainda. Comece criando sua primeira personagem.','suave'));return;}
+    for(const item of itens) {
+      const botao=el('button',(item.nome||'Personagem')+' · Nível '+item.dados.nivel,'personagem-item');
+      botao.type='button';
+      botao.onclick=()=>{
+        fichaAbertaId=item.id;
+        const d=item.dados;
+        $('p-nome').value=d.nome||'';
+        $('p-classe').value=d.classe||'';
+        $('p-especie').value=d.especie||'';
+        $('p-antecedente').value=d.antecedente||'';
+        $('p-nivel').value=d.nivel||1;
+        $('p-notas').value=d.notas||'';
+        for(const [sigla] of atributosDnd) $('at-'+sigla).value=String(d.atributos[sigla]||8);
+        $('ficha-form-titulo').textContent='Editar personagem';
+        $('p-remover').hidden=false;
+        atualizarPontosDnd();
+        $('f-personagem').scrollIntoView({behavior:'smooth',block:'start'});
+      };
+      lista.appendChild(botao);
+    }
+  }catch(e){aviso(e.message);}
+}
+$('f-personagem').onsubmit=async ev=>{
+  ev.preventDefault();
+  if(pontosDnd()>27){aviso('Você ultrapassou 27 pontos. Ajuste os atributos.');return;}
+  const dados={edicao:'2024',metodo:'compra27',nome:$('p-nome').value.trim(),classe:$('p-classe').value.trim(),
+    especie:$('p-especie').value.trim(),antecedente:$('p-antecedente').value.trim(),
+    nivel:Number($('p-nivel').value),notas:$('p-notas').value.trim(),atributos:{}};
+  for(const [sigla] of atributosDnd)dados.atributos[sigla]=Number($('at-'+sigla).value);
+  const botao=$('f-personagem').querySelector('button[type="submit"]');botao.disabled=true;
+  try{
+    await api(fichaAbertaId?'/api/personagens/'+fichaAbertaId:'/api/personagens',fichaAbertaId?'PUT':'POST',{dados});
+    aviso('Ficha salva com sucesso!',true);
+    limparFicha();await carregarPersonagens();
+  }catch(e){aviso(e.message);}
+  finally{botao.disabled=false;}
+};
+$('p-remover').onclick=async()=>{
+  if(!fichaAbertaId || !confirm('Excluir permanentemente esta ficha?'))return;
+  try{await api('/api/personagens/'+fichaAbertaId,'DELETE');limparFicha();await carregarPersonagens();aviso('Ficha excluída.',true);}
+  catch(e){aviso(e.message);}
+};
+atualizarPontosDnd();
+// ---- Tutor com IA, sem execução automática de mudanças nas fichas ----
+$('f-ajuda-dnd').onsubmit=async ev=>{
+  ev.preventDefault();
+  const botao=$('ajuda-enviar');botao.disabled=true;
+  const alvo=$('resposta-dnd');alvo.textContent='Consultando o tutor...';
+  try{
+    const r=await api('/api/dnd/ajuda','POST',{pergunta:$('pergunta-dnd').value.trim()});
+    alvo.textContent=r.resposta;
+  }catch(e){alvo.textContent=e.message;}
+  finally{botao.disabled=false;}
+};
 
 // ---- Conta e recuperação de acesso ----
 const formulariosConta = ['f-login','f-cadastro','f-recuperar','f-redefinir'];
