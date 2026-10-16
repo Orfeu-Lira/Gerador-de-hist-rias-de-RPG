@@ -145,3 +145,11 @@ body.tela-acesso .menu-legenda,body.tela-acesso .menu-rodape{display:none}
 .ficha-resumo>div>strong{display:block;color:#873e2d;font:700 1.4rem Cinzel,Georgia,serif;margin-top:7px}
 .ficha-resumo>p{grid-column:1/-1;background:#f0e5d0;border-radius:9px;padding:12px;margin:0;color:#594b3a}
 @media(max-width:460px){.ficha-resumo{grid-template-columns:1fr}}
+
+/* Recomendação opcional de distribuição inicial por classe */
+.sugestao-classe{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:18px;background:#f1e5d0;border:1px solid #d7bd8c;border-left:4px solid #aa6b3f;border-radius:12px;padding:18px 20px;margin:14px 0}
+.sugestao-classe h3{color:#503924;margin:6px 0 8px}
+.sugestao-classe .sobretitulo{color:#916437}
+.sugestao-classe p{max-width:520px;margin:0}
+.sugestao-classe button:disabled{opacity:.5;cursor:not-allowed}
+@media(max-width:680px){.sugestao-classe button{width:100%}}
