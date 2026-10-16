@@ -276,6 +276,48 @@ app.delete('/api/aventuras/:id',asyncHandler(async(req,res)=>{
   await query('DELETE FROM public.aventuras WHERE id=$1 AND usuario_id=$2',[id,u.id]);
   res.json({ok:true});
 }));
+// D&D 5e revisado 2024: compra de pontos, antes de bônus de antecedente.
+const CUSTOS_DND = {8:0,9:1,10:2,11:3,12:4,13:5,14:7,15:9};
+const CHAVES_DND = ['for','des','con','int','sab','car'];
+function validarFichaDnd(dados) {
+  if (!dados || typeof dados !== 'object' || Array.isArray(dados)) return false;
+  if (dados.edicao !== '2024' || dados.metodo !== 'compra27') return false;
+  if (typeof dados.nome !== 'string' || dados.nome.trim().length < 1 || dados.nome.length > 100) return false;
+  if (typeof dados.classe !== 'string' || dados.classe.length > 70 ||
+      typeof dados.especie !== 'string' || dados.especie.length > 70 ||
+      typeof dados.antecedente !== 'string' || dados.antecedente.length > 70 ||
+      typeof dados.notas !== 'string' || dados.notas.length > 1500) return false;
+  if (!Number.isInteger(dados.nivel) || dados.nivel < 1 || dados.nivel > 20) return false;
+  if (!dados.atributos || typeof dados.atributos !== 'object') return false;
+  const valores = CHAVES_DND.map(k => dados.atributos[k]);
+  if (!valores.every(v => Number.isInteger(v) && Object.hasOwn(CUSTOS_DND,v))) return false;
+  const custo = valores.reduce((s,v) => s+CUSTOS_DND[v],0);
+  return custo <= 27;
+}
+app.get('/api/personagens',asyncHandler(async(req,res)=>{
+  const u=await atual(req);if(!u) return res.status(401).json({erro:'Entre na sua conta para consultar suas fichas.'});
+  const r=await query('SELECT id,nome,dados,atualizado_em FROM public.personagens_dnd WHERE usuario_id=$1 ORDER BY atualizado_em DESC LIMIT 50',[u.id]);
+  res.json(r.rows);
+}));
+app.post('/api/personagens',asyncHandler(async(req,res)=>{
+  const u=await atual(req);if(!u) return res.status(401).json({erro:'Entre na sua conta para salvar uma ficha.'});
+  const dados=req.body?.dados;if(!validarFichaDnd(dados)) return res.status(400).json({erro:'Ficha inválida. Use atributos base entre 8 e 15 e até 27 pontos.'});
+  const r=await query('INSERT INTO public.personagens_dnd(usuario_id,nome,dados) VALUES($1,$2,$3::jsonb) RETURNING id',[u.id,dados.nome.trim(),JSON.stringify(dados)]);
+  res.status(201).json({id:r.rows[0].id});
+}));
+app.put('/api/personagens/:id',asyncHandler(async(req,res)=>{
+  const u=await atual(req);if(!u) return res.status(401).json({erro:'Entre na sua conta.'});
+  const id=Number(req.params.id),dados=req.body?.dados;
+  if(!Number.isSafeInteger(id)||id<1||!validarFichaDnd(dados)) return res.status(400).json({erro:'Ficha inválida.'});
+  const r=await query('UPDATE public.personagens_dnd SET nome=$1,dados=$2::jsonb,atualizado_em=NOW() WHERE id=$3 AND usuario_id=$4 RETURNING id',[dados.nome.trim(),JSON.stringify(dados),id,u.id]);
+  if(!r.rowCount) return res.status(404).json({erro:'Ficha não encontrada.'});
+  res.json({ok:true});
+}));
+app.delete('/api/personagens/:id',asyncHandler(async(req,res)=>{
+  const u=await atual(req);if(!u) return res.status(401).json({erro:'Entre na sua conta.'});
+  const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1) return res.status(400).json({erro:'ID inválido.'});
+  await query('DELETE FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2',[id,u.id]);res.json({ok:true});
+}));
 app.get('/api/admin/resumo',asyncHandler(async(req,res)=>{
   const u=await atual(req);
   if(u?.papel!=='admin') return res.status(403).json({erro:'Acesso negado.'});
