@@ -329,6 +329,7 @@ function atualizarModoFicha() {
   for(const campo of document.querySelectorAll('.campo-dnd')) campo.hidden=!fantasia;
   $('p-regras-dnd').hidden=!fantasia;
   $('p-perfil-narrativo').hidden=!narrativa;
+  $('p-dnd-ressalva').hidden=!fantasia;
   $('campo-especialidade').hidden=!narrativa;
   $('p-selecione-cenario').hidden=Boolean(fantasia||narrativa);
   $('campo-funcao').hidden=true;
