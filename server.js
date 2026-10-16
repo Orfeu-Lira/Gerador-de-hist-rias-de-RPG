@@ -360,6 +360,7 @@ function validarFichaDnd(dados) {
   const dnd = dados.edicao === '2024' && dados.metodo === 'compra27';
   if (!narrativa && !dnd) return false;
   if (typeof dados.nome !== 'string' || dados.nome.trim().length < 1 || dados.nome.length > 100) return false;
+  if(dados.equipamentos !== undefined && (typeof dados.equipamentos !== 'string' || dados.equipamentos.length > 1800)) return false;
   if (typeof dados.classe !== 'string' || dados.classe.length > 70 ||
       typeof dados.especie !== 'string' || dados.especie.length > 70 ||
       typeof dados.antecedente !== 'string' || dados.antecedente.length > 70 ||
