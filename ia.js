@@ -27,7 +27,7 @@ function limpar(a) {
 }
 
 async function gerarAventura({ genero, tom, jogadores, ideia }) {
-  if (!process.env.ANTHROPIC_API_KEY) return MOCK; // modo teste: sem chave, sem custo
+  if (!process.env.GEMINI_API_KEY) return MOCK; // modo teste: sem chave, sem custo
 
   const prompt =
     'Você é um assistente de mestre de RPG. Use um sistema genérico, sem regras de um sistema específico. ' +
@@ -37,25 +37,28 @@ async function gerarAventura({ genero, tom, jogadores, ideia }) {
     '{"titulo":"","gancho":"2 a 3 frases","locais":["",""],"npcs":[{"nome":"","descricao":""}],"vilao":"","trilha":"clima musical em uma frase e 3 termos de busca para playlist"}';
 
   const controle = new AbortController();
-  const timer = setTimeout(() => controle.abort(), 30000); // desiste depois de 30s
+  const timer = setTimeout(() => controle.abort(), 30000);
   try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      signal: controle.signal,
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    if (!r.ok) throw new Error('A API respondeu com status ' + r.status);
+    const modelo = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const r = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(modelo) + ':generateContent',
+      {
+        method: 'POST',
+        signal: controle.signal,
+        headers: {
+          'content-type': 'application/json',
+          'x-goog-api-key': process.env.GEMINI_API_KEY
+        },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 2048 }
+        })
+      }
+    );
+    if (!r.ok) throw new Error('A API Gemini respondeu com status ' + r.status);
     const dados = await r.json();
-    const texto = (dados.content || []).map((b) => b.text || '').join('');
+    const texto = (dados.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
+    if (!texto) throw new Error('A API Gemini não retornou texto.');
     return limpar(JSON.parse(texto.replace(/```json|```/g, '').trim()));
   } finally {
     clearTimeout(timer);
