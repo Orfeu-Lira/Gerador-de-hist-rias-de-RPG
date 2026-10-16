@@ -485,7 +485,20 @@ app.put('/api/personagens/:id',asyncHandler(async(req,res)=>{
 app.delete('/api/personagens/:id',asyncHandler(async(req,res)=>{
   const u=await atual(req);if(!u) return res.status(401).json({erro:'Entre na sua conta.'});
   const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1) return res.status(400).json({erro:'ID inválido.'});
-  await query('DELETE FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2',[id,u.id]);res.json({ok:true});
+  const antigo=await query(
+    'SELECT a.storage_path FROM public.personagem_avatares a JOIN public.personagens_dnd p ON p.id=a.personagem_id WHERE p.id=$1 AND p.usuario_id=$2',
+    [id,u.id]);
+  await query('DELETE FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2',[id,u.id]);
+  if(antigo.rowCount && avatarConfigurado()){
+    // A remoção do arquivo no Storage é a melhor tentativa possível após a exclusão da ficha.
+    try{
+      const limpeza=await fetch(avatarBase()+antigo.rows[0].storage_path,{
+        method:'DELETE',headers:avatarHeaders(),signal:AbortSignal.timeout(8000)
+      });
+      if(!limpeza.ok)console.error('Limpeza de avatar após excluir ficha:',limpeza.status);
+    }catch(e){console.error('Falha na limpeza do avatar excluído:',e.name);}
+  }
+  res.json({ok:true});
 }));
 // Assistente educacional D&D 2024: responde dúvidas de regras, sem editar fichas.
 app.post('/api/dnd/ajuda',asyncHandler(async(req,res)=>{
