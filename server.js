@@ -440,10 +440,12 @@ app.post('/api/personagens/:id/avatar/gerar',gerarAvatarLimite,asyncHandler(asyn
       ganchoAventura=String(aventura.rows[0].conteudo?.gancho||'').slice(0,240);
     }
   }
-  const chave='avatar-ia:'+acesso.u.id+':'+new Date().toISOString().slice(0,10);
+  // v2 desconsidera os contadores deixados por tentativas falhas da versão anterior.
+  // Mantemos cota diária para controlar custo do Gemini.
+  const chave='avatar-ia-v2:'+acesso.u.id+':'+new Date().toISOString().slice(0,10);
   const maximo=acesso.u.papel==='admin'?6:2;
   const uso=await query('INSERT INTO public.geracoes_limite(identificador,total) VALUES($1,1) ON CONFLICT(identificador) DO UPDATE SET total=public.geracoes_limite.total+1 WHERE public.geracoes_limite.total<$2 RETURNING total',[chave,maximo]);
-  if(!uso.rowCount)return res.status(429).json({erro:'Você atingiu o limite de avatares gerados com IA hoje.'});
+  if(!uso.rowCount)return res.status(429).json({erro:'Você já usou suas gerações de avatar com IA de hoje. Tente novamente amanhã (horário UTC).'});
   let geracaoConcluida=false;
   try {
     const prompt=[
