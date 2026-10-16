@@ -1,0 +1,267 @@
+/* Ideia visual: uma mesa de jogo. Feltro verde ao fundo, folhas de pergaminho em cima,
+   e lacre vermelho só nas ações principais. */
+:root {
+    --feltro: #10231d;
+    --feltro-2: #183229;
+    --pergaminho: #f3e9d0;
+    --tinta: #2a2118;
+    --suave: #6b5d48;
+    --lacre: #a8321e;
+    --latao: #c9a24b;
+    --borda: #d8c9a3
+}
+
+* {
+    box-sizing: border-box
+}
+
+body {
+    margin: 0;
+    background: var(--feltro);
+    color: var(--pergaminho);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif
+}
+
+main {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 20px 16px 56px
+}
+
+h1,
+h2 {
+    font-family: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    margin: 0
+}
+
+h1 {
+    font-size: 34px;
+    letter-spacing: .02em
+}
+
+h2 {
+    font-size: 24px;
+    margin-bottom: 8px
+}
+
+header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--latao);
+    padding-bottom: 12px
+}
+
+nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px
+}
+
+nav button {
+    background: transparent;
+    color: var(--pergaminho);
+    border: 1px solid #3d5a4d;
+    border-radius: 6px;
+    padding: 8px 14px;
+    min-height: 44px;
+    cursor: pointer;
+    font: inherit
+}
+
+nav button[aria-current="true"] {
+    background: var(--pergaminho);
+    color: var(--tinta);
+    font-weight: 700;
+    border-color: var(--pergaminho)
+}
+
+nav button:hover {
+    border-color: var(--latao)
+}
+
+.folha {
+    background: var(--pergaminho);
+    color: var(--tinta);
+    border-radius: 4px;
+    padding: 22px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 0 #00000055
+}
+
+.estreita {
+    max-width: 420px
+}
+
+.grade {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 12px;
+    margin-bottom: 12px
+}
+
+label {
+    display: block;
+    font-size: 14px;
+    color: var(--suave);
+    margin-bottom: 4px
+}
+
+input,
+select {
+    width: 100%;
+    min-height: 44px;
+    padding: 9px 12px;
+    border: 1px solid var(--borda);
+    border-radius: 4px;
+    background: #fffaf0;
+    color: var(--tinta);
+    font: inherit;
+    margin-bottom: 4px
+}
+
+input.curto {
+    max-width: 120px;
+    margin-bottom: 12px
+}
+
+:focus-visible {
+    outline: 3px solid var(--latao);
+    outline-offset: 2px
+}
+
+.acoes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin: 14px 0 0
+}
+
+.principal {
+    background: var(--lacre);
+    color: #fff;
+    border: 0;
+    border-radius: 4px;
+    padding: 11px 22px;
+    min-height: 44px;
+    font: 700 16px system-ui, sans-serif;
+    cursor: pointer
+}
+
+.principal:hover {
+    background: #8a2716
+}
+
+.principal:disabled {
+    opacity: .6;
+    cursor: wait
+}
+
+.dado {
+    background: #fffaf0;
+    border: 1px solid var(--borda);
+    border-radius: 4px;
+    min-width: 64px;
+    min-height: 44px;
+    cursor: pointer;
+    font: inherit;
+    color: var(--tinta)
+}
+
+.dado:hover {
+    border-color: var(--lacre)
+}
+
+.link {
+    background: none;
+    border: 0;
+    color: var(--lacre);
+    text-decoration: underline;
+    cursor: pointer;
+    font: inherit;
+    padding: 0;
+    min-height: 0
+}
+
+.suave {
+    color: var(--suave);
+    font-size: 14px;
+    margin: 6px 0 0
+}
+
+#aviso {
+    min-height: 24px;
+    margin: 0 0 12px;
+    color: #f6c9b8
+}
+
+#aviso.bom {
+    color: #bfe3c6
+}
+
+.resultado {
+    font: 700 48px "Palatino Linotype", Palatino, Georgia, serif;
+    color: var(--lacre);
+    margin: 16px 0 0
+}
+
+.aventura h2 {
+    border-bottom: 1px solid var(--borda);
+    padding-bottom: 6px
+}
+
+.aventura h3 {
+    font-size: 15px;
+    margin: 16px 0 4px;
+    color: var(--lacre)
+}
+
+.aventura ul {
+    margin: 0;
+    padding-left: 20px
+}
+
+.item {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px
+}
+
+.item .abrir {
+    flex: 1;
+    text-align: left;
+    background: var(--pergaminho);
+    color: var(--tinta);
+    border: 0;
+    border-radius: 4px;
+    padding: 12px 14px;
+    min-height: 44px;
+    cursor: pointer;
+    font: inherit
+}
+
+.item .abrir:hover {
+    background: #fff4d8
+}
+
+.item .apagar {
+    background: transparent;
+    color: #f6c9b8;
+    border: 1px solid #6b3a30;
+    border-radius: 4px;
+    padding: 0 14px;
+    min-height: 44px;
+    cursor: pointer;
+    font: inherit
+}
+
+@media (prefers-reduced-motion:reduce) {
+    * {
+        transition: none !important;
+        animation: none !important
+    }
+}
