@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#102928">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/mesa-192.png">
+<link rel="apple-touch-icon" href="/icons/mesa-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mesa RPG">
 <meta name="description" content="Crie histórias inesquecíveis para suas mesas de RPG.">
 <title>Mesa | Suas histórias começam aqui</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -50,6 +56,7 @@
       <p id="ambiente-creditos" class="musica-creditos" aria-live="polite"></p>
     </div>
   </section>
+  <div id="aviso-publico" role="status" hidden></div>
   <p id="aviso" role="status"></p>
 
   <!-- Gerador: qualquer visitante vê; o servidor aplica os limites -->
@@ -71,6 +78,21 @@
     <div class="como-funciona"><span class="sobretitulo">O PRÓXIMO CAPÍTULO</span><h2>Seu universo em três passos</h2><div class="passos"><article><b>01</b><h3>Escolha o mundo</h3><p>Defina o gênero e a atmosfera.</p></article><article><b>02</b><h3>Compartilhe uma ideia</h3><p>Dê vida à sua inspiração.</p></article><article><b>03</b><h3>Viva a história</h3><p>Receba aventuras, locais e personagens.</p></article></div></div>
   </section>
 
+  <section id="v-instalar" hidden>
+    <div class="pagina-intro"><span class="sobretitulo">MESA SEMPRE COM VOCÊ</span><h1>Instale o Mesa</h1><p>Leve seu portal de aventuras para a tela inicial do celular ou para o desktop.</p></div>
+    <div class="folha instalar-mesa">
+      <div class="instalar-cabecalho"><img src="/icons/mesa-192.png" width="88" height="88" alt="Ícone do Mesa"><div><h2>Mesa — Aventuras e RPG</h2><p>Instale gratuitamente com um atalho de aplicativo, sem baixar arquivos desconhecidos.</p></div></div>
+      <button id="instalar-mesa-botao" type="button" class="principal" hidden>⬇ Instalar Mesa</button>
+      <p id="instalar-mesa-status" class="suave" role="status">Verificando opções de instalação neste aparelho...</p>
+      <div class="instalar-orientacoes">
+        <article><h3>Android — Chrome</h3><p>Abra este site pelo Chrome, toque no menu ⋮ e escolha <strong>Instalar aplicativo</strong> ou <strong>Adicionar à tela inicial</strong>. Se o botão acima estiver disponível, basta tocá-lo.</p></article>
+        <article><h3>iPhone / iPad — Safari</h3><p>Abra o Mesa no Safari, toque em <strong>Compartilhar</strong> e escolha <strong>Adicionar à Tela de Início</strong>. Confirme em Adicionar.</p></article>
+        <article><h3>Computador — Chrome ou Edge</h3><p>Abra o Mesa no Chrome ou Edge, procure <strong>Instalar</strong> na barra de endereço ou no menu do navegador e confirme. O Mesa aparecerá entre seus aplicativos.</p></article>
+      </div>
+      <p class="suave">A instalação usa a tecnologia PWA: aparência de aplicativo e ícone na tela inicial. O gerador com IA, o login, o banco de dados, os arquivos privados e o tutor precisam de conexão com a internet. Para atualizações, abra o aplicativo conectado.</p>
+    </div>
+  </section>
+  <section id="v-novidades" hidden><div class="pagina-intro"><span class="sobretitulo">CRÔNICAS DO MESA</span><h1>Novidades e comunicados</h1><p>Acompanhe anúncios publicados pela administração.</p></div><div class="folha" id="lista-novidades"></div></section>
   <section id="v-tutorial" hidden aria-labelledby="tutorial-titulo">
     <div class="pagina-intro"><span class="sobretitulo">MANUAL DO AVENTUREIRO</span><h1 id="tutorial-titulo">Como usar o Mesa</h1><p>Da sua primeira aventura ao inventário, descubra todas as ferramentas em poucos passos.</p></div>
     <div class="folha tutorial-folha">
@@ -83,6 +105,7 @@
       <div class="tutorial-acoes"><button type="button" id="tutorial-ir" class="guia-abrir">Abrir esta ferramenta ↗</button><button type="button" id="tutorial-recomecar" class="link">Recomeçar tutorial</button></div>
       <p class="suave">Você pode abrir este guia a qualquer momento pelo menu lateral. O tutorial não altera suas fichas nem consome gerações de IA.</p>
     </div>
+    <div class="tutorial-atualizacoes folha"><h2>Artigos, perguntas frequentes e exemplos</h2><div id="conteudos-publicos"></div></div>
     <div class="tutorial-atualizacoes folha"><h2>Dicas para começar</h2><p>Não é necessário saber programar ou ter experiência em RPG. Os resultados gerados são sugestões narrativas; regras, equipamentos e habilidades devem ser confirmados com o mestre e o sistema utilizado.</p></div>
   </section>
 
@@ -264,8 +287,26 @@
   </section>
 
   <section id="v-admin" hidden>
-    <div class="pagina-intro"><span class="sobretitulo">VISÃO GERAL</span><h1>Painel do administrador</h1></div>
-    <div class="folha" id="resumo"></div>
+    <div class="pagina-intro"><span class="sobretitulo">CENTRAL DO MESTRE</span><h1>Administração do Mesa</h1><p>Usuários, relatórios, comunicados e segurança em um único lugar.</p></div>
+    <div id="admin-feedback" role="status" aria-live="polite"></div>
+    <div class="admin-abas" id="admin-abas" role="group" aria-label="Áreas da administração">
+      <button type="button" data-admin="geral" aria-pressed="true">◈ Visão geral</button>
+      <button type="button" data-admin="usuarios">♙ Usuários</button>
+      <button type="button" data-admin="relatorios">▥ Relatórios</button>
+      <button type="button" data-admin="novidades">✦ Novidades</button>
+      <button type="button" data-admin="conteudos">▤ Conteúdos</button>
+      <button type="button" data-admin="suporte">✉ Suporte</button>
+      <button type="button" data-admin="config">⚙ Configurações</button>
+      <button type="button" data-admin="auditoria">◇ Auditoria</button>
+    </div>
+    <div class="folha admin-corpo" id="resumo"></div>
+  </section>
+  <section id="v-suporte" hidden>
+    <div class="pagina-intro"><span class="sobretitulo">CANAL DO AVENTUREIRO</span><h1>Suporte e sugestões</h1><p>Conte suas dúvidas, sugestões ou problemas para a equipe Mesa.</p></div>
+    <div class="folha admin-formulario">
+      <form id="form-suporte"><label for="suporte-assunto">Assunto</label><input id="suporte-assunto" maxlength="120" required placeholder="Ex.: erro na ficha do personagem"><label for="suporte-mensagem">Mensagem</label><textarea id="suporte-mensagem" maxlength="2000" required rows="5" placeholder="Explique o que aconteceu ou o que você gostaria de sugerir."></textarea><button class="principal" type="submit">Enviar mensagem</button></form>
+      <h2>Minhas mensagens</h2><div id="suporte-meus-chamados"></div>
+    </div>
   </section>
 </main>
 <script src="./config.js"></script>
