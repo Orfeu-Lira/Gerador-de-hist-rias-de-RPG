@@ -38,7 +38,7 @@ function mostrar(tela) {
   document.querySelectorAll('#nav button[data-tela]').forEach((b) => b.setAttribute('aria-current', b.dataset.tela === tela));
   aviso('');
   if (tela === 'historico') carregarHistorico();
-  if (tela === 'personagens') { consultarAvatarIa(); carregarAventurasDaFicha().then(carregarPersonagens); }
+  if (tela === 'personagens') { carregarAventurasDaFicha().then(carregarPersonagens); }
   if (tela === 'admin') carregarResumo();
 }
 
@@ -473,14 +473,6 @@ for (const [sigla,nome] of atributosDnd) {
   item.append(rotulo,campo,modificador);$('p-atributos').appendChild(item);
 }
 // Avatares ficam em um bucket privado. Somente a própria conta pode carregá-los.
-let avatarIaDisponivel=false;
-async function consultarAvatarIa(){
-  try{
-    const status=await api('/api/avatar-ia/status');
-    avatarIaDisponivel=status.habilitado===true;
-  }catch{ avatarIaDisponivel=false; }
-  atualizarEstadoAvatar();
-}
 let avatarObjectUrl=null;
 function limparPreviewAvatar(){
   if(avatarObjectUrl)URL.revokeObjectURL(avatarObjectUrl);
@@ -493,11 +485,6 @@ function limparPreviewAvatar(){
 function atualizarEstadoAvatar(){
   const salvo=Boolean(fichaAbertaId);
   $('p-avatar-file').disabled=!salvo;
-  $('p-avatar-gerar').disabled=!salvo||!avatarIaDisponivel;
-  $('p-avatar-gerar').textContent=avatarIaDisponivel?'✦ Gerar avatar com IA':'✦ Gerar avatar com IA — Em breve';
-  $('p-avatar-ia-nota').textContent=avatarIaDisponivel
-    ? 'Teste de IA habilitado no Preview. O Gemini pode cobrar por imagem; respeite seu orçamento. O limite provisório é de 2 por dia (6 para administrador).'
-    : 'A geração por IA precisa ser habilitada pelo responsável no Vercel Preview. Enviar imagem continua disponível.';
   $('p-avatar-info').textContent=salvo
     ? 'Envie um retrato. Ele será visível somente para você ao abrir esta ficha.'
     : 'Salve a ficha primeiro e reabra-a para enviar um avatar.';
@@ -543,39 +530,6 @@ async function prepararWebpAvatar(arquivo){
     return base64;
   }finally{URL.revokeObjectURL(url);}
 }
-// IA devolve imagem em formato nativo; o navegador converte para WebP antes
-// de salvar no mesmo bucket privado usado pelo upload manual.
-$('p-avatar-gerar').onclick=async()=>{
-  const id=fichaAbertaId;
-  if(!id)return;
-  const botao=$('p-avatar-gerar');
-  botao.disabled=true;
-  botao.textContent='✦ Criando retrato...';
-  $('p-avatar-info').textContent='A IA está desenhando o retrato; isso pode levar alguns segundos.';
-  try{
-    const gerado=await api('/api/personagens/'+id+'/avatar/gerar','POST',{
-      estilo:$('p-avatar-estilo').value,aparencia:$('p-avatar-aparencia').value.trim()
-    });
-    if(fichaAbertaId!==id)throw new Error('A ficha foi alterada durante a geração. Reabra a personagem.');
-    if(!gerado.imagem||!['image/jpeg','image/png','image/webp'].includes(gerado.mimeType))
-      throw new Error('A IA não retornou uma imagem válida.');
-    const bytes=atob(gerado.imagem);
-    const blob=new Uint8Array(bytes.length);
-    for(let i=0;i<bytes.length;i++)blob[i]=bytes.charCodeAt(i);
-    const arquivo=new File([blob],'avatar-gerado',{type:gerado.mimeType});
-    const imagem=await prepararWebpAvatar(arquivo);
-    if(fichaAbertaId!==id)throw new Error('A ficha foi alterada durante o processamento.');
-    await api('/api/personagens/'+id+'/avatar','POST',{imagem});
-    await carregarAvatar();
-    aviso('Avatar criado com IA e salvo na ficha!',true);
-  }catch(e){
-    aviso(e.message);
-    $('p-avatar-info').textContent='Não foi possível concluir a geração. O avatar anterior foi preservado.';
-  }finally{
-    botao.textContent='✦ Gerar avatar com IA';
-    atualizarEstadoAvatar();
-  }
-};
 $('p-avatar-file').onchange=async()=>{
   const arquivo=$('p-avatar-file').files?.[0],id=fichaAbertaId;
   if(!arquivo||!id)return;
