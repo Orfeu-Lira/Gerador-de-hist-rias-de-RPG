@@ -211,11 +211,9 @@ body.tela-acesso .menu-legenda,body.tela-acesso .menu-rodape{display:none}
 .avatar-acoes:has(input:disabled) .avatar-upload{opacity:.5;cursor:not-allowed}
 @media(max-width:560px){.avatar-painel{justify-content:center;text-align:center}.avatar-moldura{margin:auto}.avatar-acoes{min-width:100%}}
 
-/* Geração de retrato por IA */
-.avatar-ia-editor{display:grid;gap:7px;margin:13px 0;padding:13px;border-radius:10px;border:1px solid #d5bd90;background:#faf0d9}
-.avatar-ia-editor label{font-size:.82rem;font-weight:700;color:#69422b}
-.avatar-ia-editor textarea{resize:vertical;min-height:65px}
-.avatar-ia-editor select,.avatar-ia-editor textarea{width:100%;max-width:100%}
-.avatar-ia-editor button{justify-self:start;margin-top:7px;white-space:normal}
-.avatar-ia-editor button:disabled{opacity:.6;cursor:wait}
-.avatar-ia-editor .suave{margin-top:4px;font-size:.75rem}
+/* Upload como ação principal, com aviso discreto de futura geração por IA */
+.avatar-upload-principal{display:grid;gap:7px;margin:13px 0;padding:14px;border-radius:10px;border:1px solid #d5bd90;background:#faf0d9}
+.avatar-upload-principal .avatar-upload{display:inline-flex;align-items:center;justify-content:center;width:fit-content;max-width:100%;margin:0;text-align:center;line-height:1.3}
+.avatar-upload-principal .suave{font-size:.8rem;line-height:1.5;margin:4px 0}
+.avatar-ia-futuro{color:#795c3c;font-size:.8rem;font-weight:600;margin:5px 0 0}
+@media(max-width:560px){.avatar-upload-principal .avatar-upload{width:100%}}
