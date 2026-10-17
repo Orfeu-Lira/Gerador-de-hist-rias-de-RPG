@@ -381,3 +381,44 @@ body.tela-acesso .acesso-cartao{max-width:460px}
  .tutorial-passos button{font-size:.76rem;padding:9px 12px}
 }
 @media(prefers-reduced-motion:reduce){body,.topo,.tutorial-conteudo{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+
+/* Ficha ativa e orientações: destaque visível também para leitores de tela via aria-pressed. */
+#personagens-lista .personagem-item.personagem-selecionado,
+#personagens-lista .personagem-item[aria-pressed="true"]{
+  background:linear-gradient(110deg,#19483c,#245745);
+  border:2px solid #d5ac5e;
+  color:#fff7dc;
+  box-shadow:0 5px 16px #0d40384d,inset 4px 0 #e6c178;
+  padding:12px 13px;
+  font-weight:800;
+  position:relative;
+}
+#personagens-lista .personagem-item.personagem-selecionado::before{
+  content:"✦ SELECIONADO";
+  display:block;
+  font-size:.62rem;
+  letter-spacing:.12em;
+  color:#e9c98f;
+  margin-bottom:4px;
+}
+#personagens-lista .personagem-item.personagem-selecionado:hover{
+  background:#285d4a;
+  border-color:#f1d28c;
+}
+.inventario-aviso{
+  padding:12px 15px;
+  border:1px solid #bd8855;
+  border-left:4px solid #ac6735;
+  background:#fff0d4;
+  color:#5e3921;
+  border-radius:9px;
+  font-size:.87rem;
+  font-weight:650;
+  line-height:1.5;
+}
+.dnd-trilha-aprendizado{border-left:4px solid #c39b59}
+.dnd-trilha-aprendizado h2{color:#493a2c}
+.dnd-trilha-aprendizado p{line-height:1.7}
+.dnd-trilha-links{display:flex;gap:10px;flex-wrap:wrap;margin:19px 0}
+.dnd-trilha-links :is(a,button){text-decoration:none;display:inline-flex;align-items:center;justify-content:center;min-height:46px;text-align:center;white-space:normal}
+@media(max-width:640px){.dnd-trilha-links{flex-direction:column;align-items:stretch}.dnd-trilha-links :is(a,button){width:100%}}
