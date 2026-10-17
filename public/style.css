@@ -217,3 +217,49 @@ body.tela-acesso .menu-legenda,body.tela-acesso .menu-rodape{display:none}
 .avatar-upload-principal .suave{font-size:.8rem;line-height:1.5;margin:4px 0}
 .avatar-ia-futuro{color:#795c3c;font-size:.8rem;font-weight:600;margin:5px 0 0}
 @media(max-width:560px){.avatar-upload-principal .avatar-upload{width:100%}}
+
+/* Folha de personagem em abas, inventário e grimório */
+[hidden]{display:none!important}
+.ficha-abas{display:flex;gap:7px;flex-wrap:wrap;margin:18px 0 20px;border-bottom:1px solid #d6c09f;padding-bottom:10px}
+.ficha-aba{background:#faf0db;border:1px solid #ddc6a3;color:#58412f;border-radius:8px;padding:9px 12px;font-size:.8rem;font-weight:700;cursor:pointer}
+.ficha-aba:hover,.ficha-aba:focus-visible{border-color:#a74f35}
+.ficha-aba.ativa{background:#143c36;color:#faecd2;border-color:#143c36}
+.ficha-painel{min-height:170px;animation:ficha-revelar .15s ease-in}
+@keyframes ficha-revelar{from{opacity:.7;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+.ficha-criar-item{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin:16px 0}
+.ficha-criar-item input{flex:1;min-width:175px}
+.ficha-criar-item select{flex:0 1 150px}
+.ficha-criar-item button{min-height:44px}
+.ficha-mestre-secao{background:#fff7e8;border:1px solid #dcc8a5;border-radius:12px;margin:18px 0;padding:20px}
+.ficha-mestre-secao h3{color:#63442f}
+.inventario-lista{display:grid;gap:10px}
+.item-ficha{background:#fffaf1;border:1px solid #d8c7a8;border-radius:10px;padding:13px;display:grid;gap:10px}
+.item-ficha strong{font-family:Cinzel,Georgia,serif;font-size:.85rem;color:#473629}
+.item-ficha-linha{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.item-ficha-linha select{flex:1;min-width:115px}
+.item-ficha-linha input[type=number]{width:76px;flex:0 0 76px}
+.item-ficha-linha label{display:flex;align-items:center;gap:5px;font-size:.81rem;margin:0;font-weight:600;cursor:pointer}
+.item-ficha-linha input[type=checkbox]{width:17px;min-height:17px;height:17px;accent-color:#205247}
+.item-ficha input[type=text],.item-ficha textarea{width:100%;margin:0}
+.evolucao-lista{display:grid;gap:10px;margin:10px 0}
+.evolucao-item{background:#fffaf1;border-left:3px solid #ba8e4b;border-radius:8px;padding:12px 15px}
+.evolucao-item strong{font-size:.86rem;color:#58412c}
+.evolucao-item p{font-size:.85rem;margin:5px 0}
+.musica-ambiente{max-width:1180px;margin:10px auto 0;padding:12px 18px;border:1px solid #c4a26c5b;border-radius:12px;background:#20352f;display:flex;align-items:center;flex-wrap:wrap;gap:12px;color:#f6ebd4;box-shadow:0 5px 22px #050e1225}
+.musica-ambiente-titulo{display:flex;align-items:center;gap:10px;white-space:nowrap;font-size:.87rem}
+.musica-ambiente-titulo span{font-size:1.3rem;color:#e6c586}
+.musica-ambiente-controles{display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:1}
+.musica-ambiente-controles button{border:1px solid #baa072;border-radius:8px;color:#f7ecd5;background:#2c5349;padding:8px 14px;cursor:pointer}
+.musica-ambiente-controles label{font-size:.76rem;color:#dcc6a0}
+.musica-ambiente-controles select{max-width:158px;min-height:36px;padding:5px 8px;background:#fbf1dc;color:#30291e;border-radius:7px}
+.musica-ambiente-controles input[type=range]{width:90px;accent-color:#d1a75c}
+.musica-ambiente .suave{margin:0;font-size:.7rem;color:#dac8ad}
+.sr-only{position:absolute;width:1px;height:1px;clip:rect(0,0,0,0);overflow:hidden;white-space:nowrap}
+@media(max-width:640px){
+ .ficha-aba{flex:1;min-width:92px}
+ .ficha-criar-item{flex-direction:column;align-items:stretch}
+ .ficha-criar-item input,.ficha-criar-item select{flex:auto;width:100%}
+ .musica-ambiente{margin:8px 10px;padding:11px}
+ .musica-ambiente-controles{width:100%}
+ .musica-ambiente .suave{width:100%}
+}
