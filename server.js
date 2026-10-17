@@ -686,7 +686,7 @@ app.post('/api/admin/notificacoes/:id/ler',asyncHandler(async(req,res)=>{
 }));
 app.post('/api/admin/notificacoes/ler-todas',asyncHandler(async(req,res)=>{
  await query(`INSERT INTO public.mesa_notificacoes_lidas(administrador_id,chamado_id)
-              SELECT $1,id FROM public.mesa_chamados
+              SELECT $1,id FROM public.mesa_chamados WHERE true
               ON CONFLICT (administrador_id,chamado_id) DO NOTHING`,[req.admin.id]);
  res.json({ok:true});
 }));
