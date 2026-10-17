@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#102928">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/mesa-192.png">
+<link rel="apple-touch-icon" href="/icons/mesa-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mesa RPG">
 <meta name="description" content="Crie histórias inesquecíveis para suas mesas de RPG.">
 <title>Mesa | Suas histórias começam aqui</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -72,6 +78,20 @@
     <div class="como-funciona"><span class="sobretitulo">O PRÓXIMO CAPÍTULO</span><h2>Seu universo em três passos</h2><div class="passos"><article><b>01</b><h3>Escolha o mundo</h3><p>Defina o gênero e a atmosfera.</p></article><article><b>02</b><h3>Compartilhe uma ideia</h3><p>Dê vida à sua inspiração.</p></article><article><b>03</b><h3>Viva a história</h3><p>Receba aventuras, locais e personagens.</p></article></div></div>
   </section>
 
+  <section id="v-instalar" hidden>
+    <div class="pagina-intro"><span class="sobretitulo">MESA SEMPRE COM VOCÊ</span><h1>Instale o Mesa</h1><p>Leve seu portal de aventuras para a tela inicial do celular ou para o desktop.</p></div>
+    <div class="folha instalar-mesa">
+      <div class="instalar-cabecalho"><img src="/icons/mesa-192.png" width="88" height="88" alt="Ícone do Mesa"><div><h2>Mesa — Aventuras e RPG</h2><p>Instale gratuitamente com um atalho de aplicativo, sem baixar arquivos desconhecidos.</p></div></div>
+      <button id="instalar-mesa-botao" type="button" class="principal" hidden>⬇ Instalar Mesa</button>
+      <p id="instalar-mesa-status" class="suave" role="status">Verificando opções de instalação neste aparelho...</p>
+      <div class="instalar-orientacoes">
+        <article><h3>Android — Chrome</h3><p>Abra este site pelo Chrome, toque no menu ⋮ e escolha <strong>Instalar aplicativo</strong> ou <strong>Adicionar à tela inicial</strong>. Se o botão acima estiver disponível, basta tocá-lo.</p></article>
+        <article><h3>iPhone / iPad — Safari</h3><p>Abra o Mesa no Safari, toque em <strong>Compartilhar</strong> e escolha <strong>Adicionar à Tela de Início</strong>. Confirme em Adicionar.</p></article>
+        <article><h3>Computador — Chrome ou Edge</h3><p>Abra o Mesa no Chrome ou Edge, procure <strong>Instalar</strong> na barra de endereço ou no menu do navegador e confirme. O Mesa aparecerá entre seus aplicativos.</p></article>
+      </div>
+      <p class="suave">A instalação usa a tecnologia PWA: aparência de aplicativo e ícone na tela inicial. O gerador com IA, o login, o banco de dados, os arquivos privados e o tutor precisam de conexão com a internet. Para atualizações, abra o aplicativo conectado.</p>
+    </div>
+  </section>
   <section id="v-novidades" hidden><div class="pagina-intro"><span class="sobretitulo">CRÔNICAS DO MESA</span><h1>Novidades e comunicados</h1><p>Acompanhe anúncios publicados pela administração.</p></div><div class="folha" id="lista-novidades"></div></section>
   <section id="v-tutorial" hidden aria-labelledby="tutorial-titulo">
     <div class="pagina-intro"><span class="sobretitulo">MANUAL DO AVENTUREIRO</span><h1 id="tutorial-titulo">Como usar o Mesa</h1><p>Da sua primeira aventura ao inventário, descubra todas as ferramentas em poucos passos.</p></div>
