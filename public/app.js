@@ -379,79 +379,94 @@ async function carregarAventurasDaFicha(){
   }catch(e){aventurasFicha=[];op.replaceChildren(new Option('Aventuras indisponíveis',''));}
 }
 
-// ---- Instrumental folk medieval ORIGINAL do Mesa (Web Audio, sem arquivos externos) ----
-const ambiente={ctx:null,master:null,playing:false,sequencia:0,loop:null};
-const escalas={
-  taverna:{notas:[62,66,69,74,71,69,66,64,62,66,69,76,74,71,69,66],acordes:[[50,57,62],[47,54,59],[45,52,57],[50,57,62]],tempo:340},
-  floresta:{notas:[64,67,71,74,71,67,64,62,64,69,72,76,74,69,67,64],acordes:[[52,59,64],[48,55,60],[45,52,57],[50,57,62]],tempo:490},
-  jornada:{notas:[57,60,64,69,67,64,60,62,57,60,64,72,69,67,64,60],acordes:[[45,52,57],[41,48,53],[43,50,55],[45,52,57]],tempo:280}
-};
-function ambienteNota(midi,quando,duracao,tipo='corda',volume=0.15){
-  const ctx=ambiente.ctx;
-  if(!ctx||!ambiente.master)return;
-  const osc=ctx.createOscillator(),ganho=ctx.createGain();
-  osc.type=tipo==='flauta'?'sine':'triangle';
-  osc.frequency.value=440*Math.pow(2,(midi-69)/12);
-  ganho.gain.setValueAtTime(0.0001,quando);
-  ganho.gain.exponentialRampToValueAtTime(volume,quando+0.012);
-  ganho.gain.exponentialRampToValueAtTime(0.0001,quando+duracao);
-  osc.connect(ganho);ganho.connect(ambiente.master);
-  osc.start(quando);osc.stop(quando+duracao+0.03);
-}
-function ambientePasso(){
-  if(!ambiente.playing||!ambiente.ctx)return;
-  const config=escalas[$('ambiente-estilo').value]||escalas.taverna;
-  const passo=ambiente.sequencia++%16,agora=ambiente.ctx.currentTime+0.04;
-  ambienteNota(config.notas[passo],agora,config.tempo/1000*.78,passo%4===0?'flauta':'corda',0.15);
-  if(passo%4===0){
-    const acorde=config.acordes[Math.floor(passo/4)];
-    acorde.forEach((nota,i)=>ambienteNota(nota,agora+i*.08,config.tempo/1000*2.7,'corda',.045));
+// ---- Trilha ambiente: gravações medievais sob licenças Creative Commons ----
+// As faixas permanecem hospedadas no Wikimedia Commons: crédito obrigatório e link ao original.
+const trilhasAmbiente = {
+  taverna:{
+    titulo:'Medieval Story',artista:'Frank Schröter',licenca:'CC BY 4.0',
+    fonte:'https://commons.wikimedia.org/wiki/File:Medieval_Story_by_Frank_Schr%C3%B6ter.ogg',
+    audio:'https://commons.wikimedia.org/wiki/Special:Redirect/file/Medieval_Story_by_Frank_Schr%C3%B6ter.ogg',
+    termos:'Música medieval alegre, adequada à taverna'
+  },
+  floresta:{
+    titulo:'Medieval Dream',artista:'Frank Schröter',licenca:'CC BY 4.0',
+    fonte:'https://commons.wikimedia.org/wiki/File:Medieval_Dream_by_Frank_Schr%C3%B6ter.ogg',
+    audio:'https://commons.wikimedia.org/wiki/Special:Redirect/file/Medieval_Dream_by_Frank_Schr%C3%B6ter.ogg',
+    termos:'Melodia medieval tranquila para exploração'
+  },
+  jornada:{
+    titulo:'Chominciamento de Gioia',artista:'Interpretação disponibilizada no Wikimedia Commons',licenca:'CC BY-SA',
+    fonte:'https://commons.wikimedia.org/wiki/File:Chominciamento_de_Gioia1.ogg',
+    audio:'https://commons.wikimedia.org/wiki/Special:Redirect/file/Chominciamento_de_Gioia1.ogg',
+    termos:'Dança medieval com flautas, viela e percussão'
   }
+};
+const ambienteAudio=new Audio();
+ambienteAudio.loop=true;
+ambienteAudio.preload='none';
+let ambienteFaixaAtiva=null;
+function ambienteCreditos(){
+  const dados=trilhasAmbiente[$('ambiente-estilo').value]||trilhasAmbiente.taverna;
+  const caixa=$('ambiente-creditos');
+  caixa.replaceChildren();
+  caixa.append(document.createTextNode(dados.titulo+' — '+dados.artista+' · '+dados.licenca+' · '));
+  const fonte=el('a','Fonte e licença ↗');fonte.href=dados.fonte;
+  fonte.target='_blank';fonte.rel='noopener noreferrer';
+  caixa.appendChild(fonte);
 }
 function ambienteParar(){
-  ambiente.playing=false;
-  if(ambiente.loop)clearInterval(ambiente.loop);
-  ambiente.loop=null;
+  ambienteAudio.pause();
   $('ambiente-tocar').textContent='▶ Tocar';
   $('ambiente-tocar').setAttribute('aria-pressed','false');
-  $('ambiente-estado').textContent='Pausado. Você escolhe quando tocar.';
-  if(ambiente.ctx)ambiente.ctx.suspend().catch(()=>{});
+  $('ambiente-estado').textContent='Pausado. Clique em Tocar para continuar.';
+}
+function ambienteCarregar(){
+  const key=$('ambiente-estilo').value;
+  if(ambienteFaixaAtiva===key)return;
+  ambienteAudio.pause();
+  ambienteFaixaAtiva=key;
+  ambienteAudio.src=trilhasAmbiente[key].audio;
+  ambienteAudio.load();
+  ambienteCreditos();
 }
 $('ambiente-tocar').onclick=async()=>{
-  if(ambiente.playing){ambienteParar();return;}
-  const AudioContext=window.AudioContext||window.webkitAudioContext;
-  if(!AudioContext){$('ambiente-estado').textContent='Seu navegador não oferece áudio Web Audio.';return;}
+  if(!ambienteAudio.paused){ambienteParar();return;}
   try{
-    if(!ambiente.ctx){
-      ambiente.ctx=new AudioContext();
-      ambiente.master=ambiente.ctx.createGain();
-      ambiente.master.connect(ambiente.ctx.destination);
-    }
-    await ambiente.ctx.resume();
-    ambiente.master.gain.value=Number($('ambiente-volume').value)/100*.42;
-    ambiente.sequencia=0;ambiente.playing=true;
+    ambienteCarregar();
+    await ambienteAudio.play();
     $('ambiente-tocar').textContent='❚❚ Pausar';
     $('ambiente-tocar').setAttribute('aria-pressed','true');
-    $('ambiente-estado').textContent='Tocando instrumental folk criado pelo Mesa.';
-    ambientePasso();
-    ambiente.loop=setInterval(ambientePasso,escalas[$('ambiente-estilo').value].tempo);
-  }catch{$('ambiente-estado').textContent='O navegador não conseguiu iniciar o áudio.';}
+    $('ambiente-estado').textContent='Tocando: '+trilhasAmbiente[$('ambiente-estilo').value].titulo;
+  }catch{
+    ambienteParar();
+    $('ambiente-estado').textContent='Não foi possível reproduzir a faixa online. Confira a conexão ou abra a fonte para ouvi-la.';
+  }
 };
-$('ambiente-estilo').onchange=()=>{
+$('ambiente-estilo').onchange=async()=>{
   try{localStorage.setItem('mesa-ambiente-estilo',$('ambiente-estilo').value);}catch{}
-  if(ambiente.playing){clearInterval(ambiente.loop);ambiente.sequencia=0;ambientePasso();ambiente.loop=setInterval(ambientePasso,escalas[$('ambiente-estilo').value].tempo);}
+  const tocando=!ambienteAudio.paused;
+  ambienteCarregar();
+  if(tocando){
+    try{await ambienteAudio.play();$('ambiente-tocar').textContent='❚❚ Pausar';$('ambiente-tocar').setAttribute('aria-pressed','true');}
+    catch{ambienteParar();$('ambiente-estado').textContent='A faixa selecionada não pôde ser carregada.';}
+  } else $('ambiente-estado').textContent='Pronto para tocar: '+trilhasAmbiente[$('ambiente-estilo').value].titulo;
 };
 $('ambiente-volume').oninput=()=>{
-  if(ambiente.master)ambiente.master.gain.value=Number($('ambiente-volume').value)/100*.42;
+  ambienteAudio.volume=Number($('ambiente-volume').value)/100;
   try{localStorage.setItem('mesa-ambiente-volume',$('ambiente-volume').value);}catch{}
+};
+ambienteAudio.onerror=()=>{
+  ambienteParar();
+  $('ambiente-estado').textContent='Falha ao carregar o áudio do Wikimedia Commons. Você pode abrir a fonte no link ao lado.';
 };
 try{
   const estilo=localStorage.getItem('mesa-ambiente-estilo');
-  if(escalas[estilo])$('ambiente-estilo').value=estilo;
-  const volume=Number(localStorage.getItem('mesa-ambiente-volume'));
-  if(Number.isFinite(volume)&&volume>=0&&volume<=100 && localStorage.getItem('mesa-ambiente-volume')!==null)
-    $('ambiente-volume').value=String(volume);
+  if(Object.hasOwn(trilhasAmbiente,estilo))$('ambiente-estilo').value=estilo;
+  const guardado=localStorage.getItem('mesa-ambiente-volume');
+  if(guardado!==null&&Number.isFinite(Number(guardado)))$('ambiente-volume').value=String(Math.min(100,Math.max(0,Number(guardado))));
 }catch{}
+ambienteAudio.volume=Number($('ambiente-volume').value)/100;
+ambienteCreditos();
 
 // ---- Fichas D&D 5e 2024: atributos-base e compra com 27 pontos ----
 const atributosDnd = [['for','Força'],['des','Destreza'],['con','Constituição'],['int','Inteligência'],['sab','Sabedoria'],['car','Carisma']];
