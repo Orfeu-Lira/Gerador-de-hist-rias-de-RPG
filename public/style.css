@@ -464,3 +464,17 @@ body.tela-acesso .acesso-cartao{max-width:460px}
 #v-suporte form :is(input,textarea){width:100%;max-width:100%}
 #v-suporte form button{justify-self:start}
 @media(max-width:650px){.admin-abas{gap:6px}.admin-abas button{flex:1 1 44%;font-size:.78rem;padding:9px 7px}.admin-busca{grid-template-columns:1fr}.admin-barra-linha{grid-template-columns:minmax(70px,.9fr) minmax(65px,2fr) 28px;font-size:.68rem;gap:5px}.admin-registro{padding:12px}}
+
+/* Instalação PWA: aplicativo do Mesa em celular e computador. */
+.instalar-mesa{max-width:920px;margin:0 auto}
+.instalar-cabecalho{display:flex;align-items:center;gap:22px;padding:13px 0 20px;border-bottom:1px solid #d1bf9e;margin-bottom:23px}
+.instalar-cabecalho img{flex:none;border-radius:22px;box-shadow:0 6px 21px #14292333;border:2px solid #bca06b}
+.instalar-cabecalho h2{margin:0 0 5px;color:#433522}
+.instalar-cabecalho p{margin:0;color:#6a5843}
+.instalar-mesa>.principal{min-height:48px;margin:5px 0 11px}
+.instalar-mesa-status{margin:12px 0 22px!important}
+.instalar-orientacoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:13px;margin:20px 0}
+.instalar-orientacoes article{padding:19px;border:1px solid #d5c3a6;border-radius:12px;background:#fffaf0}
+.instalar-orientacoes h3{color:#564024;margin:0 0 11px}
+.instalar-orientacoes p{color:#554c3f;line-height:1.7;font-size:.89rem;margin:0}
+@media(max-width:580px){.instalar-cabecalho{gap:14px;align-items:start}.instalar-cabecalho img{width:64px;height:64px;border-radius:15px}.instalar-cabecalho h2{font-size:1.2rem}}
