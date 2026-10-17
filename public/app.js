@@ -32,6 +32,12 @@ function aviso(texto, bom) { const a = $('aviso'); a.textContent = texto || ''; 
 
 // ---- Navegação entre telas ----
 const TELAS = ['gerador','dados','historico','personagens','assistente','tutorial','conta','admin'];
+const estadoNavegacao={
+  ler(chave){try{return sessionStorage.getItem('mesa:'+chave);}catch{return null;}},
+  gravar(chave,valor){try{if(valor===null)sessionStorage.removeItem('mesa:'+chave);else sessionStorage.setItem('mesa:'+chave,String(valor));}catch{}}
+};
+
+$('dnd-tutorial-mesa').onclick=()=>{mostrar('tutorial');tutorialMostrarPasso(0);};
 const tutorialEtapas = [
  {titulo:'Bem-vindo ao Mesa',sub:'Seu espaço de histórias',texto:'O Mesa reúne aventuras, dados e fichas em um só lugar. Use o menu lateral para alternar de ferramenta. Você pode deixá-lo expandido ou compacto, e no celular basta tocar em Menu.',dicas:['O tutorial fica disponível sempre no menu lateral.','Sua conta guarda o histórico e as fichas privadas.'],tela:'gerador',rotulo:'Conhecer o gerador'},
  {titulo:'Crie sua primeira aventura',sub:'Gerador de histórias',texto:'Escolha o gênero, defina o tom e o número de jogadores. Escreva uma ideia opcional, como uma vila cercada por névoa, e clique em Gerar minha aventura. O Mesa usa IA e aplica limites de uso.',dicas:['Uma ideia curta pode orientar toda a aventura.','Leia a história gerada e adapte-a livremente à sua mesa.'],tela:'gerador',rotulo:'Ir ao gerador'},
@@ -97,6 +103,8 @@ window.addEventListener('resize',()=>{if(!preferirMobile())menuMobile(false);});
 try{menuRecolher(localStorage.getItem('mesa-menu-compacto')==='1');}catch{menuRecolher(false);}
 function mostrar(tela) {
   if(!TELAS.includes(tela))return;
+  if(!eu.logado&&['historico','personagens','assistente','admin'].includes(tela))tela='conta';
+  estadoNavegacao.gravar('tela',tela);
   document.body.classList.toggle('tela-acesso', tela === 'conta');
   TELAS.forEach((t) => { $('v-' + t).hidden = t !== tela; });
   document.querySelectorAll('#nav button[data-tela]').forEach((b) => b.setAttribute('aria-current', b.dataset.tela === tela?'page':'false'));
@@ -127,7 +135,14 @@ function montarNav() {
     const sair=el('button','','menu-item');sair.type='button';sair.title='Sair';sair.setAttribute('aria-label','Sair');
     const icone=el('span','↪','menu-item-icone');icone.setAttribute('aria-hidden','true');
     sair.append(icone,el('span','Sair','menu-item-texto'));
-    sair.onclick=async()=>{await api('/api/logout','POST');await atualizarEu();mostrar('gerador');};
+    sair.onclick=async()=>{
+      await api('/api/logout','POST');
+      estadoNavegacao.gravar('personagem',null);
+      estadoNavegacao.gravar('aba-ficha',null);
+      estadoNavegacao.gravar('tela',null);
+      fichaAbertaId=null;
+      await atualizarEu();mostrar('gerador');
+    };
     nav.appendChild(sair);
   }
 }
@@ -367,14 +382,28 @@ function sugerirEquipamentos(){
  if(typeof local==='string' && local.trim())itens.push('Anotações sobre '+local.trim().slice(0,70));
  return {itens:[...new Set(itens)],descricao:nome+' • '+cenario+(aventura?' • '+(aventura.conteudo?.titulo||'aventura'):'')};
 }
+function exigirPersonagemSalvo(){
+  if(fichaAbertaId)return true;
+  const mensagem='Selecione um personagem existente ou crie e salve uma ficha antes de modificar o inventário.';
+  aviso(mensagem);
+  if($('p-inventario-aviso')){
+    $('p-inventario-aviso').hidden=false;
+    $('p-inventario-aviso').textContent=mensagem;
+  }
+  return false;
+}
 function atualizarKit(){
  const kit=sugerirEquipamentos();
- $('p-gerar-kit').disabled=!kit;
- $('p-kit-origem').textContent=kit
- ? 'Sugestão para '+kit.descricao+'. Revise os itens com o mestre.'
+ // Mantenha o clique ativo para explicar por que ainda não é possível gerar itens.
+ $('p-gerar-kit').disabled=false;
+ $('p-kit-origem').textContent=!fichaAbertaId
+ ? 'Selecione um personagem existente ou crie e salve uma ficha para editar o inventário.'
+ : kit ? 'Sugestão para '+kit.descricao+'. Revise os itens com o mestre.'
  : 'Selecione cenário e classe ou especialidade para sugerir equipamentos.';
+ if($('p-inventario-aviso'))$('p-inventario-aviso').hidden=Boolean(fichaAbertaId);
 }
 $('p-gerar-kit').onclick=()=>{
+ if(!exigirPersonagemSalvo())return;
  const kit=sugerirEquipamentos();
  if(!kit)return;
  if($('p-equipamentos').value.trim()&&!confirm('Substituir os equipamentos atuais pela nova sugestão?'))return;
@@ -744,6 +773,7 @@ $('p-avatar-remover').onclick=async()=>{
 const secoesFicha=['identidade','atributos','inventario','habilidades','historia'];
 function abrirAbaFicha(nome){
   if(!secoesFicha.includes(nome))return;
+  estadoNavegacao.gravar('aba-ficha',nome);
   for(const secao of secoesFicha){
     const ativo=secao===nome;
     $('painel-'+secao).hidden=!ativo;
@@ -830,6 +860,7 @@ function pintarInventario(){
   sincronizarInventario();
 }
 function adicionarItemFicha(nome,tipo='Outros'){
+  if(!exigirPersonagemSalvo())return;
   const titulo=textoLimitado(nome,80);
   if(!titulo){aviso('Informe o nome do item.');return;}
   if(inventarioFicha.length>=32){aviso('Sua ficha atingiu o limite de 32 tipos de itens.');return;}
@@ -840,6 +871,7 @@ $('p-item-adicionar').onclick=()=>adicionarItemFicha($('p-item-nome').value,$('p
 $('p-item-nome').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('p-item-adicionar').click();}};
 const acaoKitOriginal=$('p-gerar-kit').onclick;
 $('p-gerar-kit').onclick=()=>{
+  if(!exigirPersonagemSalvo())return;
   // O botão antigo atualiza a lista textual; aproveitamos a mesma sugestão confirmada.
   const anterior=$('p-equipamentos').value;
   acaoKitOriginal();
@@ -945,6 +977,8 @@ function restaurarExtrasFicha(d){
 }
 function limparFicha(){
   fichaAbertaId=null;
+  estadoNavegacao.gravar('personagem',null);
+  destacarPersonagemSelecionado();
   limparPreviewAvatar();
   atualizarEstadoAvatar();
   $('f-personagem').reset();
@@ -959,6 +993,14 @@ function limparFicha(){
   atualizarKit();
 }
 $('nova-ficha').onclick=limparFicha;
+function destacarPersonagemSelecionado(){
+  document.querySelectorAll('#personagens-lista .personagem-item').forEach(botao=>{
+    const ativo=Boolean(fichaAbertaId)&&Number(botao.dataset.personagemId)===Number(fichaAbertaId);
+    botao.classList.toggle('personagem-selecionado',ativo);
+    botao.setAttribute('aria-pressed',String(ativo));
+    botao.setAttribute('aria-current',ativo?'true':'false');
+  });
+}
 async function carregarPersonagens(){
   const lista=$('personagens-lista');lista.replaceChildren();
   try{
@@ -967,8 +1009,14 @@ async function carregarPersonagens(){
     for(const item of itens) {
       const botao=el('button',(item.nome||'Personagem')+(item.dados.metodo==='livre'?' · '+(item.dados.especialidade||'Narrativa'):' · Nível '+item.dados.nivel),'personagem-item');
       botao.type='button';
-      botao.onclick=()=>{
+      botao.dataset.personagemId=String(item.id);
+      botao.setAttribute('aria-pressed','false');
+      botao.onclick=(evento)=>{
+        const restaurando=evento?.restaurar===true;
+        const abaRestaurada=restaurando?estadoNavegacao.ler('aba-ficha'):null;
         fichaAbertaId=item.id;
+        estadoNavegacao.gravar('personagem',item.id);
+        destacarPersonagemSelecionado();
         carregarAvatar();
         const d=item.dados;
         $('p-nome').value=d.nome||'';
@@ -978,7 +1026,7 @@ async function carregarPersonagens(){
         $('p-nivel').value=d.nivel||1;
         $('p-notas').value=d.notas||'';
         restaurarExtrasFicha(d);
-        abrirAbaFicha('identidade');
+        abrirAbaFicha(abaRestaurada&&secoesFicha.includes(abaRestaurada)?abaRestaurada:'identidade');
         $('p-cenario').value=contextosDnd[d.cenario]?d.cenario:'';
         atualizarContextoDnd();
         $('p-especialidade').value=contextosDnd[d.cenario]?.papeis.includes(d.especialidade)?d.especialidade:'';
@@ -992,10 +1040,18 @@ async function carregarPersonagens(){
         atualizarPontosDnd();
         atualizarSugestaoClasse();
         atualizarKit();
-        $('f-personagem').scrollIntoView({behavior:'smooth',block:'start'});
+        if(!restaurando)$('f-personagem').scrollIntoView({behavior:'smooth',block:'start'});
       };
       lista.appendChild(botao);
     }
+    const idAnterior=fichaAbertaId||Number(estadoNavegacao.ler('personagem'));
+    if(idAnterior){
+      const botao=[...lista.querySelectorAll('[data-personagem-id]')].find(b=>Number(b.dataset.personagemId)===Number(idAnterior));
+      if(botao)botao.onclick({restaurar:true});
+      else limparFicha();
+    }
+    destacarPersonagemSelecionado();
+    atualizarKit();
   }catch(e){aviso(e.message);}
 }
 $('f-personagem').onsubmit=async ev=>{
@@ -1023,9 +1079,14 @@ $('f-personagem').onsubmit=async ev=>{
   }
   const botao=$('f-personagem').querySelector('button[type="submit"]');botao.disabled=true;
   try{
-    await api(fichaAbertaId?'/api/personagens/'+fichaAbertaId:'/api/personagens',fichaAbertaId?'PUT':'POST',{dados});
-    aviso('Ficha salva com sucesso!',true);
-    limparFicha();await carregarPersonagens();
+    const abaAtual=estadoNavegacao.ler('aba-ficha')||'identidade';
+    const resposta=await api(fichaAbertaId?'/api/personagens/'+fichaAbertaId:'/api/personagens',fichaAbertaId?'PUT':'POST',{dados});
+    if(!fichaAbertaId&&resposta?.id)fichaAbertaId=resposta.id;
+    estadoNavegacao.gravar('personagem',fichaAbertaId);
+    estadoNavegacao.gravar('aba-ficha',abaAtual);
+    await carregarPersonagens();
+    abrirAbaFicha(abaAtual);
+    aviso('Ficha salva com sucesso! O personagem continua selecionado.',true);
   }catch(e){aviso(e.message);}
   finally{botao.disabled=false;}
 };
@@ -1116,11 +1177,14 @@ async function carregarResumo() {
 atualizarEu().then(() => {
   if (new URL(location.href).searchParams.has('reset_token')) {
     abrirFormularioConta('f-redefinir'); mostrar('conta');
-  } else mostrar('gerador');
+  } else {
+    const anterior=estadoNavegacao.ler('tela');
+    mostrar(TELAS.includes(anterior)?anterior:'gerador');
+  }
 }).catch((e) => {
   montarNav();
   if (new URL(location.href).searchParams.has('reset_token')) {
     abrirFormularioConta('f-redefinir'); mostrar('conta');
-  }
+  } else mostrar('gerador');
   aviso(e.message);
 });
