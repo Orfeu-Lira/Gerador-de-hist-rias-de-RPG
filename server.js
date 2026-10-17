@@ -72,6 +72,8 @@ app.use(express.json({ limit: '10kb' }));
 app.use(session({
   name: 'mesa.sid', secret: process.env.SESSION_SECRET,
   store: new PostgresSessionStore(), resave: false, saveUninitialized: false,
+  // Renova a validade de sessões ativas, inclusive após novos deployments.
+  rolling: true,
   cookie: { httpOnly: true, secure: PRODUCAO, sameSite: PRODUCAO ? 'none' : 'lax', maxAge: 604800000 }
 }));
 
@@ -91,9 +93,13 @@ const quotaKey = (req,u) => u
   : 'visitante:' + (req.ip || 'desconhecido');
 const usadas = async chave => Number((await query('SELECT total FROM public.geracoes_limite WHERE identificador=$1',[chave])).rows[0]?.total || 0);
 const restantes = async (req,u) => u && u.papel === 'admin' ? null : Math.max(0,(u ? 5 : 1) - await usadas(quotaKey(req,u)));
-const refreshSession = (req, userId) => new Promise((resolve,reject) => req.session.regenerate(err => {
+// A duração precisa estar definida ANTES da primeira gravação no PostgreSQL.
+// Cadastro usa cookie de sessão; login oferece a opção persistente de 30 dias.
+const refreshSession = (req, userId, manterConectado = false) => new Promise((resolve,reject) => req.session.regenerate(err => {
   if (err) return reject(err);
-  req.session.userId = userId; req.session.save(err2 => err2 ? reject(err2) : resolve());
+  req.session.userId = userId;
+  req.session.cookie.maxAge = manterConectado ? 30 * 24 * 60 * 60 * 1000 : null;
+  req.session.save(err2 => err2 ? reject(err2) : resolve());
 }));
 const compareSecret = (received, secret) => {
   if (typeof received !== 'string' || !secret || !received) return false;
@@ -139,15 +145,9 @@ app.post('/api/login',asyncHandler(async(req,res) => {
   const u = r.rows[0];
   const ok = await bcrypt.compare(typeof senha === 'string' ? senha : '',u ? u.senha_hash : HASH_FALSO);
   if (!u || !ok) return res.status(401).json({erro:'E-mail ou senha incorretos.'});
-  await refreshSession(req,Number(u.id));
-  // Sessão persistente apenas quando solicitada pelo usuário.
+  // O cookie persistente e a validade do registro no banco são criados juntos.
   // Nunca armazenamos a senha no cookie ou no armazenamento do navegador.
-  if (req.body?.manterConectado === true) {
-    req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000;
-  } else {
-    req.session.cookie.maxAge = null; // cookie de sessão: fecha ao encerrar navegador
-  }
-  await new Promise((resolve,reject) => req.session.save(err => err ? reject(err) : resolve()));
+  await refreshSession(req,Number(u.id),req.body?.manterConectado === true);
   res.json({ok:true});
 }));
 // Recuperação de senha: links únicos por 20 min, enviados pelo Resend.
