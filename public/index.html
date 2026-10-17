@@ -13,12 +13,20 @@
 </head>
 <body>
 <main>
-  <header class="topo">
-    <a href="/" class="marca" aria-label="Mesa, voltar ao início"><span class="marca-emblema" aria-hidden="true">✦</span><span><strong>MESA</strong><small>FERRAMENTAS PARA MESTRES</small></span></a>
-    <span class="menu-legenda">SUA MESA DE JOGO</span>
+  <header class="topo" id="menu-lateral">
+    <div class="menu-cabecalho">
+      <a href="/" class="marca" aria-label="Mesa, início"><span class="marca-emblema" aria-hidden="true">✦</span><span class="marca-nome"><strong>MESA</strong><small>SEU PORTAL DE AVENTURAS</small></span></a>
+      <button type="button" id="menu-retrair" class="menu-retrair" aria-label="Recolher menu lateral" aria-expanded="true" aria-controls="nav" title="Recolher menu">‹</button>
+    </div>
+    <span class="menu-legenda">EXPLORE O MESA</span>
     <nav id="nav" aria-label="Menu principal"></nav>
-    <p class="menu-rodape">✧ Cada história começa com uma escolha.</p>
+    <div class="menu-rodape">
+      <button id="abrir-tutorial-menu" type="button" class="menu-ajuda" aria-label="Abrir tutorial do Mesa" title="Tutorial">❖ <span>Como usar o Mesa</span></button>
+      <p>✧ Cada história começa com uma escolha.</p>
+    </div>
   </header>
+  <button id="menu-abrir-mobile" class="menu-abrir-mobile" type="button" aria-label="Abrir menu lateral" aria-expanded="false" aria-controls="menu-lateral">☰ <span>Menu</span></button>
+  <button id="menu-fundo" class="menu-fundo" type="button" aria-label="Fechar menu lateral" hidden></button>
   <!-- Painel de trilha sonora flutuante: disponível inclusive no login. -->
   <section class="musica-ambiente" aria-label="Trilha ambiente do Mesa">
     <button class="musica-gatilho" id="ambiente-menu" type="button" aria-expanded="false" aria-controls="ambiente-painel" aria-label="Abrir opções da música ambiente">
@@ -61,6 +69,21 @@
     </form>
     <div id="saida"></div>
     <div class="como-funciona"><span class="sobretitulo">O PRÓXIMO CAPÍTULO</span><h2>Seu universo em três passos</h2><div class="passos"><article><b>01</b><h3>Escolha o mundo</h3><p>Defina o gênero e a atmosfera.</p></article><article><b>02</b><h3>Compartilhe uma ideia</h3><p>Dê vida à sua inspiração.</p></article><article><b>03</b><h3>Viva a história</h3><p>Receba aventuras, locais e personagens.</p></article></div></div>
+  </section>
+
+  <section id="v-tutorial" hidden aria-labelledby="tutorial-titulo">
+    <div class="pagina-intro"><span class="sobretitulo">MANUAL DO AVENTUREIRO</span><h1 id="tutorial-titulo">Como usar o Mesa</h1><p>Da sua primeira aventura ao inventário, descubra todas as ferramentas em poucos passos.</p></div>
+    <div class="folha tutorial-folha">
+      <div class="tutorial-progresso"><span id="tutorial-contagem">Passo 1 de 10</span><progress id="tutorial-progresso" max="10" value="1" aria-label="Progresso do tutorial"></progress></div>
+      <div class="tutorial-passos" role="group" aria-label="Capítulos do tutorial">
+        <button type="button" id="tutorial-anterior" class="guia-abrir">← Anterior</button>
+        <button type="button" id="tutorial-proximo" class="principal">Próximo capítulo →</button>
+      </div>
+      <article id="tutorial-conteudo" class="tutorial-conteudo" aria-live="polite"></article>
+      <div class="tutorial-acoes"><button type="button" id="tutorial-ir" class="guia-abrir">Abrir esta ferramenta ↗</button><button type="button" id="tutorial-recomecar" class="link">Recomeçar tutorial</button></div>
+      <p class="suave">Você pode abrir este guia a qualquer momento pelo menu lateral. O tutorial não altera suas fichas nem consome gerações de IA.</p>
+    </div>
+    <div class="tutorial-atualizacoes folha"><h2>Dicas para começar</h2><p>Não é necessário saber programar ou ter experiência em RPG. Os resultados gerados são sugestões narrativas; regras, equipamentos e habilidades devem ser confirmados com o mestre e o sistema utilizado.</p></div>
   </section>
 
   <section id="v-dados" hidden>
