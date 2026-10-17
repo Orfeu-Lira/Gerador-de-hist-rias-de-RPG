@@ -263,3 +263,8 @@ body.tela-acesso .menu-legenda,body.tela-acesso .menu-rodape{display:none}
  .musica-ambiente-controles{width:100%}
  .musica-ambiente .suave{width:100%}
 }
+
+/* Créditos obrigatórios das gravações Creative Commons */
+.musica-ambiente .musica-creditos{margin:0;color:#e1d0ad;font-size:.72rem;line-height:1.45;width:100%}
+.musica-creditos a{color:#f3dba3;text-decoration:underline;text-underline-offset:2px}
+.musica-creditos a:hover{color:#fff6dd}
