@@ -19,6 +19,13 @@
     <nav id="nav" aria-label="Menu principal"></nav>
     <p class="menu-rodape">✧ Cada história começa com uma escolha.</p>
   </header>
+  <section class="musica-ambiente" aria-label="Trilha ambiente do Mesa">
+    <div class="musica-ambiente-titulo"><span aria-hidden="true">♫</span><strong>Melodias da Taverna</strong></div>
+    <div class="musica-ambiente-controles"><button id="ambiente-tocar" type="button" aria-pressed="false">▶ Tocar</button>
+    <label for="ambiente-estilo">Clima</label><select id="ambiente-estilo"><option value="taverna">Folk medieval</option><option value="floresta">Floresta</option><option value="jornada">Jornada</option></select>
+    <label for="ambiente-volume">Volume</label><input id="ambiente-volume" type="range" min="0" max="100" value="30" step="5" aria-label="Volume da música ambiente"></div>
+    <p id="ambiente-estado" class="suave">Instrumental original do Mesa. Toque para iniciar.</p>
+  </section>
   <p id="aviso" role="status"></p>
 
   <!-- Gerador: qualquer visitante vê; o servidor aplica os limites -->
@@ -79,6 +86,18 @@
       <div class="folha"><div class="painel-titulo"><h2>Minha biblioteca</h2><button id="nova-ficha" class="guia-abrir" type="button">+ Nova ficha</button></div><div id="personagens-lista"></div><p class="suave">As fichas são privadas e ficam vinculadas à sua conta.</p></div>
       <form id="f-personagem" class="folha" autocomplete="off">
         <h2 id="ficha-form-titulo">Nova personagem</h2>
+        <nav class="ficha-abas" role="tablist" aria-label="Seções da ficha">
+          <button type="button" class="ficha-aba ativa" id="aba-identidade" data-ficha-aba="identidade" role="tab" aria-selected="true" aria-controls="painel-identidade">Identidade</button>
+          <button type="button" class="ficha-aba" id="aba-atributos" data-ficha-aba="atributos" role="tab" aria-selected="false" aria-controls="painel-atributos">Atributos</button>
+          <button type="button" class="ficha-aba" id="aba-inventario" data-ficha-aba="inventario" role="tab" aria-selected="false" aria-controls="painel-inventario">Inventário</button>
+          <button type="button" class="ficha-aba" id="aba-habilidades" data-ficha-aba="habilidades" role="tab" aria-selected="false" aria-controls="painel-habilidades">Habilidades</button>
+          <button type="button" class="ficha-aba" id="aba-historia" data-ficha-aba="historia" role="tab" aria-selected="false" aria-controls="painel-historia">História</button>
+        </nav>
+        <div id="painel-identidade" class="ficha-painel" role="tabpanel" aria-labelledby="aba-identidade"></div>
+        <div id="painel-atributos" class="ficha-painel" role="tabpanel" aria-labelledby="aba-atributos" hidden></div>
+        <div id="painel-inventario" class="ficha-painel" role="tabpanel" aria-labelledby="aba-inventario" hidden></div>
+        <div id="painel-habilidades" class="ficha-painel" role="tabpanel" aria-labelledby="aba-habilidades" hidden></div>
+        <div id="painel-historia" class="ficha-painel" role="tabpanel" aria-labelledby="aba-historia" hidden></div>
         <section class="avatar-painel" aria-label="Avatar da personagem">
           <div class="avatar-moldura"><img id="p-avatar-img" alt="Retrato da personagem" hidden><span id="p-avatar-vazio" aria-hidden="true">♙</span></div>
           <div class="avatar-acoes"><h3>Retrato da personagem</h3><p id="p-avatar-info" class="suave">Salve a ficha antes de enviar uma imagem. O avatar ficará privado na sua conta.</p>
@@ -125,9 +144,30 @@
             <button id="p-gerar-kit" type="button" class="guia-abrir">✦ Sugerir kit inicial</button>
           </div>
           <p id="p-kit-origem" class="suave">Selecione uma história e uma classe ou especialidade para receber uma sugestão contextual.</p>
-          <label for="p-equipamentos">Itens do inventário (um por linha)</label>
-          <textarea id="p-equipamentos" rows="7" maxlength="1800" placeholder="Ex.: Mochila de viagem&#10;Corda&#10;Lanterna"></textarea>
+          <label for="p-equipamentos" class="sr-only">Resumo dos equipamentos</label>
+          <textarea id="p-equipamentos" rows="7" maxlength="1800" hidden></textarea>
+          <div class="ficha-criar-item">
+            <input id="p-item-nome" type="text" maxlength="80" placeholder="Nome do item (ex.: Espada longa)" aria-label="Nome do novo item">
+            <select id="p-item-tipo" aria-label="Categoria do novo item"><option>Arma</option><option>Armadura</option><option>Consumível</option><option>Ferramenta</option><option>Exploração</option><option>Outros</option></select>
+            <button id="p-item-adicionar" type="button" class="guia-abrir">+ Adicionar item</button>
+          </div>
+          <div id="p-inventario-lista" class="inventario-lista" aria-live="polite"></div>
+          <p id="p-inventario-resumo" class="suave"></p>
           <p class="suave">Você pode adicionar, remover ou substituir itens. A lista é uma sugestão narrativa — equipamento inicial oficial, moedas, proficiências e bônus devem ser conferidos nas regras aplicáveis.</p>
+        </section>
+        <section id="p-habilidades-secao" class="ficha-mestre-secao">
+          <div class="painel-titulo"><div><span class="sobretitulo">GRIMÓRIO</span><h3>Habilidades e perícias</h3></div><button id="p-sugerir-habilidades" type="button" class="guia-abrir">✦ Sugerir temas</button></div>
+          <p class="suave">Adicione somente habilidades aprovadas pelo mestre. Sugestões são ideias narrativas, não concessões automáticas de poderes ou regras oficiais.</p>
+          <div class="ficha-criar-item"><input id="p-habilidade-nome" maxlength="80" placeholder="Nome da habilidade" aria-label="Nome da nova habilidade">
+            <select id="p-habilidade-tipo" aria-label="Tipo de habilidade"><option>Característica</option><option>Perícia</option><option>Magia</option><option>Talento</option><option>Narrativa</option></select>
+            <button type="button" id="p-habilidade-adicionar" class="guia-abrir">+ Adicionar</button></div>
+          <div id="p-habilidades-lista" class="inventario-lista"></div>
+        </section>
+        <section id="p-evolucao-secao" class="ficha-mestre-secao"><h3>Diário de evolução</h3>
+          <p class="suave">Registre missões, mudanças de nível e conquistas. Este diário não concede atributos ou habilidades automaticamente.</p>
+          <div class="ficha-criar-item"><input id="p-evolucao-nota" maxlength="160" placeholder="Ex.: Cheguei ao nível 2 após a missão do farol" aria-label="Nova conquista">
+          <button type="button" id="p-evolucao-adicionar" class="guia-abrir">+ Registrar</button></div>
+          <div id="p-evolucao-lista" class="evolucao-lista"></div>
         </section>
         <label for="p-notas">Anotações da personagem</label><textarea id="p-notas" maxlength="1500" rows="4" placeholder="História, equipamento, perícias e observações..."></textarea>
         <div class="acoes"><button type="submit" class="principal">Salvar ficha</button><button id="p-remover" type="button" class="apagar-ficha" hidden>Excluir ficha</button></div>
