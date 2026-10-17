@@ -304,3 +304,80 @@ body.tela-acesso .menu-legenda,body.tela-acesso .menu-rodape{display:none}
  html{scroll-behavior:auto}
  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
 }
+
+/* Mesa v3 — navegação lateral retrátil e guia completo */
+:root{--mesa-menu-largura:246px;--mesa-menu-compacto:76px}
+body{padding-left:var(--mesa-menu-largura);transition:padding-left .3s cubic-bezier(.2,.75,.3,1)}
+body.menu-compacto{padding-left:var(--mesa-menu-compacto)}
+body>main{max-width:1500px;margin:0 auto;padding:23px clamp(20px,3vw,48px) 90px}
+.topo{position:fixed;z-index:100;left:0;top:0;bottom:0;width:var(--mesa-menu-largura);max-width:none;margin:0;padding:22px 13px 18px;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:12px;border:0;border-right:1px solid #d2b77948;background:linear-gradient(155deg,#193c36,#0b2426 78%);box-shadow:12px 0 36px #061b1b33;overflow-x:hidden;overflow-y:auto;transition:width .3s cubic-bezier(.2,.75,.3,1)}
+.menu-cabecalho{display:flex;align-items:center;justify-content:space-between;gap:5px;min-width:0}
+.topo .marca{display:flex;min-width:0;gap:9px;overflow:hidden}
+.topo .marca strong{font-size:21px;letter-spacing:.07em}
+.topo .marca small{font-size:8px;letter-spacing:.04em;white-space:nowrap}
+.topo .marca-emblema{flex:0 0 42px;width:42px;height:42px}
+.marca-nome{white-space:nowrap}
+.menu-retrair{flex:none;border:1px solid #d4b87565;background:#ffffff0c;color:#f4e4c9;border-radius:9px;width:28px;height:35px;cursor:pointer;font-size:1.4rem;line-height:1}
+.topo .menu-legenda{display:block;font-size:.62rem;letter-spacing:.18em;color:#c2aa80;margin:13px 10px 4px;white-space:nowrap;font-weight:700}
+#nav{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:6px;width:100%;flex-wrap:nowrap}
+#nav .menu-item{display:flex;align-items:center;justify-content:flex-start;gap:12px;width:100%;border:1px solid transparent;background:transparent;color:#ecdfc7;padding:10px 11px;border-radius:12px;min-height:48px;text-align:left;white-space:nowrap}
+#nav .menu-item:last-child{border-color:transparent}
+#nav .menu-item:hover{border-color:#bca77b44;background:#ffffff0e;transform:translateX(2px)}
+#nav .menu-item[aria-current="page"]{color:#f7e6bf;border-color:#dcb8737d;background:linear-gradient(90deg,#cfb1782b,#cfb1780c);box-shadow:inset 3px 0 #dcb873}
+.menu-item-icone{flex:none;display:inline-grid;place-items:center;width:30px;height:28px;color:#e6bf80;font-size:1.18rem}
+.menu-item-texto{font-size:.88rem;font-weight:700;white-space:nowrap}
+.menu-rodape{margin-top:auto;width:100%;display:grid;gap:14px}
+.menu-rodape p{font-size:.75rem;color:#c8b89b;line-height:1.5;margin:0 8px}
+.menu-ajuda{display:flex;align-items:center;gap:11px;border:1px solid #cfad6a77;background:#e0bc7330;color:#f6e2bc;border-radius:12px;padding:11px 12px;text-align:left;cursor:pointer;min-height:46px;white-space:nowrap;font-weight:700}
+.menu-ajuda:hover{background:#e0bc7345}
+body.menu-compacto .topo{width:var(--mesa-menu-compacto);padding:20px 12px}
+body.menu-compacto .menu-cabecalho{flex-direction:column;gap:16px}
+body.menu-compacto .topo .marca{justify-content:center}
+body.menu-compacto .marca-nome,
+body.menu-compacto .menu-legenda,
+body.menu-compacto .menu-item-texto,
+body.menu-compacto .menu-rodape p,
+body.menu-compacto .menu-ajuda span{display:none}
+body.menu-compacto #nav .menu-item{justify-content:center;padding:10px 4px}
+body.menu-compacto #nav .menu-item:hover{transform:translateY(-2px)}
+body.menu-compacto .menu-ajuda{justify-content:center;padding:9px 2px}
+body.menu-compacto .menu-retrair{width:42px}
+.menu-abrir-mobile,.menu-fundo{display:none}
+body.tela-acesso{background:radial-gradient(ellipse 60% 60% at 50% 18%,#285044 0,transparent 72%),#0b2122}
+body.tela-acesso .topo{border-right:1px solid #d2b77948;justify-content:flex-start;padding-top:22px}
+body.tela-acesso #nav{display:flex}
+body.tela-acesso main{max-width:940px;padding:24px 22px 75px}
+body.tela-acesso .acesso-cartao{max-width:460px}
+#v-tutorial .pagina-intro{max-width:900px;margin:auto}
+.tutorial-folha,.tutorial-atualizacoes{max-width:920px;margin:0 auto 22px}
+.tutorial-progresso{display:grid;gap:8px;margin-bottom:16px}
+.tutorial-progresso span{font-size:.78rem;color:#79582f;font-weight:700}
+.tutorial-progresso progress{width:100%;height:10px;border:0;border-radius:15px;overflow:hidden;accent-color:#1b5346}
+.tutorial-passos{display:flex;gap:12px;align-items:center;justify-content:space-between;margin:13px 0 25px}
+.tutorial-passos button{min-height:42px}
+.tutorial-conteudo{min-height:230px;background:#fff9e9;border:1px solid #e0c9a2;border-radius:12px;padding:24px;animation:mesa-surgir .25s ease both}
+.tutorial-conteudo .sobretitulo{color:#8d613d}
+.tutorial-conteudo h2{margin:12px 0;color:#3c3b27;font-size:clamp(1.35rem,3vw,1.85rem)}
+.tutorial-conteudo p{line-height:1.85;color:#574c3d}
+.tutorial-conteudo ul{padding-left:22px;display:grid;gap:8px;color:#554733}
+.tutorial-acoes{display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap;margin:20px 0}
+.tutorial-atualizacoes h2{color:#493c2a}
+@media(max-width:850px){
+ body,body.menu-compacto{padding-left:0}
+ body>main,body.tela-acesso main{padding:68px 16px 85px;max-width:100%}
+ .topo,body.menu-compacto .topo,body.tela-acesso .topo{width:min(290px,83vw);padding:22px 13px 18px;transform:translateX(-105%);transition:transform .28s ease;box-shadow:12px 0 44px #05161699;z-index:150}
+ body.menu-mobile-aberto .topo,body.menu-compacto.menu-mobile-aberto .topo{transform:translateX(0)}
+ body.menu-compacto .menu-cabecalho{flex-direction:row;gap:5px}
+ body.menu-compacto .marca-nome,body.menu-compacto .menu-legenda,body.menu-compacto .menu-item-texto,body.menu-compacto .menu-rodape p,body.menu-compacto .menu-ajuda span{display:initial}
+ body.menu-compacto #nav .menu-item{justify-content:flex-start;padding:10px 11px}
+ body.menu-compacto .menu-ajuda{justify-content:flex-start;padding:11px 12px}
+ .menu-abrir-mobile{position:fixed;top:12px;left:12px;z-index:120;display:flex;align-items:center;gap:8px;padding:8px 15px;min-height:44px;background:#163c35;color:#f6e6c9;border:1px solid #c5a56677;border-radius:12px;box-shadow:0 4px 20px #071c2088;cursor:pointer;font-size:.9rem;font-weight:700}
+ .menu-fundo:not([hidden]){display:block;position:fixed;inset:0;background:#0515139c;border:0;z-index:140;cursor:pointer}
+ body.menu-mobile-aberto{overflow:hidden}
+ body.menu-mobile-aberto .menu-abrir-mobile{opacity:0;pointer-events:none}
+ body.tela-acesso #v-conta{padding-top:0}
+ .tutorial-conteudo{padding:17px;min-height:245px}
+ .tutorial-passos{gap:8px}
+ .tutorial-passos button{font-size:.76rem;padding:9px 12px}
+}
+@media(prefers-reduced-motion:reduce){body,.topo,.tutorial-conteudo{transition-duration:.01ms!important;animation-duration:.01ms!important}}
