@@ -395,7 +395,7 @@ const trilhasAmbiente = {
     termos:'Melodia medieval tranquila para exploração'
   },
   jornada:{
-    titulo:'Chominciamento de Gioia',artista:'Interpretação disponibilizada no Wikimedia Commons',licenca:'CC BY-SA',
+    titulo:'Chominciamento de Gioia',artista:'Ririkuku',licenca:'CC BY-SA 4.0',
     fonte:'https://commons.wikimedia.org/wiki/File:Chominciamento_de_Gioia1.ogg',
     audio:'https://commons.wikimedia.org/wiki/Special:Redirect/file/Chominciamento_de_Gioia1.ogg',
     termos:'Dança medieval com flautas, viela e percussão'
