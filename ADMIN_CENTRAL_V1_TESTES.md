@@ -1,7 +1,7 @@
 # Central do Mestre — Administração v1 (Mesa)
 
 ## Status de entrega
-Código em branch de revisão, **não publicado em produção**. Antes de lançar, aplicar `supabase/006_central_admin.sql` no SQL Editor do projeto Supabase do Mesa; executar testes de permissão e dados. A migração é aditiva e não apaga usuários, fichas ou aventuras.
+Código em branch de revisão, **não publicado em produção**. A migração `supabase/006_central_admin.sql` **já foi aplicada com sucesso** ao projeto Supabase `raxcheouibmwmynwlqii` e as cinco tabelas novas tiveram RLS confirmado via consulta. Executar testes de permissão e dados antes do deploy. A migração é aditiva e não apaga usuários, fichas ou aventuras.
 
 ## Oito áreas
 1. **Visão geral**: usuários, aventuras, personagens, aventuras do dia e chamados pendentes; série agregada de 14 dias.
@@ -22,7 +22,7 @@ Código em branch de revisão, **não publicado em produção**. Antes de lança
 
 ## Ordem de ativação
 1. Revisar SQL e rotas no PR.
-2. Executar a migração `006_central_admin.sql` no Supabase certo (fazer backup antes).
+2. Migração `006_central_admin.sql` já aplicada e confirmada no Supabase atual. Não é necessário executá-la novamente neste projeto.
 3. Validar colunas/tabelas por consultas somente leitura.
 4. Testar via Preview: visitante e usuário devem receber 401/403 em rotas administrativas; admin deve acessar todas.
 5. Testar busca, suspensão de uma conta de teste, encerramento da sessão e reativação; criar comunicado em rascunho e publicado; chamado e resposta.
