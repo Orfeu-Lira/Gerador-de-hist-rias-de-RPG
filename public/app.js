@@ -157,7 +157,13 @@ function textoInfo() {
   return eu.restantes === null ? 'Acesso total (administrador).' : 'Gerações restantes hoje: ' + eu.restantes;
 }
 
-async function atualizarEu() { eu = await api('/api/eu'); montarNav(); $('info').textContent = textoInfo(); }
+async function atualizarEu() {
+  // Não substitua o estado de login antes que o servidor confirme a sessão.
+  const resposta=await api('/api/eu');
+  eu=resposta;
+  montarNav();
+  $('info').textContent=textoInfo();
+}
 
 // ---- Mostrar uma aventura na tela ----
 function desenharAventura(a, alvo) {
@@ -1193,9 +1199,15 @@ atualizarEu().then(() => {
     mostrar(TELAS.includes(anterior)?anterior:'gerador');
   }
 }).catch((e) => {
+  // Um erro de rede/banco na inicialização não significa que o usuário saiu.
+  // Mantemos o contexto visual e pedimos que tente novamente.
   montarNav();
   if (new URL(location.href).searchParams.has('reset_token')) {
     abrirFormularioConta('f-redefinir'); mostrar('conta');
-  } else mostrar('gerador');
-  aviso(e.message);
+  } else {
+    const ultima=estadoNavegacao.ler('tela');
+    const pagina=TELAS.includes(ultima) && !['historico','personagens','assistente','admin'].includes(ultima)?ultima:'gerador';
+    mostrar(pagina);
+  }
+  aviso('Não foi possível verificar a sessão com o servidor agora. Sua conta pode continuar conectada. Atualize a página e tente novamente. Detalhes: '+e.message);
 });
