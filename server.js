@@ -658,6 +658,38 @@ app.patch('/api/admin/conteudos/:id',asyncHandler(async(req,res)=>{
  if(!r.rowCount)return res.status(404).json({erro:'Conteúdo não encontrado.'});
  await auditoriaAdmin(req.admin,'conteudo.editado','conteudo',id);res.json(r.rows[0]);
 }));
+// Avisos administrativos de chamados: consulta derivada dos tickets, leitura por administrador.
+app.get('/api/admin/notificacoes',asyncHandler(async(req,res)=>{
+ const [lista,total]=await Promise.all([
+  query(`SELECT c.id,c.assunto,c.criado_em,u.email,
+       (l.chamado_id IS NOT NULL) AS lido
+       FROM public.mesa_chamados c
+       JOIN public.usuarios u ON u.id=c.usuario_id
+       LEFT JOIN public.mesa_notificacoes_lidas l ON l.chamado_id=c.id AND l.administrador_id=$1
+       ORDER BY c.criado_em DESC,c.id DESC LIMIT 50`,[req.admin.id]),
+  query(`SELECT COUNT(*)::int AS total
+         FROM public.mesa_chamados c
+         LEFT JOIN public.mesa_notificacoes_lidas l ON l.chamado_id=c.id AND l.administrador_id=$1
+         WHERE l.chamado_id IS NULL`,[req.admin.id])
+ ]);
+ res.set('Cache-Control','private, no-store');
+ res.json({naoLidas:total.rows[0].total,itens:lista.rows});
+}));
+app.post('/api/admin/notificacoes/:id/ler',asyncHandler(async(req,res)=>{
+ const id=idPositivo(req.params.id);
+ if(!id)return res.status(400).json({erro:'Notificação inválida.'});
+ const found=await query('SELECT id FROM public.mesa_chamados WHERE id=$1',[id]);
+ if(!found.rowCount)return res.status(404).json({erro:'Notificação não encontrada.'});
+ await query(`INSERT INTO public.mesa_notificacoes_lidas(administrador_id,chamado_id)
+              VALUES($1,$2) ON CONFLICT (administrador_id,chamado_id) DO NOTHING`,[req.admin.id,id]);
+ res.json({ok:true});
+}));
+app.post('/api/admin/notificacoes/ler-todas',asyncHandler(async(req,res)=>{
+ await query(`INSERT INTO public.mesa_notificacoes_lidas(administrador_id,chamado_id)
+              SELECT $1,id FROM public.mesa_chamados
+              ON CONFLICT (administrador_id,chamado_id) DO NOTHING`,[req.admin.id]);
+ res.json({ok:true});
+}));
 app.get('/api/admin/chamados',asyncHandler(async(req,res)=>{
  const r=await query('SELECT c.id,c.assunto,c.mensagem,c.resposta,c.status,c.criado_em,c.atualizado_em,u.email FROM public.mesa_chamados c JOIN public.usuarios u ON u.id=c.usuario_id ORDER BY CASE WHEN c.status=\'resolvido\' THEN 1 ELSE 0 END,c.criado_em DESC LIMIT 100');res.json(r.rows);
 }));
