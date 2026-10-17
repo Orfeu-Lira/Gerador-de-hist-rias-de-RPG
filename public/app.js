@@ -1246,7 +1246,7 @@ async function adminExibirRelatorios(alvo){
 async function adminExibirUsuarios(alvo,pagina=1,busca=''){
  adminTitulo(alvo,'Gerenciamento de usuários','Consulte contas e aplique suspensões temporárias. Contas administrativas são protegidas.');
  const buscaForm=add('form',alvo,'','admin-busca');const buscaInput=campoAdmin(buscaForm,'Buscar por e-mail','search',busca);const submit=add('button',buscaForm,'Buscar','principal');submit.type='submit';
- buscaForm.onsubmit=e=>{e.preventDefault();adminExibirUsuarios(alvo,1,buscaInput.value).catch(x=>mensagemAdmin(x.message,true));};
+ buscaForm.onsubmit=e=>{e.preventDefault();const termo=buscaInput.value;alvo.replaceChildren();adminExibirUsuarios(alvo,1,termo).catch(x=>mensagemAdmin(x.message,true));};
  const r=await api('/api/admin/usuarios?pagina='+pagina+'&busca='+encodeURIComponent(busca));
  const box=add('div',alvo,'','admin-lista');
  if(!r.usuarios.length)add('p',box,'Nenhuma conta encontrada.');
