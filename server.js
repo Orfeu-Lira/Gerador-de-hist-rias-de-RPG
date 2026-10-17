@@ -249,6 +249,13 @@ app.get('/api/eu',asyncHandler(async(req,res) => {
   const u = await atual(req);
   res.json({logado:!!u,email:u?.email||null,papel:u?.papel||null,restantes:await restantes(req,u)});
 }));
+// Manutenção é imposta no servidor; não basta desabilitar botões no navegador.
+const modoManutencao=asyncHandler(async(req,res,next)=>{
+ const r=await query("SELECT valor FROM public.mesa_config WHERE chave='modo_manutencao'");
+ if(r.rows[0]?.valor==='true')return res.status(503).json({erro:'Mesa em manutenção temporária. O gerador e o tutor estão pausados.'});
+ next();
+});
+app.use(['/api/gerar','/api/dnd/ajuda'],modoManutencao);
 app.post('/api/gerar',asyncHandler(async(req,res) => {
   const {genero,tom,ideia} = req.body || {};
   const jogadores=Number(req.body?.jogadores);
@@ -683,7 +690,11 @@ app.get('/api/publico/informacoes',asyncHandler(async(req,res)=>{
  ]);
  res.json({avisos:avisos.rows,conteudos:conteudos.rows,config:Object.fromEntries(config.rows.map(x=>[x.chave,x.valor]))});
 }));
-app.post('/api/suporte',asyncHandler(async(req,res)=>{
+const limiteSuporte=require('express-rate-limit').rateLimit({
+ windowMs:60*60*1000,limit:5,standardHeaders:'draft-7',legacyHeaders:false,
+ message:{erro:'Você já enviou muitas mensagens. Aguarde uma hora.'}
+});
+app.post('/api/suporte',limiteSuporte,asyncHandler(async(req,res)=>{
  const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre para enviar uma mensagem ao suporte.'});
  const assunto=textoSeguro(req.body?.assunto,120),mensagem=textoSeguro(req.body?.mensagem,2000);
  if(!assunto||!mensagem)return res.status(400).json({erro:'Preencha assunto e mensagem (até 2000 caracteres).'});
