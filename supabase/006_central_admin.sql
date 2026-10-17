@@ -60,5 +60,4 @@ ALTER TABLE public.mesa_chamados ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.mesa_config ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.mesa_auditoria ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.mesa_comunicados,public.mesa_conteudos,public.mesa_chamados,public.mesa_config,public.mesa_auditoria FROM anon,authenticated;
-REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon,authenticated;
 -- A aplicação deve usar um papel de banco confiável com permissões nas tabelas.
