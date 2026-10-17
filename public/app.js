@@ -31,7 +31,7 @@ async function api(url, metodo = 'GET', corpo) {
 function aviso(texto, bom) { const a = $('aviso'); a.textContent = texto || ''; a.className = bom ? 'bom' : ''; }
 
 // ---- Navegação entre telas ----
-const TELAS = ['gerador','dados','historico','personagens','assistente','tutorial','conta','admin'];
+const TELAS = ['gerador','dados','historico','personagens','assistente','tutorial','novidades','suporte','conta','admin'];
 const estadoNavegacao={
   ler(chave){try{return sessionStorage.getItem('mesa:'+chave);}catch{return null;}},
   gravar(chave,valor){try{if(valor===null)sessionStorage.removeItem('mesa:'+chave);else sessionStorage.setItem('mesa:'+chave,String(valor));}catch{}}
@@ -120,6 +120,8 @@ function mostrar(tela) {
   if (tela === 'historico') carregarHistorico();
   if (tela === 'personagens') { carregarAventurasDaFicha().then(carregarPersonagens); }
   if (tela === 'admin') carregarResumo();
+  if (tela === 'suporte') suporteListar();
+  if (tela === 'novidades') noticiasMesa();
 }
 $('abrir-tutorial-menu').onclick=()=>mostrar('tutorial');
 function montarNav() {
@@ -127,7 +129,8 @@ function montarNav() {
   nav.replaceChildren();
   const itens = [['gerador', '✦', 'Gerador'], ['dados', '◇', 'Dados']];
   if (eu.logado) itens.push(['historico', '▤', 'Histórico'], ['personagens', '♙', 'Personagens'], ['assistente', '✧', 'Tutor D&D']);
-  itens.push(['tutorial','❖','Tutorial']);
+  itens.push(['tutorial','❖','Tutorial'],['novidades','✦','Novidades']);
+  if(eu.logado)itens.push(['suporte','✉','Suporte']);
   if (eu.papel === 'admin') itens.push(['admin', '⚙', 'Painel']);
   if (!eu.logado) itens.push(['conta', '↪', 'Entrar']);
   itens.forEach(([t,simbolo,nome])=>{
@@ -1181,16 +1184,196 @@ $('f-login').onsubmit = (ev) => { ev.preventDefault(); entrar('/api/login', $('l
 $('f-cadastro').onsubmit = (ev) => { ev.preventDefault(); entrar('/api/cadastro', $('c-email').value, $('c-senha').value, $('c-token-bootstrap').value); };
 
 // ---- Painel do dono ----
-async function carregarResumo() {
-  const alvo = $('resumo'); alvo.replaceChildren();
-  try {
-    const r = await api('/api/admin/resumo');
-    alvo.appendChild(el('h2', 'Resumo'));
-    alvo.appendChild(el('p', 'Usuários: ' + r.usuarios));
-    alvo.appendChild(el('p', 'Aventuras geradas: ' + r.aventuras + ' (hoje: ' + r.aventurasHoje + ')'));
-  } catch (e) { aviso(e.message); }
+// Central do Mestre. Texto remoto sempre tratado como texto, nunca como HTML.
+let adminSecao='geral';
+const adminData={};
+function add(t,pai,valor,classe){const n=el(t,valor,classe);pai.append(n);return n;}
+function mensagemAdmin(msg,erro=false){const n=$('admin-feedback');n.textContent=msg;n.className=erro?'admin-erro':'admin-ok';}
+function adminLinha(pai,...valores){const row=add('div',pai,'','admin-linha');valores.forEach(x=>add('span',row,String(x??'—')));return row;}
+function adminTitulo(pai,titulo,descricao){add('h2',pai,titulo);if(descricao)add('p',pai,descricao,'suave');}
+function dataBR(iso){return iso?new Date(iso).toLocaleDateString('pt-BR'):'Nunca';}
+function campoAdmin(form,nome,tipo,valor='',opcoes){
+  const label=add('label',form,nome);
+  const campo=opcoes?document.createElement('select'):document.createElement(tipo==='longo'?'textarea':'input');
+  if(tipo!=='longo'&&!opcoes)campo.type=tipo||'text';
+  if(opcoes)opcoes.forEach(([valor,rotulo])=>{const opt=document.createElement('option');opt.value=valor;opt.textContent=rotulo;campo.append(opt);});
+  if(tipo==='longo')campo.rows=4;
+  if(tipo==='check'){campo.checked=Boolean(valor);}else campo.value=String(valor??'');
+  label.append(campo);return campo;
 }
+function botaoAdmin(pai,rotulo,acao,classe='guia-abrir'){
+  const b=add('button',pai,rotulo,classe);b.type='button';b.onclick=acao;return b;
+}
+async function acaoAdmin(fn,ok){
+ try{await fn();mensagemAdmin(ok);await carregarResumo();}catch(e){mensagemAdmin(e.message,true);}
+}
+function desenharBarras(alvo,dados,chave,rotulo){
+ const valores=dados.map(x=>Number(x[chave])||0),max=Math.max(1,...valores);
+ if(!dados.length){add('p',alvo,'Sem dados para mostrar.','suave');return;}
+ const area=add('div',alvo,'','admin-grafico');
+ dados.forEach((item,i)=>{
+  const linha=add('div',area,'','admin-barra-linha');
+  add('span',linha,String(item[rotulo]).slice(0,35));
+  const trilho=add('div',linha,'','admin-barra-trilho');
+  const barra=add('div',trilho,'','admin-barra-valor');barra.style.width=(valores[i]/max*100)+'%';
+  add('strong',linha,String(valores[i]));
+ });
+}
+async function adminExibirGeral(alvo){
+ const r=await api('/api/admin/dashboard');
+ adminTitulo(alvo,'Visão geral','Indicadores reais da plataforma, atualizados sob demanda.');
+ const grade=add('div',alvo,'','admin-indicadores');
+ [['Usuários',r.indicadores.usuarios],['Aventuras',r.indicadores.aventuras],['Personagens',r.indicadores.personagens],['Aventuras hoje',r.indicadores.aventuras_hoje],['Chamados pendentes',r.indicadores.chamados_abertos]].forEach(([titulo,numero])=>{
+  const card=add('div',grade,'','admin-indicador');add('small',card,titulo);add('strong',card,String(numero));
+ });
+ adminTitulo(alvo,'Atividade recente','Aventuras salvas nos últimos 14 dias (UTC).');
+ desenharBarras(alvo,r.serie,'total','dia');
+}
+async function adminExibirRelatorios(alvo){
+ const r=await api('/api/admin/dashboard');
+ adminTitulo(alvo,'Relatórios e tendências','Estatísticas agregadas, sem expor histórias privadas.');
+ add('h3',alvo,'Aventuras nos últimos 14 dias');
+ desenharBarras(alvo,r.serie,'total','dia');
+ add('h3',alvo,'Gêneros mais utilizados');
+ desenharBarras(alvo,r.cenarios,'total','genero');
+ botaoAdmin(alvo,'Exportar dados agregados (CSV)',()=>{
+  const linhas=[['tipo','nome','total'],...r.serie.map(x=>['dia',x.dia,x.total]),...r.cenarios.map(x=>['genero',x.genero,x.total])];
+  const csv=linhas.map(a=>a.map(x=>'"'+String(x).replaceAll('"','""')+'"').join(',')).join('\r\n');
+  const arquivo=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(arquivo),a=document.createElement('a');
+  a.href=url;a.download='mesa-relatorios.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);
+ });
+}
+async function adminExibirUsuarios(alvo,pagina=1,busca=''){
+ adminTitulo(alvo,'Gerenciamento de usuários','Consulte contas e aplique suspensões temporárias. Contas administrativas são protegidas.');
+ const buscaForm=add('form',alvo,'','admin-busca');const buscaInput=campoAdmin(buscaForm,'Buscar por e-mail','search',busca);const submit=add('button',buscaForm,'Buscar','principal');submit.type='submit';
+ buscaForm.onsubmit=e=>{e.preventDefault();const termo=buscaInput.value;alvo.replaceChildren();adminExibirUsuarios(alvo,1,termo).catch(x=>mensagemAdmin(x.message,true));};
+ const r=await api('/api/admin/usuarios?pagina='+pagina+'&busca='+encodeURIComponent(busca));
+ const box=add('div',alvo,'','admin-lista');
+ if(!r.usuarios.length)add('p',box,'Nenhuma conta encontrada.');
+ r.usuarios.forEach(u=>{
+  const card=add('article',box,'','admin-registro');
+  add('strong',card,u.email);
+  add('p',card,'Tipo: '+u.papel+' · Cadastro: '+dataBR(u.criado_em)+' · Último login: '+dataBR(u.ultimo_login_em),'suave');
+  if(u.bloqueado_ate&&new Date(u.bloqueado_ate)>new Date())add('p',card,'Suspenso até '+dataBR(u.bloqueado_ate),'admin-atencao');
+  if(u.papel!=='admin'){
+   const controles=add('div',card,'','admin-registro-acoes');
+   const prazo=campoAdmin(controles,'Suspensão','select','1',[['0','Reativar'],['1','1 dia'],['7','7 dias'],['30','30 dias']]);
+   const botao=botaoAdmin(controles,'Aplicar',()=>{const dias=Number(prazo.value);if(!confirm('Confirma '+(dias?'suspensão por '+dias+' dia(s)':'reativação')+' da conta '+u.email+'?'))return;acaoAdmin(()=>api('/api/admin/usuarios/'+u.id+'/suspensao','PATCH',{dias}),'Conta atualizada.');});
+  }
+ });
+ const paginas=Math.max(1,Math.ceil(r.total/20));
+ add('p',alvo,'Página '+r.pagina+' de '+paginas+' · '+r.total+' contas','suave');
+ const nav=add('div',alvo,'','admin-registro-acoes');
+ if(pagina>1)botaoAdmin(nav,'← Anterior',()=>{alvo.replaceChildren();adminExibirUsuarios(alvo,pagina-1,busca).catch(x=>mensagemAdmin(x.message,true));});
+ if(pagina<paginas)botaoAdmin(nav,'Próxima →',()=>{alvo.replaceChildren();adminExibirUsuarios(alvo,pagina+1,busca).catch(x=>mensagemAdmin(x.message,true));});
+}
+function adminEditor(alvo,item,tipo){
+ const corpoMax=tipo==='conteudos'?5000:3000;
+ const form=add('form',alvo,'','admin-editor');
+ add('h3',form,item?'Editar publicação':'Nova publicação');
+ const titulo=campoAdmin(form,'Título','text',item?.titulo||'');
+ const corpo=campoAdmin(form,'Texto','longo',item?.corpo||'');corpo.maxLength=corpoMax;
+ const lista=tipo==='conteudos'?[['tutorial','Tutorial'],['faq','Perguntas frequentes'],['exemplo','Exemplo']]:[['novidade','Novidade'],['aviso','Aviso'],['manutencao','Manutenção']];
+ const categoria=campoAdmin(form,'Categoria','select',item?.tipo||item?.categoria||lista[0][0],lista);
+ const publicado=campoAdmin(form,'Publicar agora','check',item?.publicado||false);
+ const btn=add('button',form,item?'Salvar alterações':'Criar publicação','principal');btn.type='submit';
+ form.onsubmit=e=>{e.preventDefault();
+  const payload={titulo:titulo.value.trim(),corpo:corpo.value.trim(),publicado:publicado.checked,[tipo==='conteudos'?'tipo':'categoria']:categoria.value};
+  const prefixo='/api/admin/'+tipo;
+  if(!payload.titulo||!payload.corpo)return mensagemAdmin('Preencha o título e o texto.',true);
+  acaoAdmin(()=>api(prefixo+(item?'/'+item.id:''),item?'PATCH':'POST',payload),'Publicação salva.');
+ };
+}
+async function adminExibirPublicacoes(alvo,tipo){
+ const conteudo=tipo==='conteudos';
+ adminTitulo(alvo,conteudo?'Conteúdos e tutorial':'Central de novidades',conteudo?'Gerencie artigos adicionais, exemplos e perguntas frequentes. Os 10 passos do tutorial principal continuam no aplicativo.':'Publique novidades e avisos visíveis para os jogadores.');
+ const r=await api('/api/admin/'+tipo);
+ adminEditor(alvo,null,tipo);
+ const area=add('div',alvo,'','admin-lista');
+ r.forEach(item=>{
+  const art=add('article',area,'','admin-registro');
+  add('h3',art,item.titulo);
+  add('p',art,(item.publicado?'Publicado':'Rascunho')+' · '+(item.tipo||item.categoria)+' · '+dataBR(item.atualizado_em),'suave');
+  add('p',art,item.corpo.length>230?item.corpo.slice(0,230)+'…':item.corpo);
+  botaoAdmin(art,'Editar',()=>{
+   area.querySelector('.admin-editor-aberto')?.remove();
+   const editor=add('div',art,'','admin-editor-aberto');adminEditor(editor,item,tipo);
+  });
+ });
+}
+async function adminExibirSuporte(alvo){
+ adminTitulo(alvo,'Suporte e feedback','Mensagens enviadas pelos jogadores, com estado e resposta.');
+ const chamados=await api('/api/admin/chamados');
+ if(!chamados.length)add('p',alvo,'Nenhum chamado recebido ainda.','suave');
+ const area=add('div',alvo,'','admin-lista');
+ chamados.forEach(c=>{
+  const card=add('article',area,'','admin-registro');add('h3',card,c.assunto);
+  add('p',card,c.email+' · '+dataBR(c.criado_em));
+  add('p',card,c.mensagem);
+  const f=add('form',card,'','admin-editor');
+  const status=campoAdmin(f,'Estado','select',c.status,[['aberto','Aberto'],['analise','Em análise'],['resolvido','Resolvido']]);
+  const resposta=campoAdmin(f,'Resposta','longo',c.resposta||'');resposta.maxLength=2000;
+  const b=add('button',f,'Salvar resposta','principal');b.type='submit';
+  f.onsubmit=e=>{e.preventDefault();acaoAdmin(()=>api('/api/admin/chamados/'+c.id,'PATCH',{status:status.value,resposta:resposta.value}),'Chamado atualizado.');};
+ });
+}
+async function adminExibirConfig(alvo){
+ adminTitulo(alvo,'Configurações do sistema','Comunicado global e estado de manutenção. O modo de manutenção pausa novas solicitações ao gerador e ao tutor.');
+ const r=await api('/api/admin/config'),conf=Object.fromEntries(r.map(x=>[x.chave,x.valor]));
+ const form=add('form',alvo,'','admin-editor');
+ const aviso=campoAdmin(form,'Aviso visível no site','longo',conf.aviso_site||'');aviso.maxLength=1000;
+ const manutencao=campoAdmin(form,'Ativar manutenção','check',conf.modo_manutencao==='true');
+ const b=add('button',form,'Salvar configurações','principal');b.type='submit';
+ form.onsubmit=e=>{e.preventDefault();if(!confirm('Salvar configurações do site?'))return;acaoAdmin(()=>api('/api/admin/config','PUT',{aviso_site:aviso.value,modo_manutencao:manutencao.checked}),'Configurações salvas.');};
+}
+async function adminExibirAuditoria(alvo){
+ adminTitulo(alvo,'Segurança e auditoria','Últimas 100 ações administrativas registradas. Nenhuma senha é armazenada neste histórico.');
+ const r=await api('/api/admin/auditoria');
+ if(!r.length)add('p',alvo,'Ainda não há ações administrativas registradas.');
+ const area=add('div',alvo,'','admin-lista');
+ r.forEach(item=>{const art=add('article',area,'','admin-registro');add('strong',art,item.acao);add('p',art,(item.administrador||'Administrador removido')+' · '+new Date(item.criado_em).toLocaleString('pt-BR')+' · '+(item.alvo_tipo||'sistema')+' #'+(item.alvo_id||'—'),'suave');});
+}
+async function carregarResumo(){
+ const alvo=$('resumo');alvo.replaceChildren();
+ if(eu.papel!=='admin')return;
+ $('admin-abas').querySelectorAll('button[data-admin]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.admin===adminSecao)));
+ try{
+  if(adminSecao==='geral')await adminExibirGeral(alvo);
+  else if(adminSecao==='relatorios')await adminExibirRelatorios(alvo);
+  else if(adminSecao==='usuarios')await adminExibirUsuarios(alvo);
+  else if(adminSecao==='novidades'||adminSecao==='conteudos')await adminExibirPublicacoes(alvo,adminSecao==='novidades'?'comunicados':'conteudos');
+  else if(adminSecao==='suporte')await adminExibirSuporte(alvo);
+  else if(adminSecao==='config')await adminExibirConfig(alvo);
+  else if(adminSecao==='auditoria')await adminExibirAuditoria(alvo);
+ }catch(e){add('p',alvo,'Não foi possível carregar esta seção: '+e.message,'admin-atencao');}
+}
+$('admin-abas').querySelectorAll('button[data-admin]').forEach(btn=>btn.onclick=()=>{adminSecao=btn.dataset.admin;mensagemAdmin('');carregarResumo();});
+async function noticiasMesa(){
+ try{
+  const dados=await api('/api/publico/informacoes');
+  const avisoBox=$('aviso-publico'),texto=dados.config?.aviso_site;
+  avisoBox.hidden=!texto&&! (dados.config?.modo_manutencao==='true');
+  avisoBox.textContent=(dados.config?.modo_manutencao==='true'?'Mesa em manutenção: o gerador e o tutor estão pausados. ':'')+(texto||'');
+  const alvo=$('lista-novidades');alvo.replaceChildren();
+  if(!dados.avisos.length)add('p',alvo,'Ainda não há comunicados publicados.');
+  dados.avisos.forEach(x=>{const card=add('article',alvo,'','admin-registro');add('span',card,x.categoria,'sobretitulo');add('h2',card,x.titulo);add('p',card,x.corpo);});
+  const artigos=$('conteudos-publicos');if(artigos){artigos.replaceChildren();dados.conteudos.forEach(x=>{const art=add('article',artigos,'','admin-registro');add('h3',art,x.titulo);add('p',art,x.corpo);});}
+ }catch(e){console.warn('Avisos indisponíveis:',e.message);}
+}
+async function suporteListar(){
+ const alvo=$('suporte-meus-chamados');alvo.replaceChildren();
+ try{const dados=await api('/api/suporte');if(!dados.length)add('p',alvo,'Nenhuma mensagem enviada.');
+ dados.forEach(c=>{const art=add('article',alvo,'','admin-registro');add('h3',art,c.assunto);add('p',art,'Estado: '+c.status+' · '+dataBR(c.criado_em),'suave');add('p',art,c.mensagem);if(c.resposta){add('strong',art,'Resposta do Mesa:');add('p',art,c.resposta);}});}
+ catch(e){add('p',alvo,e.message);}
+}
+$('form-suporte').onsubmit=async ev=>{
+ ev.preventDefault();try{
+  await api('/api/suporte','POST',{assunto:$('suporte-assunto').value,mensagem:$('suporte-mensagem').value});
+  $('form-suporte').reset();aviso('Mensagem enviada com sucesso!',true);suporteListar();
+ }catch(e){aviso(e.message);}
+};
 
+noticiasMesa();
 atualizarEu().then(() => {
   if (new URL(location.href).searchParams.has('reset_token')) {
     abrirFormularioConta('f-redefinir'); mostrar('conta');
@@ -1206,7 +1389,7 @@ atualizarEu().then(() => {
     abrirFormularioConta('f-redefinir'); mostrar('conta');
   } else {
     const ultima=estadoNavegacao.ler('tela');
-    const pagina=TELAS.includes(ultima) && !['historico','personagens','assistente','admin'].includes(ultima)?ultima:'gerador';
+    const pagina=TELAS.includes(ultima) && !['historico','personagens','assistente','admin','suporte'].includes(ultima)?ultima:'gerador';
     mostrar(pagina);
   }
   aviso('Não foi possível verificar a sessão com o servidor agora. Sua conta pode continuar conectada. Atualize a página e tente novamente. Detalhes: '+e.message);
