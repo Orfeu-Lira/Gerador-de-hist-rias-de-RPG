@@ -85,8 +85,9 @@ const senhaValida = s => typeof s === 'string' && s.length >= 8 && s.length <= 7
 const asyncHandler = f => (req,res,next) => Promise.resolve(f(req,res,next)).catch(next);
 const atual = async req => {
   if (!req.session.userId) return null;
-  const r = await query('SELECT id,email,papel FROM public.usuarios WHERE id=$1', [req.session.userId]);
-  return r.rows[0] || null;
+  const r = await query('SELECT id,email,papel,bloqueado_ate FROM public.usuarios WHERE id=$1', [req.session.userId]);
+  const u=r.rows[0] || null;
+  return u && u.bloqueado_ate && new Date(u.bloqueado_ate)>new Date() ? null : u;
 };
 const quotaKey = (req,u) => u
   ? 'usuario:' + u.id + ':' + new Date().toISOString().slice(0,10)
@@ -140,11 +141,13 @@ app.post('/api/cadastro', asyncHandler(async(req,res) => {
 app.post('/api/login',asyncHandler(async(req,res) => {
   const {email,senha} = req.body || {};
   const r = typeof email === 'string' && email.length <= 254
-    ? await query('SELECT id,senha_hash FROM public.usuarios WHERE email=$1',[email.trim().toLowerCase()])
+    ? await query('SELECT id,senha_hash,bloqueado_ate FROM public.usuarios WHERE email=$1',[email.trim().toLowerCase()])
     : {rows:[]};
   const u = r.rows[0];
   const ok = await bcrypt.compare(typeof senha === 'string' ? senha : '',u ? u.senha_hash : HASH_FALSO);
   if (!u || !ok) return res.status(401).json({erro:'E-mail ou senha incorretos.'});
+  if(u.bloqueado_ate && new Date(u.bloqueado_ate)>new Date()) return res.status(403).json({erro:'Esta conta está temporariamente suspensa. Contate o suporte.'});
+  await query('UPDATE public.usuarios SET ultimo_login_em=now() WHERE id=$1',[u.id]);
   // O cookie persistente e a validade do registro no banco são criados juntos.
   // Nunca armazenamos a senha no cookie ou no armazenamento do navegador.
   await refreshSession(req,Number(u.id),req.body?.manterConectado === true);
@@ -573,6 +576,123 @@ app.get('/api/admin/resumo',asyncHandler(async(req,res)=>{
   if(u?.papel!=='admin') return res.status(403).json({erro:'Acesso negado.'});
   const r=await query("SELECT (SELECT COUNT(*) FROM public.usuarios)::int AS usuarios,(SELECT COUNT(*) FROM public.aventuras)::int AS aventuras,(SELECT COUNT(*) FROM public.aventuras WHERE criado_em::date=(now() AT TIME ZONE 'UTC')::date)::int AS hoje");
   res.json({usuarios:r.rows[0].usuarios,aventuras:r.rows[0].aventuras,aventurasHoje:r.rows[0].hoje});
+}));
+// Central administrativa: isolamento por sessão + papel, sem expor senhas ou fichas privadas.
+const exigeAdmin=asyncHandler(async(req,res,next)=>{
+ const u=await atual(req);
+ if(!u)return res.status(401).json({erro:'Entre com sua conta.'});
+ if(u.papel!=='admin')return res.status(403).json({erro:'Acesso restrito ao administrador.'});
+ req.admin=u;next();
+});
+const idPositivo=v=>Number.isSafeInteger(Number(v))&&Number(v)>0?Number(v):null;
+const textoSeguro=(v,max)=>typeof v==='string'&&v.trim()&&v.trim().length<=max?v.trim():null;
+async function auditoriaAdmin(u,acao,tipo,id,detalhes={}){
+ await query('INSERT INTO public.mesa_auditoria(admin_id,acao,alvo_tipo,alvo_id,detalhes) VALUES($1,$2,$3,$4,$5::jsonb)',[u.id,acao,tipo,id,JSON.stringify(detalhes)]);
+}
+const adminLeituras=require('express-rate-limit').rateLimit({windowMs:60000,limit:120,standardHeaders:'draft-7',legacyHeaders:false,message:{erro:'Muitas consultas. Aguarde um minuto.'}});
+app.use('/api/admin',exigeAdmin,adminLeituras);
+app.get('/api/admin/dashboard',asyncHandler(async(req,res)=>{
+ const [indicadores,serie,cenarios]=await Promise.all([
+  query(`SELECT (SELECT COUNT(*) FROM public.usuarios)::int usuarios,(SELECT COUNT(*) FROM public.aventuras)::int aventuras,(SELECT COUNT(*) FROM public.personagens_dnd)::int personagens,(SELECT COUNT(*) FROM public.aventuras WHERE criado_em>=CURRENT_DATE)::int aventuras_hoje,(SELECT COUNT(*) FROM public.mesa_chamados WHERE status<>'resolvido')::int chamados_abertos`),
+  query("SELECT TO_CHAR(d::date,'YYYY-MM-DD') dia,COUNT(a.id)::int total FROM generate_series(CURRENT_DATE-13,CURRENT_DATE,'1 day'::interval) d LEFT JOIN public.aventuras a ON a.criado_em::date=d::date GROUP BY d ORDER BY d"),
+  query('SELECT genero,COUNT(*)::int total FROM public.aventuras GROUP BY genero ORDER BY total DESC LIMIT 8')
+ ]);
+ res.json({indicadores:indicadores.rows[0],serie:serie.rows,cenarios:cenarios.rows});
+}));
+app.get('/api/admin/usuarios',asyncHandler(async(req,res)=>{
+ const busca=String(req.query.busca||'').trim().slice(0,80);
+ const pagina=Math.min(100,Math.max(1,parseInt(req.query.pagina,10)||1));
+ const [count,lista]=await Promise.all([
+   query('SELECT COUNT(*)::int total FROM public.usuarios WHERE email ILIKE $1',['%'+busca+'%']),
+   query('SELECT id,email,papel,criado_em,ultimo_login_em,bloqueado_ate FROM public.usuarios WHERE email ILIKE $1 ORDER BY id DESC LIMIT 20 OFFSET $2',['%'+busca+'%',(pagina-1)*20])
+ ]);
+ res.json({total:count.rows[0].total,pagina,usuarios:lista.rows});
+}));
+app.patch('/api/admin/usuarios/:id/suspensao',asyncHandler(async(req,res)=>{
+ const id=idPositivo(req.params.id),dias=req.body?.dias;
+ if(!id||![0,1,7,30].includes(dias))return res.status(400).json({erro:'Informe duração válida: 0, 1, 7 ou 30 dias.'});
+ if(id===Number(req.admin.id))return res.status(403).json({erro:'Você não pode suspender a própria conta.'});
+ const r=await query("UPDATE public.usuarios SET bloqueado_ate=CASE WHEN $1::int=0 THEN NULL ELSE now()+($1::int * interval '1 day') END WHERE id=$2 AND papel<>'admin' RETURNING id,email,bloqueado_ate",[dias,id]);
+ if(!r.rowCount)return res.status(404).json({erro:'Usuário não encontrado ou protegido.'});
+ await query("DELETE FROM public.sessoes WHERE sessao->>'userId'=$1",[String(id)]);
+ await auditoriaAdmin(req.admin,dias?'usuario.suspenso':'usuario.reativado','usuario',id,{dias});
+ res.json({ok:true,usuario:r.rows[0]});
+}));
+app.get('/api/admin/comunicados',asyncHandler(async(req,res)=>{
+ const r=await query('SELECT * FROM public.mesa_comunicados ORDER BY atualizado_em DESC LIMIT 100');res.json(r.rows);
+}));
+app.post('/api/admin/comunicados',asyncHandler(async(req,res)=>{
+ const titulo=textoSeguro(req.body?.titulo,120),corpo=textoSeguro(req.body?.corpo,3000),categoria=req.body?.categoria;
+ if(!titulo||!corpo||!['novidade','aviso','manutencao'].includes(categoria)||typeof req.body?.publicado!=='boolean')return res.status(400).json({erro:'Comunicado inválido.'});
+ const r=await query('INSERT INTO public.mesa_comunicados(titulo,corpo,categoria,publicado) VALUES($1,$2,$3,$4) RETURNING *',[titulo,corpo,categoria,req.body.publicado]);
+ await auditoriaAdmin(req.admin,'comunicado.criado','comunicado',r.rows[0].id);
+ res.status(201).json(r.rows[0]);
+}));
+app.patch('/api/admin/comunicados/:id',asyncHandler(async(req,res)=>{
+ const id=idPositivo(req.params.id),titulo=textoSeguro(req.body?.titulo,120),corpo=textoSeguro(req.body?.corpo,3000);
+ if(!id||!titulo||!corpo||!['novidade','aviso','manutencao'].includes(req.body?.categoria)||typeof req.body?.publicado!=='boolean')return res.status(400).json({erro:'Dados inválidos.'});
+ const r=await query('UPDATE public.mesa_comunicados SET titulo=$1,corpo=$2,categoria=$3,publicado=$4,atualizado_em=now() WHERE id=$5 RETURNING *',[titulo,corpo,req.body.categoria,req.body.publicado,id]);
+ if(!r.rowCount)return res.status(404).json({erro:'Comunicado não encontrado.'});
+ await auditoriaAdmin(req.admin,'comunicado.editado','comunicado',id);res.json(r.rows[0]);
+}));
+app.get('/api/admin/conteudos',asyncHandler(async(req,res)=>{
+ const r=await query('SELECT * FROM public.mesa_conteudos ORDER BY atualizado_em DESC LIMIT 100');res.json(r.rows);
+}));
+app.post('/api/admin/conteudos',asyncHandler(async(req,res)=>{
+ const titulo=textoSeguro(req.body?.titulo,120),corpo=textoSeguro(req.body?.corpo,5000);
+ if(!titulo||!corpo||!['tutorial','faq','exemplo'].includes(req.body?.tipo)||typeof req.body?.publicado!=='boolean')return res.status(400).json({erro:'Conteúdo inválido.'});
+ const r=await query('INSERT INTO public.mesa_conteudos(titulo,corpo,tipo,publicado) VALUES($1,$2,$3,$4) RETURNING *',[titulo,corpo,req.body.tipo,req.body.publicado]);
+ await auditoriaAdmin(req.admin,'conteudo.criado','conteudo',r.rows[0].id);res.status(201).json(r.rows[0]);
+}));
+app.patch('/api/admin/conteudos/:id',asyncHandler(async(req,res)=>{
+ const id=idPositivo(req.params.id),titulo=textoSeguro(req.body?.titulo,120),corpo=textoSeguro(req.body?.corpo,5000);
+ if(!id||!titulo||!corpo||!['tutorial','faq','exemplo'].includes(req.body?.tipo)||typeof req.body?.publicado!=='boolean')return res.status(400).json({erro:'Dados inválidos.'});
+ const r=await query('UPDATE public.mesa_conteudos SET titulo=$1,corpo=$2,tipo=$3,publicado=$4,atualizado_em=now() WHERE id=$5 RETURNING *',[titulo,corpo,req.body.tipo,req.body.publicado,id]);
+ if(!r.rowCount)return res.status(404).json({erro:'Conteúdo não encontrado.'});
+ await auditoriaAdmin(req.admin,'conteudo.editado','conteudo',id);res.json(r.rows[0]);
+}));
+app.get('/api/admin/chamados',asyncHandler(async(req,res)=>{
+ const r=await query('SELECT c.id,c.assunto,c.mensagem,c.resposta,c.status,c.criado_em,c.atualizado_em,u.email FROM public.mesa_chamados c JOIN public.usuarios u ON u.id=c.usuario_id ORDER BY CASE WHEN c.status=\'resolvido\' THEN 1 ELSE 0 END,c.criado_em DESC LIMIT 100');res.json(r.rows);
+}));
+app.patch('/api/admin/chamados/:id',asyncHandler(async(req,res)=>{
+ const id=idPositivo(req.params.id),status=req.body?.status,resposta=typeof req.body?.resposta==='string'?req.body.resposta.trim():null;
+ if(!id||!['aberto','analise','resolvido'].includes(status)||resposta===null||resposta.length>2000)return res.status(400).json({erro:'Resposta ou estado inválido.'});
+ const r=await query('UPDATE public.mesa_chamados SET status=$1,resposta=$2,atualizado_em=now() WHERE id=$3 RETURNING id',[status,resposta,id]);
+ if(!r.rowCount)return res.status(404).json({erro:'Chamado não encontrado.'});
+ await auditoriaAdmin(req.admin,'chamado.atualizado','chamado',id,{status});res.json({ok:true});
+}));
+app.get('/api/admin/config',asyncHandler(async(req,res)=>{
+ const r=await query('SELECT chave,valor,atualizado_em FROM public.mesa_config ORDER BY chave');res.json(r.rows);
+}));
+app.put('/api/admin/config',asyncHandler(async(req,res)=>{
+ const aviso=req.body?.aviso_site,manutencao=req.body?.modo_manutencao;
+ if(typeof aviso!=='string'||aviso.length>1000||typeof manutencao!=='boolean')return res.status(400).json({erro:'Configurações inválidas.'});
+ await query("UPDATE public.mesa_config SET valor=$1,atualizado_em=now() WHERE chave='aviso_site'",[aviso.trim()]);
+ await query("UPDATE public.mesa_config SET valor=$1,atualizado_em=now() WHERE chave='modo_manutencao'",[String(manutencao)]);
+ await auditoriaAdmin(req.admin,'config.atualizada','config',null,{modo_manutencao:manutencao});
+ res.json({ok:true});
+}));
+app.get('/api/admin/auditoria',asyncHandler(async(req,res)=>{
+ const r=await query('SELECT a.id,a.acao,a.alvo_tipo,a.alvo_id,a.detalhes,a.criado_em,u.email administrador FROM public.mesa_auditoria a LEFT JOIN public.usuarios u ON u.id=a.admin_id ORDER BY a.id DESC LIMIT 100');res.json(r.rows);
+}));
+app.get('/api/publico/informacoes',asyncHandler(async(req,res)=>{
+ const [avisos,conteudos,config]=await Promise.all([
+  query('SELECT id,titulo,corpo,categoria,criado_em FROM public.mesa_comunicados WHERE publicado=true ORDER BY criado_em DESC LIMIT 10'),
+  query('SELECT id,titulo,corpo,tipo FROM public.mesa_conteudos WHERE publicado=true ORDER BY atualizado_em DESC LIMIT 20'),
+  query('SELECT chave,valor FROM public.mesa_config')
+ ]);
+ res.json({avisos:avisos.rows,conteudos:conteudos.rows,config:Object.fromEntries(config.rows.map(x=>[x.chave,x.valor]))});
+}));
+app.post('/api/suporte',asyncHandler(async(req,res)=>{
+ const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre para enviar uma mensagem ao suporte.'});
+ const assunto=textoSeguro(req.body?.assunto,120),mensagem=textoSeguro(req.body?.mensagem,2000);
+ if(!assunto||!mensagem)return res.status(400).json({erro:'Preencha assunto e mensagem (até 2000 caracteres).'});
+ const r=await query('INSERT INTO public.mesa_chamados(usuario_id,assunto,mensagem) VALUES($1,$2,$3) RETURNING id',[u.id,assunto,mensagem]);
+ res.status(201).json({id:r.rows[0].id});
+}));
+app.get('/api/suporte',asyncHandler(async(req,res)=>{
+ const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre para consultar o suporte.'});
+ const r=await query('SELECT id,assunto,mensagem,resposta,status,criado_em FROM public.mesa_chamados WHERE usuario_id=$1 ORDER BY criado_em DESC LIMIT 30',[u.id]);res.json(r.rows);
 }));
 // A raiz deve servir o frontend mesmo quando a implantação é roteada para a função serverless.
 app.get('/', (req, res) => res.sendFile(require('path').join(__dirname, 'public', 'index.html')));
