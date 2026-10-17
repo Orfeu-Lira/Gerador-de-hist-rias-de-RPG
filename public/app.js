@@ -1195,7 +1195,7 @@ function dataBR(iso){return iso?new Date(iso).toLocaleDateString('pt-BR'):'Nunca
 function campoAdmin(form,nome,tipo,valor='',opcoes){
   const label=add('label',form,nome);
   const campo=opcoes?document.createElement('select'):document.createElement(tipo==='longo'?'textarea':'input');
-  if(tipo!=='longo'&&!opcoes)campo.type=tipo||'text';
+  if(tipo!=='longo'&&!opcoes)campo.type=tipo==='check'?'checkbox':(tipo||'text');
   if(opcoes)opcoes.forEach(([valor,rotulo])=>{const opt=document.createElement('option');opt.value=valor;opt.textContent=rotulo;campo.append(opt);});
   if(tipo==='longo')campo.rows=4;
   if(tipo==='check'){campo.checked=Boolean(valor);}else campo.value=String(valor??'');
@@ -1404,7 +1404,7 @@ botaoInstalar.onclick=async()=>{
   const resultado=await convite.userChoice;
   statusInstalar.textContent=resultado?.outcome==='accepted'?'Instalação solicitada! Procure o Mesa entre os aplicativos.':'Instalação cancelada. Você pode tentar novamente pelo navegador.';
  }catch{statusInstalar.textContent='Não foi possível iniciar a instalação. Utilize o menu do navegador.';}
- mesaAtualizarInstalacao();
+ botaoInstalar.hidden=true;
 };
 mesaAtualizarInstalacao();
 if('serviceWorker' in navigator&&window.isSecureContext){
