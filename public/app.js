@@ -119,11 +119,85 @@ function mostrar(tela) {
   aviso('');
   if (tela === 'historico') carregarHistorico();
   if (tela === 'personagens') { carregarAventurasDaFicha().then(carregarPersonagens); }
-  if (tela === 'admin') carregarResumo();
+  if (tela === 'admin') {carregarResumo();notificacoesAtualizar();}
   if (tela === 'suporte') suporteListar();
   if (tela === 'novidades') noticiasMesa();
 }
 $('abrir-tutorial-menu').onclick=()=>mostrar('tutorial');
+// Notificações internas do administrador: novos chamados de suporte e feedback.
+let notificacoesAberto=false;
+let notificacoesUltimoCarregamento=0;
+let notificacoesEmAndamento=false;
+function notificacoesFechar(devolverFoco=false){
+ const painel=$('notificacoes-painel');
+ painel.hidden=true;notificacoesAberto=false;
+ $('notificacoes-abrir').setAttribute('aria-expanded','false');
+ if(devolverFoco)$('notificacoes-abrir').focus();
+}
+async function notificacoesAtualizar(force=false){
+ if(eu.papel!=='admin'||!eu.logado)return;
+ if(notificacoesEmAndamento)return;
+ if(!force&&Date.now()-notificacoesUltimoCarregamento<45000)return;
+ notificacoesEmAndamento=true;
+ try{
+  const data=await api('/api/admin/notificacoes');
+  notificacoesUltimoCarregamento=Date.now();
+  if(eu.papel!=='admin')return;
+  const contador=$('notificacoes-contador'),quantidade=Number(data.naoLidas)||0;
+  contador.hidden=quantidade<1;
+  contador.textContent=quantidade>99?'99+':String(quantidade);
+  $('notificacoes-abrir').setAttribute('aria-label',quantidade?quantidade+' notificações não lidas de suporte':'Abrir notificações de suporte');
+  $('notificacoes-abrir').title=quantidade?quantidade+' notificações não lidas':'Nenhuma notificação pendente';
+  const estado=$('notificacoes-estado');
+  estado.textContent=quantidade?quantidade+' chamado(s) ainda não lido(s).':'Tudo em dia! Nenhum chamado novo.';
+  const lista=$('notificacoes-lista');lista.replaceChildren();
+  if(!data.itens.length)add('p',lista,'Ainda não recebemos mensagens de suporte.','suave');
+  for(const item of data.itens){
+   const card=add('article',lista,'','notificacoes-item'+(item.lido?'':' nao-lida'));
+   add('strong',card,item.assunto);
+   add('p',card,item.email+' · '+dataBR(item.criado_em),'suave');
+   const linha=add('div',card,'','notificacoes-item-acoes');
+   if(!item.lido)botaoAdmin(linha,'Marcar como lida',async()=>{
+    try{await api('/api/admin/notificacoes/'+item.id+'/ler','POST',{});notificacoesUltimoCarregamento=0;await notificacoesAtualizar(true);}
+    catch(e){estado.textContent=e.message;}
+   });
+   botaoAdmin(linha,'Atender ↗',async()=>{
+    try{
+     if(!item.lido)await api('/api/admin/notificacoes/'+item.id+'/ler','POST',{});
+     notificacoesFechar();adminSecao='suporte';mostrar('admin');notificacoesUltimoCarregamento=0;notificacoesAtualizar(true);
+    }catch(e){estado.textContent=e.message;}
+   });
+  }
+  $('notificacoes-ler-todas').disabled=quantidade===0;
+ }catch(e){
+  $('notificacoes-estado').textContent='Não foi possível atualizar os avisos. '+e.message;
+ }finally{notificacoesEmAndamento=false;}
+}
+$('notificacoes-abrir').onclick=()=>{
+ notificacoesAberto=!notificacoesAberto;
+ $('notificacoes-painel').hidden=!notificacoesAberto;
+ $('notificacoes-abrir').setAttribute('aria-expanded',String(notificacoesAberto));
+ if(notificacoesAberto)notificacoesAtualizar(true);
+};
+$('notificacoes-fechar').onclick=()=>notificacoesFechar(true);
+$('notificacoes-ler-todas').onclick=async()=>{
+ try{await api('/api/admin/notificacoes/ler-todas','POST',{});notificacoesUltimoCarregamento=0;await notificacoesAtualizar(true);}
+ catch(e){$('notificacoes-estado').textContent=e.message;}
+};
+$('notificacoes-ir-suporte').onclick=()=>{notificacoesFechar();adminSecao='suporte';mostrar('admin');};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&notificacoesAberto)notificacoesFechar(true);});
+document.addEventListener('pointerdown',e=>{if(notificacoesAberto&&!e.target.closest('#mesa-notificacoes'))notificacoesFechar();});
+function notificacoesSessao(){
+ const ativo=eu.logado&&eu.papel==='admin';
+ $('mesa-notificacoes').hidden=!ativo;
+ if(!ativo){
+  notificacoesFechar();notificacoesUltimoCarregamento=0;
+  $('notificacoes-contador').hidden=true;
+ }else notificacoesAtualizar(true);
+}
+// Consulta de 60 em 60 segundos enquanto o documento estiver visível e autenticado.
+window.setInterval(()=>{if(!document.hidden)notificacoesAtualizar();},60000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&eu.papel==='admin')notificacoesAtualizar();});
 function montarNav() {
   const nav = $('nav');
   nav.replaceChildren();
@@ -165,6 +239,7 @@ async function atualizarEu() {
   const resposta=await api('/api/eu');
   eu=resposta;
   montarNav();
+  notificacoesSessao();
   $('info').textContent=textoInfo();
 }
 
