@@ -66,6 +66,8 @@ app.use((req,res,next) => {
 });
 // Só o upload de avatar aceita payload maior; demais rotas continuam limitadas a 10kb.
 app.use(/^\/api\/personagens\/\d+\/avatar$/, express.json({limit:'650kb'}));
+// Fichas com inventário, habilidades e diário precisam de um limite próprio.
+app.use(/^\/api\/personagens(?:\/\d+)?$/,express.json({limit:'32kb'}));
 app.use(express.json({ limit: '10kb' }));
 app.use(session({
   name: 'mesa.sid', secret: process.env.SESSION_SECRET,
@@ -363,6 +365,26 @@ function validarFichaDnd(dados) {
   if (!narrativa && !dnd) return false;
   if (typeof dados.nome !== 'string' || dados.nome.trim().length < 1 || dados.nome.length > 100) return false;
   if(dados.equipamentos !== undefined && (typeof dados.equipamentos !== 'string' || dados.equipamentos.length > 1800)) return false;
+  // Campos adicionais opcionais: fichas antigas em JSONB continuam válidas.
+  const tiposItem=['Arma','Armadura','Consumível','Ferramenta','Exploração','Outros'];
+  const tiposHabilidade=['Característica','Perícia','Magia','Talento','Narrativa'];
+  if(dados.inventario!==undefined &&
+    (!Array.isArray(dados.inventario)||dados.inventario.length>32||
+     !dados.inventario.every(x=>x&&typeof x==='object'&&!Array.isArray(x)&&
+       typeof x.nome==='string'&&x.nome.trim().length>0&&x.nome.length<=80&&
+       tiposItem.includes(x.tipo)&&Number.isInteger(x.quantidade)&&x.quantidade>=1&&x.quantidade<=99&&
+       typeof x.equipado==='boolean'&&typeof x.descricao==='string'&&x.descricao.length<=120))) return false;
+  if(dados.habilidades!==undefined &&
+    (!Array.isArray(dados.habilidades)||dados.habilidades.length>24||
+     !dados.habilidades.every(x=>x&&typeof x==='object'&&!Array.isArray(x)&&
+       typeof x.nome==='string'&&x.nome.trim().length>0&&x.nome.length<=80&&
+       tiposHabilidade.includes(x.tipo)&&typeof x.descricao==='string'&&x.descricao.length<=200))) return false;
+  if(dados.evolucao!==undefined &&
+    (!Array.isArray(dados.evolucao)||dados.evolucao.length>30||
+     !dados.evolucao.every(x=>x&&typeof x==='object'&&!Array.isArray(x)&&
+       typeof x.nota==='string'&&x.nota.trim().length>0&&x.nota.length<=160&&
+       Number.isInteger(x.nivel)&&x.nivel>=1&&x.nivel<=20&&
+       typeof x.data==='string'&&/^\\d{4}-\\d{2}-\\d{2}$/.test(x.data)))) return false;
   if (typeof dados.classe !== 'string' || dados.classe.length > 70 ||
       typeof dados.especie !== 'string' || dados.especie.length > 70 ||
       typeof dados.antecedente !== 'string' || dados.antecedente.length > 70 ||
