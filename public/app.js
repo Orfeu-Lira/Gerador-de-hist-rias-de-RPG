@@ -714,12 +714,17 @@ function limparPreviewAvatar(){
   $('p-avatar-vazio').hidden=false;
   $('p-avatar-remover').hidden=true;
 }
+let avatarPendente=null;
 function atualizarEstadoAvatar(){
   const salvo=Boolean(fichaAbertaId);
-  $('p-avatar-file').disabled=!salvo;
+  $('p-avatar-file').disabled=false;
+  if(avatarPendente&&!salvo){
+    $('p-avatar-info').textContent='Foto selecionada: '+avatarPendente.name+'. Clique em Salvar ficha ao final do formulário; o retrato será enviado automaticamente.';
+    return;
+  }
   $('p-avatar-info').textContent=salvo
-    ? 'Envie um retrato. Ele será visível somente para você ao abrir esta ficha.'
-    : 'Salve a ficha primeiro e reabra-a para enviar um avatar.';
+    ? 'Escolha uma foto para esta ficha. O retrato fica privado na sua conta.'
+    : 'Você pode escolher uma foto agora. Salve a ficha para enviar o retrato automaticamente.';
 }
 async function carregarAvatar(){
   limparPreviewAvatar();
@@ -727,8 +732,9 @@ async function carregarAvatar(){
   if(!fichaAbertaId)return;
   const id=fichaAbertaId;
   try{
-    const response=await fetch(API_BASE_URL+'/api/personagens/'+id+'/avatar',{credentials:'include'});
-    if(!response.ok)return;
+    const response=await fetch(API_BASE_URL+'/api/personagens/'+id+'/avatar',{credentials:'include',cache:'no-store'});
+    if(response.status===404)return;
+    if(!response.ok)throw new Error('Não foi possível carregar o retrato salvo.');
     const blob=await response.blob();
     if(fichaAbertaId!==id)return;
     avatarObjectUrl=URL.createObjectURL(blob);
@@ -736,53 +742,80 @@ async function carregarAvatar(){
     $('p-avatar-img').hidden=false;
     $('p-avatar-vazio').hidden=true;
     $('p-avatar-remover').hidden=false;
-  }catch{ /* Avatar é opcional; erro não impede edição da ficha. */ }
+  }catch(e){
+    $('p-avatar-info').textContent=e.message||'Não foi possível carregar a foto. Tente novamente.';
+  }
 }
 async function prepararWebpAvatar(arquivo){
-  if(!['image/jpeg','image/png','image/webp'].includes(arquivo.type))
-    throw new Error('Escolha uma imagem JPG, PNG ou WebP.');
-  if(arquivo.size>8*1024*1024)throw new Error('Arquivo original acima de 8 MB.');
+  const extensao=arquivo.name?.toLowerCase()||'';
+  if(!arquivo.type.startsWith('image/')&&!/\.(jpg|jpeg|png|webp|heic|heif)$/.test(extensao))
+    throw new Error('Escolha uma foto válida (JPG, PNG, WebP ou foto do celular).');
+  if(arquivo.size>8*1024*1024)throw new Error('A foto tem mais de 8 MB. Escolha uma imagem menor.');
   const url=URL.createObjectURL(arquivo);
   try{
     const foto=new Image();
     foto.src=url;
-    await foto.decode();
+    try{await foto.decode();}catch{throw new Error('Este formato de foto não pôde ser aberto pelo navegador. No celular, tente compartilhar ou salvar a foto em JPG ou PNG.');}
     if(foto.width<32||foto.height<32)throw new Error('Imagem pequena demais.');
-    const tamanho=400;
     const canvas=document.createElement('canvas');
-    canvas.width=tamanho;canvas.height=tamanho;
     const ctx=canvas.getContext('2d');
     if(!ctx)throw new Error('Seu navegador não suporta o processamento desta imagem.');
     const recorte=Math.min(foto.width,foto.height);
-    ctx.drawImage(foto,(foto.width-recorte)/2,(foto.height-recorte)/2,recorte,recorte,0,0,tamanho,tamanho);
-    const resultado=canvas.toDataURL('image/webp',0.8);
-    if(!resultado.startsWith('data:image/webp;base64,'))throw new Error('Seu navegador não conseguiu converter a imagem para WebP.');
-    const base64=resultado.split(',')[1];
-    if(base64.length>525000)throw new Error('A imagem resultante ultrapassou 384 KB.');
-    return base64;
+    // Dimensões e qualidade adaptáveis, para caber no limite do bucket mesmo com fotos complexas.
+    for(const tamanho of [400,320,256,192]){
+      canvas.width=tamanho;canvas.height=tamanho;
+      ctx.drawImage(foto,(foto.width-recorte)/2,(foto.height-recorte)/2,recorte,recorte,0,0,tamanho,tamanho);
+      for(const qualidade of [.82,.67,.5]){
+        const resultado=canvas.toDataURL('image/webp',qualidade);
+        if(!resultado.startsWith('data:image/webp;base64,'))throw new Error('Seu navegador não conseguiu converter a foto para WebP.');
+        const base64=resultado.slice('data:image/webp;base64,'.length);
+        if(base64.length<=510000)return base64;
+      }
+    }
+    throw new Error('Esta foto continua grande demais depois da otimização. Experimente uma imagem menor.');
   }finally{URL.revokeObjectURL(url);}
 }
-$('p-avatar-file').onchange=async()=>{
-  const arquivo=$('p-avatar-file').files?.[0],id=fichaAbertaId;
-  if(!arquivo||!id)return;
-  $('p-avatar-file').disabled=true;
-  $('p-avatar-info').textContent='Processando e enviando o retrato...';
+async function enviarAvatar(arquivo,id){
+  const campo=$('p-avatar-file');
+  campo.disabled=true;
+  $('p-avatar-info').textContent='Otimizando a foto e enviando...';
   try{
     const imagem=await prepararWebpAvatar(arquivo);
-    if(fichaAbertaId!==id)throw new Error('Reabra a ficha para concluir o envio.');
+    if(fichaAbertaId!==id)throw new Error('A ficha selecionada mudou. Abra o personagem e tente novamente.');
     await api('/api/personagens/'+id+'/avatar','POST',{imagem});
+    avatarPendente=null;
     await carregarAvatar();
-    aviso('Avatar salvo com sucesso!',true);
-  }catch(e){aviso(e.message);}
-  finally{$('p-avatar-file').value='';atualizarEstadoAvatar();}
+    aviso('Retrato salvo com sucesso!',true);
+    $('p-avatar-info').textContent='Retrato salvo! Você pode trocar a foto quando quiser.';
+    return true;
+  }catch(e){
+    $('p-avatar-info').textContent='Falha no envio: '+e.message;
+    aviso(e.message);
+    return false;
+  }finally{
+    campo.value='';
+    campo.disabled=false;
+  }
+}
+$('p-avatar-file').onchange=async()=>{
+  const arquivo=$('p-avatar-file').files?.[0];
+  if(!arquivo)return;
+  avatarPendente=arquivo;
+  if(!fichaAbertaId){
+    atualizarEstadoAvatar();
+    return;
+  }
+  await enviarAvatar(arquivo,fichaAbertaId);
 };
 $('p-avatar-remover').onclick=async()=>{
-  if(!fichaAbertaId||!confirm('Remover o avatar desta personagem?'))return;
+  if(!fichaAbertaId||!confirm('Remover o retrato desta personagem?'))return;
   try{
     await api('/api/personagens/'+fichaAbertaId+'/avatar','DELETE');
+    avatarPendente=null;
     limparPreviewAvatar();
-    aviso('Avatar removido.',true);
-  }catch(e){aviso(e.message);}
+    atualizarEstadoAvatar();
+    aviso('Retrato removido.',true);
+  }catch(e){$('p-avatar-info').textContent='Não foi possível remover o retrato: '+e.message;aviso(e.message);}
 };
 // ---- Ficha em abas: preserva os campos e a compatibilidade com fichas antigas ----
 const secoesFicha=['identidade','atributos','inventario','habilidades','historia'];
@@ -991,6 +1024,7 @@ function restaurarExtrasFicha(d){
   pintarInventario();pintarHabilidades();pintarEvolucao();
 }
 function limparFicha(){
+  avatarPendente=null;
   fichaAbertaId=null;
   estadoNavegacao.gravar('personagem',null);
   destacarPersonagemSelecionado();
@@ -1034,6 +1068,7 @@ async function carregarPersonagens(){
       botao.onclick=(evento)=>{
         const restaurando=evento?.restaurar===true;
         const abaRestaurada=restaurando?estadoNavegacao.ler('aba-ficha'):null;
+        avatarPendente=null;
         fichaAbertaId=item.id;
         estadoNavegacao.gravar('personagem',item.id);
         destacarPersonagemSelecionado();
@@ -1102,11 +1137,14 @@ $('f-personagem').onsubmit=async ev=>{
     const abaAtual=estadoNavegacao.ler('aba-ficha')||'identidade';
     const resposta=await api(fichaAbertaId?'/api/personagens/'+fichaAbertaId:'/api/personagens',fichaAbertaId?'PUT':'POST',{dados});
     if(!fichaAbertaId&&resposta?.id)fichaAbertaId=resposta.id;
+    const fotoAEnviar=avatarPendente;
+    avatarPendente=null;
     estadoNavegacao.gravar('personagem',fichaAbertaId);
     estadoNavegacao.gravar('aba-ficha',abaAtual);
     await carregarPersonagens();
     abrirAbaFicha(abaAtual);
     aviso('Ficha salva com sucesso! O personagem continua selecionado.',true);
+    if(fotoAEnviar&&fichaAbertaId)await enviarAvatar(fotoAEnviar,fichaAbertaId);
   }catch(e){aviso(e.message);}
   finally{botao.disabled=false;}
 };
