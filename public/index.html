@@ -50,6 +50,7 @@
       <p id="ambiente-creditos" class="musica-creditos" aria-live="polite"></p>
     </div>
   </section>
+  <div id="aviso-publico" role="status" hidden></div>
   <p id="aviso" role="status"></p>
 
   <!-- Gerador: qualquer visitante vê; o servidor aplica os limites -->
@@ -71,6 +72,7 @@
     <div class="como-funciona"><span class="sobretitulo">O PRÓXIMO CAPÍTULO</span><h2>Seu universo em três passos</h2><div class="passos"><article><b>01</b><h3>Escolha o mundo</h3><p>Defina o gênero e a atmosfera.</p></article><article><b>02</b><h3>Compartilhe uma ideia</h3><p>Dê vida à sua inspiração.</p></article><article><b>03</b><h3>Viva a história</h3><p>Receba aventuras, locais e personagens.</p></article></div></div>
   </section>
 
+  <section id="v-novidades" hidden><div class="pagina-intro"><span class="sobretitulo">CRÔNICAS DO MESA</span><h1>Novidades e comunicados</h1><p>Acompanhe anúncios publicados pela administração.</p></div><div class="folha" id="lista-novidades"></div></section>
   <section id="v-tutorial" hidden aria-labelledby="tutorial-titulo">
     <div class="pagina-intro"><span class="sobretitulo">MANUAL DO AVENTUREIRO</span><h1 id="tutorial-titulo">Como usar o Mesa</h1><p>Da sua primeira aventura ao inventário, descubra todas as ferramentas em poucos passos.</p></div>
     <div class="folha tutorial-folha">
@@ -264,8 +266,26 @@
   </section>
 
   <section id="v-admin" hidden>
-    <div class="pagina-intro"><span class="sobretitulo">VISÃO GERAL</span><h1>Painel do administrador</h1></div>
-    <div class="folha" id="resumo"></div>
+    <div class="pagina-intro"><span class="sobretitulo">CENTRAL DO MESTRE</span><h1>Administração do Mesa</h1><p>Usuários, relatórios, comunicados e segurança em um único lugar.</p></div>
+    <div id="admin-feedback" role="status" aria-live="polite"></div>
+    <div class="admin-abas" id="admin-abas" role="group" aria-label="Áreas da administração">
+      <button type="button" data-admin="geral" aria-pressed="true">◈ Visão geral</button>
+      <button type="button" data-admin="usuarios">♙ Usuários</button>
+      <button type="button" data-admin="relatorios">▥ Relatórios</button>
+      <button type="button" data-admin="novidades">✦ Novidades</button>
+      <button type="button" data-admin="conteudos">▤ Conteúdos</button>
+      <button type="button" data-admin="suporte">✉ Suporte</button>
+      <button type="button" data-admin="config">⚙ Configurações</button>
+      <button type="button" data-admin="auditoria">◇ Auditoria</button>
+    </div>
+    <div class="folha admin-corpo" id="resumo"></div>
+  </section>
+  <section id="v-suporte" hidden>
+    <div class="pagina-intro"><span class="sobretitulo">CANAL DO AVENTUREIRO</span><h1>Suporte e sugestões</h1><p>Conte suas dúvidas, sugestões ou problemas para a equipe Mesa.</p></div>
+    <div class="folha admin-formulario">
+      <form id="form-suporte"><label for="suporte-assunto">Assunto</label><input id="suporte-assunto" maxlength="120" required placeholder="Ex.: erro na ficha do personagem"><label for="suporte-mensagem">Mensagem</label><textarea id="suporte-mensagem" maxlength="2000" required rows="5" placeholder="Explique o que aconteceu ou o que você gostaria de sugerir."></textarea><button class="principal" type="submit">Enviar mensagem</button></form>
+      <h2>Minhas mensagens</h2><div id="suporte-meus-chamados"></div>
+    </div>
   </section>
 </main>
 <script src="./config.js"></script>
