@@ -43,11 +43,15 @@ const tutorialEtapas = [
  {titulo:'Crie sua primeira aventura',sub:'Gerador de histórias',texto:'Escolha o gênero, defina o tom e o número de jogadores. Escreva uma ideia opcional, como uma vila cercada por névoa, e clique em Gerar minha aventura. O Mesa usa IA e aplica limites de uso.',dicas:['Uma ideia curta pode orientar toda a aventura.','Leia a história gerada e adapte-a livremente à sua mesa.'],tela:'gerador',rotulo:'Ir ao gerador'},
  {titulo:'Role os dados',sub:'Oráculo dos dados',texto:'Os dados introduzem sorte no jogo. Um d20 tem 20 faces; d4, d6, d8, d10 e d12 possuem as quantidades de faces indicadas. No Oráculo dos dados você encontra botões para rolar e um tutorial ilustrado para iniciantes.',dicas:['O mestre determina quando uma rolagem é necessária.','Os efeitos de cada resultado dependem das regras da campanha.'],tela:'dados',rotulo:'Abrir os dados'},
  {titulo:'Crie uma conta',sub:'Acesso ao seu espaço',texto:'Ao entrar ou criar uma conta, você pode guardar aventuras, fichas e preferências. A opção Manter conectado preserva a sessão por até 30 dias. Se perder sua senha, use o link de recuperação da tela de entrada.',dicas:['Nunca compartilhe sua senha.','O login e o cadastro ficam em Entrar, no menu.'],tela:'conta',rotulo:'Abrir acesso'},
+ {titulo:'Recupere o acesso quando precisar',sub:'Segurança da conta',texto:'Na tela Entrar, toque em Esqueceu sua senha? e siga as instruções para solicitar a recuperação. Você também pode criar uma conta nova se ainda não tiver registro. Não compartilhe sua senha com o mestre ou outros jogadores.',dicas:['Use um e-mail ao qual você tenha acesso.','Se o envio de e-mail não estiver configurado pelo administrador, a recuperação poderá ficar indisponível.'],tela:'conta',rotulo:'Ver tela de acesso'},
  {titulo:'Consulte suas aventuras',sub:'Histórico',texto:'Após entrar na conta, abra Histórico para rever histórias anteriores. Dessa forma, você pode reutilizar locais, personagens e ideias sem precisar gerar tudo novamente.',dicas:['O histórico requer login.','Se a seção não aparecer, entre primeiro na sua conta.'],tela:'historico',rotulo:'Abrir histórico',requerLogin:true},
  {titulo:'Monte sua ficha',sub:'Personagens',texto:'Acesse Personagens, clique em Nova ficha e selecione o cenário. Para fantasia, o Mesa oferece a ficha D&D 2024 com atributos de compra de 27 pontos; nos outros mundos, a ficha usa uma abordagem narrativa.',dicas:['As abas dividem a ficha em Identidade, Atributos, Inventário, Habilidades e História.','Salve a ficha antes de enviar um retrato.'],tela:'personagens',rotulo:'Criar personagem',requerLogin:true},
+ {titulo:'Personalize o retrato e a ficha',sub:'Identidade do personagem',texto:'Depois de salvar a ficha, abra o personagem pela Minha biblioteca. Na aba Identidade, envie um retrato JPG, PNG ou WebP, selecione o cenário e associe a história, se desejar. O retrato fica privado na sua conta.',dicas:['O botão de geração de avatar por IA está desativado por enquanto.','O personagem selecionado recebe destaque verde e dourado, e a seleção volta após atualizar a página.'],tela:'personagens',rotulo:'Abrir personagens',requerLogin:true},
  {titulo:'Organize a mochila',sub:'Inventário',texto:'Na ficha, abra a aba Inventário. Você pode sugerir um kit inicial, adicionar itens, definir categorias, quantidades, descrição e marcar o que está equipado. Salve a ficha para preservar as alterações.',dicas:['Equipado é uma marcação manual, não calcula automaticamente dano ou defesa.','Confira itens e proficiências com as regras da campanha.'],tela:'personagens',rotulo:'Abrir personagens',requerLogin:true},
  {titulo:'Escreva habilidades e conquistas',sub:'Grimório e evolução',texto:'Na aba Habilidades, registre perícias, magias, talentos e características, com suas descrições. Na aba História, registre missões, conquistas, mudanças e anotações do personagem.',dicas:['Temas sugeridos não liberam poderes nem proficiências automaticamente.','O mestre valida as regras utilizadas.'],tela:'personagens',rotulo:'Abrir fichas',requerLogin:true},
  {titulo:'Peça ajuda ao tutor',sub:'Tutor D&D',texto:'O Tutor D&D responde dúvidas sobre conceitos e regras, com base de referência na SRD 5.2.1. Abra a ferramenta, descreva a dúvida e examine a resposta. Existem limites de perguntas por conta.',dicas:['Uma pergunta específica costuma render uma explicação mais útil.','O tutor não substitui a decisão do mestre.'],tela:'assistente',rotulo:'Abrir tutor',requerLogin:true},
+ {titulo:'Entenda as regras de D&D do zero',sub:'Material gratuito oficial',texto:'No Tutor D&D você encontra o guia oficial para começar a jogar e o livro eletrônico gratuito das regras de 2024. Aprenda testes, rolagens, atributos, combate, classes, espécies, antecedentes, magias, equipamentos e progressão. Depois, use o Tutor para dúvidas específicas.',dicas:['Comece pelo guia introdutório e avance para o compêndio de regras.','O conteúdo do D&D Beyond está em inglês e pode ser traduzido pelo navegador.'],tela:'assistente',rotulo:'Ver trilha oficial de D&D',requerLogin:true},
+ {titulo:'Administração do Mesa',sub:'Painel do administrador',texto:'Quando a conta tem perfil de administrador, o menu inclui Painel, onde é possível consultar informações gerais como número de usuários e aventuras geradas. Usuários comuns não têm acesso a essa área.',dicas:['O painel não dá acesso às fichas privadas de outras pessoas.','Se você não for administrador, essa área não aparecerá no seu menu.'],tela:'admin',rotulo:'Abrir painel (administrador)',requerAdmin:true},
  {titulo:'Crie a atmosfera da mesa',sub:'Música e ajustes finais',texto:'O botão ♫ Música fica no canto inferior direito, inclusive no login. Abra-o para escolher entre três gravações medievais licenciadas, controlar volume e pausar. A reprodução começa somente quando você solicitar.',dicas:['O player mostra autor, licença e fonte das gravações.','Se preferir silêncio, deixe o player pausado. Pronto: sua aventura pode começar!'],tela:'gerador',rotulo:'Começar aventura'}
 ];
 let tutorialPasso=0;
@@ -70,7 +74,8 @@ $('tutorial-proximo').onclick=()=>{if(tutorialPasso===tutorialEtapas.length-1){m
 $('tutorial-recomecar').onclick=()=>tutorialMostrarPasso(0);
 $('tutorial-ir').onclick=()=>{
   const etapa=tutorialEtapas[tutorialPasso];
-  if(etapa.requerLogin&&!eu.logado){aviso('Entre na sua conta primeiro para usar essa ferramenta.');mostrar('conta');return;}
+  if(etapa.requerLogin&&!eu.logado){mostrar('conta');aviso('Entre na sua conta primeiro para usar essa ferramenta.');return;}
+  if(etapa.requerAdmin&&eu.papel!=='admin'){aviso('O painel é exclusivo para administradores.');return;}
   mostrar(etapa.tela);
 };
 try{const guardado=Number(localStorage.getItem('mesa-tutorial-etapa'));if(Number.isInteger(guardado))tutorialPasso=Math.max(0,Math.min(tutorialEtapas.length-1,guardado));}catch{}
@@ -104,6 +109,7 @@ try{menuRecolher(localStorage.getItem('mesa-menu-compacto')==='1');}catch{menuRe
 function mostrar(tela) {
   if(!TELAS.includes(tela))return;
   if(!eu.logado&&['historico','personagens','assistente','admin'].includes(tela))tela='conta';
+  if(tela==='admin'&&eu.papel!=='admin')tela='gerador';
   estadoNavegacao.gravar('tela',tela);
   document.body.classList.toggle('tela-acesso', tela === 'conta');
   TELAS.forEach((t) => { $('v-' + t).hidden = t !== tela; });
@@ -405,7 +411,7 @@ function atualizarKit(){
 $('p-gerar-kit').onclick=()=>{
  if(!exigirPersonagemSalvo())return;
  const kit=sugerirEquipamentos();
- if(!kit)return;
+ if(!kit){aviso('Escolha uma classe ou especialidade na aba Identidade para receber uma sugestão de kit.');abrirAbaFicha('identidade');return;}
  if($('p-equipamentos').value.trim()&&!confirm('Substituir os equipamentos atuais pela nova sugestão?'))return;
  $('p-equipamentos').value=kit.itens.join('\n');
 };
@@ -1005,7 +1011,12 @@ async function carregarPersonagens(){
   const lista=$('personagens-lista');lista.replaceChildren();
   try{
     const itens=await api('/api/personagens');
-    if(!itens.length){lista.appendChild(el('p','Nenhuma ficha salva ainda. Comece criando sua primeira personagem.','suave'));return;}
+    if(!itens.length){
+      if(fichaAbertaId||estadoNavegacao.ler('personagem'))limparFicha();
+      lista.appendChild(el('p','Nenhuma ficha salva ainda. Comece criando sua primeira personagem.','suave'));
+      atualizarKit();
+      return;
+    }
     for(const item of itens) {
       const botao=el('button',(item.nome||'Personagem')+(item.dados.metodo==='livre'?' · '+(item.dados.especialidade||'Narrativa'):' · Nível '+item.dados.nivel),'personagem-item');
       botao.type='button';
