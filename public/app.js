@@ -31,7 +31,7 @@ async function api(url, metodo = 'GET', corpo) {
 function aviso(texto, bom) { const a = $('aviso'); a.textContent = texto || ''; a.className = bom ? 'bom' : ''; }
 
 // ---- Navegação entre telas ----
-const TELAS = ['gerador','dados','historico','personagens','assistente','tutorial','novidades','suporte','conta','admin'];
+const TELAS = ['gerador','dados','historico','personagens','assistente','tutorial','novidades','suporte','instalar','conta','admin'];
 const estadoNavegacao={
   ler(chave){try{return sessionStorage.getItem('mesa:'+chave);}catch{return null;}},
   gravar(chave,valor){try{if(valor===null)sessionStorage.removeItem('mesa:'+chave);else sessionStorage.setItem('mesa:'+chave,String(valor));}catch{}}
@@ -129,7 +129,7 @@ function montarNav() {
   nav.replaceChildren();
   const itens = [['gerador', '✦', 'Gerador'], ['dados', '◇', 'Dados']];
   if (eu.logado) itens.push(['historico', '▤', 'Histórico'], ['personagens', '♙', 'Personagens'], ['assistente', '✧', 'Tutor D&D']);
-  itens.push(['tutorial','❖','Tutorial'],['novidades','✦','Novidades']);
+  itens.push(['tutorial','❖','Tutorial'],['novidades','✦','Novidades'],['instalar','⬇','Instalar Mesa']);
   if(eu.logado)itens.push(['suporte','✉','Suporte']);
   if (eu.papel === 'admin') itens.push(['admin', '⚙', 'Painel']);
   if (!eu.logado) itens.push(['conta', '↪', 'Entrar']);
@@ -1372,6 +1372,46 @@ $('form-suporte').onsubmit=async ev=>{
   $('form-suporte').reset();aviso('Mensagem enviada com sucesso!',true);suporteListar();
  }catch(e){aviso(e.message);}
 };
+
+// PWA instalável: o navegador decide quando a instalação direta está disponível.
+let mesaInstalacaoPendente=null;
+const botaoInstalar=$('instalar-mesa-botao');
+const statusInstalar=$('instalar-mesa-status');
+const mesaStandalone=()=>window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+function mesaAtualizarInstalacao(){
+ if(mesaStandalone()){
+  botaoInstalar.hidden=true;
+  statusInstalar.textContent='O Mesa já está instalado neste aparelho. Você pode abri-lo pela lista de aplicativos.';
+ }else if(mesaInstalacaoPendente){
+  botaoInstalar.hidden=false;
+  statusInstalar.textContent='Seu navegador permite instalar o Mesa agora, gratuitamente.';
+ }else{
+  botaoInstalar.hidden=true;
+  statusInstalar.textContent='Siga as instruções abaixo para instalar pelo menu do seu navegador. A instalação direta depende do aparelho e do navegador.';
+ }
+}
+window.addEventListener('beforeinstallprompt',event=>{
+ event.preventDefault();mesaInstalacaoPendente=event;mesaAtualizarInstalacao();
+});
+window.addEventListener('appinstalled',()=>{
+ mesaInstalacaoPendente=null;mesaAtualizarInstalacao();
+});
+botaoInstalar.onclick=async()=>{
+ if(!mesaInstalacaoPendente)return;
+ const convite=mesaInstalacaoPendente;mesaInstalacaoPendente=null;
+ try{
+  await convite.prompt();
+  const resultado=await convite.userChoice;
+  statusInstalar.textContent=resultado?.outcome==='accepted'?'Instalação solicitada! Procure o Mesa entre os aplicativos.':'Instalação cancelada. Você pode tentar novamente pelo navegador.';
+ }catch{statusInstalar.textContent='Não foi possível iniciar a instalação. Utilize o menu do navegador.';}
+ mesaAtualizarInstalacao();
+};
+mesaAtualizarInstalacao();
+if('serviceWorker' in navigator&&window.isSecureContext){
+ window.addEventListener('load',()=>{
+  navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(()=>{/* Instalação é opcional; website continua acessível. */});
+ });
+}
 
 noticiasMesa();
 atualizarEu().then(() => {
