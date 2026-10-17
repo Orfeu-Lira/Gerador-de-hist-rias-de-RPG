@@ -379,6 +379,80 @@ async function carregarAventurasDaFicha(){
   }catch(e){aventurasFicha=[];op.replaceChildren(new Option('Aventuras indisponíveis',''));}
 }
 
+// ---- Instrumental folk medieval ORIGINAL do Mesa (Web Audio, sem arquivos externos) ----
+const ambiente={ctx:null,master:null,playing:false,sequencia:0,loop:null};
+const escalas={
+  taverna:{notas:[62,66,69,74,71,69,66,64,62,66,69,76,74,71,69,66],acordes:[[50,57,62],[47,54,59],[45,52,57],[50,57,62]],tempo:340},
+  floresta:{notas:[64,67,71,74,71,67,64,62,64,69,72,76,74,69,67,64],acordes:[[52,59,64],[48,55,60],[45,52,57],[50,57,62]],tempo:490},
+  jornada:{notas:[57,60,64,69,67,64,60,62,57,60,64,72,69,67,64,60],acordes:[[45,52,57],[41,48,53],[43,50,55],[45,52,57]],tempo:280}
+};
+function ambienteNota(midi,quando,duracao,tipo='corda',volume=0.15){
+  const ctx=ambiente.ctx;
+  if(!ctx||!ambiente.master)return;
+  const osc=ctx.createOscillator(),ganho=ctx.createGain();
+  osc.type=tipo==='flauta'?'sine':'triangle';
+  osc.frequency.value=440*Math.pow(2,(midi-69)/12);
+  ganho.gain.setValueAtTime(0.0001,quando);
+  ganho.gain.exponentialRampToValueAtTime(volume,quando+0.012);
+  ganho.gain.exponentialRampToValueAtTime(0.0001,quando+duracao);
+  osc.connect(ganho);ganho.connect(ambiente.master);
+  osc.start(quando);osc.stop(quando+duracao+0.03);
+}
+function ambientePasso(){
+  if(!ambiente.playing||!ambiente.ctx)return;
+  const config=escalas[$('ambiente-estilo').value]||escalas.taverna;
+  const passo=ambiente.sequencia++%16,agora=ambiente.ctx.currentTime+0.04;
+  ambienteNota(config.notas[passo],agora,config.tempo/1000*.78,passo%4===0?'flauta':'corda',0.15);
+  if(passo%4===0){
+    const acorde=config.acordes[Math.floor(passo/4)];
+    acorde.forEach((nota,i)=>ambienteNota(nota,agora+i*.08,config.tempo/1000*2.7,'corda',.045));
+  }
+}
+function ambienteParar(){
+  ambiente.playing=false;
+  if(ambiente.loop)clearInterval(ambiente.loop);
+  ambiente.loop=null;
+  $('ambiente-tocar').textContent='▶ Tocar';
+  $('ambiente-tocar').setAttribute('aria-pressed','false');
+  $('ambiente-estado').textContent='Pausado. Você escolhe quando tocar.';
+  if(ambiente.ctx)ambiente.ctx.suspend().catch(()=>{});
+}
+$('ambiente-tocar').onclick=async()=>{
+  if(ambiente.playing){ambienteParar();return;}
+  const AudioContext=window.AudioContext||window.webkitAudioContext;
+  if(!AudioContext){$('ambiente-estado').textContent='Seu navegador não oferece áudio Web Audio.';return;}
+  try{
+    if(!ambiente.ctx){
+      ambiente.ctx=new AudioContext();
+      ambiente.master=ambiente.ctx.createGain();
+      ambiente.master.connect(ambiente.ctx.destination);
+    }
+    await ambiente.ctx.resume();
+    ambiente.master.gain.value=Number($('ambiente-volume').value)/100*.42;
+    ambiente.sequencia=0;ambiente.playing=true;
+    $('ambiente-tocar').textContent='❚❚ Pausar';
+    $('ambiente-tocar').setAttribute('aria-pressed','true');
+    $('ambiente-estado').textContent='Tocando instrumental folk criado pelo Mesa.';
+    ambientePasso();
+    ambiente.loop=setInterval(ambientePasso,escalas[$('ambiente-estilo').value].tempo);
+  }catch{$('ambiente-estado').textContent='O navegador não conseguiu iniciar o áudio.';}
+};
+$('ambiente-estilo').onchange=()=>{
+  try{localStorage.setItem('mesa-ambiente-estilo',$('ambiente-estilo').value);}catch{}
+  if(ambiente.playing){clearInterval(ambiente.loop);ambiente.sequencia=0;ambientePasso();ambiente.loop=setInterval(ambientePasso,escalas[$('ambiente-estilo').value].tempo);}
+};
+$('ambiente-volume').oninput=()=>{
+  if(ambiente.master)ambiente.master.gain.value=Number($('ambiente-volume').value)/100*.42;
+  try{localStorage.setItem('mesa-ambiente-volume',$('ambiente-volume').value);}catch{}
+};
+try{
+  const estilo=localStorage.getItem('mesa-ambiente-estilo');
+  if(escalas[estilo])$('ambiente-estilo').value=estilo;
+  const volume=Number(localStorage.getItem('mesa-ambiente-volume'));
+  if(Number.isFinite(volume)&&volume>=0&&volume<=100 && localStorage.getItem('mesa-ambiente-volume')!==null)
+    $('ambiente-volume').value=String(volume);
+}catch{}
+
 // ---- Fichas D&D 5e 2024: atributos-base e compra com 27 pontos ----
 const atributosDnd = [['for','Força'],['des','Destreza'],['con','Constituição'],['int','Inteligência'],['sab','Sabedoria'],['car','Carisma']];
 const custosDnd = {8:0,9:1,10:2,11:3,12:4,13:5,14:7,15:9};
