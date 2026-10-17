@@ -677,7 +677,7 @@ function normalizarInventario(dados){
     return dados.inventario.slice(0,32).filter(x=>x&&typeof x.nome==='string').map(x=>({
       nome:textoLimitado(x.nome,80),
       tipo:categoriasInventario.includes(x.tipo)?x.tipo:'Outros',
-      quantidade:Math.max(1,Math.min(99,Number(x.quantidade)||1)),
+      quantidade:Math.max(1,Math.min(99,Math.round(Number(x.quantidade)||1))),
       equipado:Boolean(x.equipado),
       descricao:textoLimitado(x.descricao,120)
     })).filter(x=>x.nome);
@@ -701,7 +701,7 @@ function pintarInventario(){
     const quantidade=document.createElement('input');
     quantidade.type='number';quantidade.min='1';quantidade.max='99';quantidade.value=item.quantidade;
     quantidade.setAttribute('aria-label','Quantidade de '+item.nome);
-    quantidade.onchange=()=>{item.quantidade=Math.min(99,Math.max(1,Number(quantidade.value)||1));quantidade.value=item.quantidade;sincronizarInventario();};
+    quantidade.onchange=()=>{item.quantidade=Math.min(99,Math.max(1,Math.round(Number(quantidade.value)||1)));quantidade.value=item.quantidade;sincronizarInventario();};
     const equipado=document.createElement('label');equipado.className='item-ficha-equipado';
     const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.checked=item.equipado;
     checkbox.onchange=()=>{item.equipado=checkbox.checked;sincronizarInventario();};
@@ -923,6 +923,7 @@ $('p-remover').onclick=async()=>{
 atualizarPontosDnd();
 atualizarSugestaoClasse();
 atualizarContextoDnd();
+restaurarExtrasFicha({});
 // ---- Tutor com IA, sem execução automática de mudanças nas fichas ----
 $('f-ajuda-dnd').onsubmit=async ev=>{
   ev.preventDefault();
