@@ -291,11 +291,13 @@ app.post('/api/musicas',musicaLimite,asyncHandler(async(req,res)=>{
     (titulo!==undefined && (typeof titulo!=='string'||titulo.length>120)))
     return res.status(400).json({erro:'Informe uma descrição musical válida.'});
   const chave='musica:'+u.id+':'+new Date().toISOString().slice(0,10);
-  const limite=u.papel==='admin'?15:4;
-  const uso=await query(
-    'INSERT INTO public.geracoes_limite(identificador,total) VALUES($1,1) ON CONFLICT(identificador) DO UPDATE SET total=public.geracoes_limite.total+1 WHERE public.geracoes_limite.total<$2 RETURNING total',
-    [chave,limite]);
-  if(!uso.rowCount) return res.status(429).json({erro:'Você atingiu o limite de pesquisas musicais de hoje.'});
+  const admin=u.papel==='admin';
+  if(!admin){
+    const uso=await query(
+      'INSERT INTO public.geracoes_limite(identificador,total) VALUES($1,1) ON CONFLICT(identificador) DO UPDATE SET total=public.geracoes_limite.total+1 WHERE public.geracoes_limite.total<$2 RETURNING total',
+      [chave,4]);
+    if(!uso.rowCount) return res.status(429).json({erro:'Você atingiu o limite de pesquisas musicais de hoje.'});
+  }
   const pesquisa=('RPG ambient soundtrack playlist '+estilo.trim()).slice(0,180);
   const pesquisaUrl='https://www.google.com/search?q='+encodeURIComponent(pesquisa);
   try{
@@ -336,7 +338,7 @@ app.post('/api/musicas',musicaLimite,asyncHandler(async(req,res)=>{
       aviso:links.length?'Links identificados em resultados da pesquisa Google; confirme se correspondem à música desejada.':
         'A pesquisa não retornou links diretos verificáveis de plataformas musicais. Use a busca sugerida no Google.'});
   }catch(e){
-    await query('UPDATE public.geracoes_limite SET total=GREATEST(0,total-1) WHERE identificador=$1',[chave]).catch(()=>{});
+    if(!admin)await query('UPDATE public.geracoes_limite SET total=GREATEST(0,total-1) WHERE identificador=$1',[chave]).catch(()=>{});
     console.error('Pesquisa musical indisponível:',e.name);
     return res.status(503).json({erro:'Não foi possível pesquisar músicas agora. Tente novamente mais tarde.',buscaGoogle:pesquisaUrl});
   }
@@ -537,11 +539,13 @@ app.post('/api/dnd/ajuda',asyncHandler(async(req,res)=>{
   if(typeof pergunta !== 'string' || pergunta.trim().length<5 || pergunta.length>450)
     return res.status(400).json({erro:'Digite uma pergunta sobre D&D com até 450 caracteres.'});
   const chave='dnd-ajuda:'+u.id+':'+new Date().toISOString().slice(0,10);
-  const limite=6;
-  const uso=await query(
-    'INSERT INTO public.geracoes_limite(identificador,total) VALUES($1,1) ON CONFLICT(identificador) DO UPDATE SET total=public.geracoes_limite.total+1 WHERE public.geracoes_limite.total<$2 RETURNING total',
-    [chave,limite]);
-  if(!uso.rowCount) return res.status(429).json({erro:'Limite de seis explicações por dia atingido. Tente amanhã.'});
+  const admin=u.papel==='admin';
+  if(!admin){
+    const uso=await query(
+      'INSERT INTO public.geracoes_limite(identificador,total) VALUES($1,1) ON CONFLICT(identificador) DO UPDATE SET total=public.geracoes_limite.total+1 WHERE public.geracoes_limite.total<$2 RETURNING total',
+      [chave,6]);
+    if(!uso.rowCount) return res.status(429).json({erro:'Limite de seis explicações por dia atingido. Tente amanhã.'});
+  }
   try{
     const modelo=process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
     const resposta=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(modelo)+':generateContent',{
@@ -559,7 +563,7 @@ app.post('/api/dnd/ajuda',asyncHandler(async(req,res)=>{
     if(!texto) throw new Error('Resposta do assistente vazia.');
     res.json({resposta:texto.slice(0,2300),fonte:'https://www.dndbeyond.com/srd'});
   }catch(e){
-    await query('UPDATE public.geracoes_limite SET total=GREATEST(0,total-1) WHERE identificador=$1',[chave]).catch(()=>{});
+    if(!admin)await query('UPDATE public.geracoes_limite SET total=GREATEST(0,total-1) WHERE identificador=$1',[chave]).catch(()=>{});
     console.error('Assistente D&D indisponível:',e.name);
     return res.status(503).json({erro:'O assistente está indisponível. Sua tentativa não foi contabilizada; tente mais tarde.'});
   }
