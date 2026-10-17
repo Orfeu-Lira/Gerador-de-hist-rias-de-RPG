@@ -182,7 +182,7 @@
             <div><span class="sobretitulo">INVENTÁRIO INICIAL</span><h3 id="equipamento-titulo">Equipamentos da personagem</h3></div>
             <button id="p-gerar-kit" type="button" class="guia-abrir">✦ Sugerir kit inicial</button>
           </div>
-          <p id="p-kit-origem" class="suave">Selecione uma história e uma classe ou especialidade para receber uma sugestão contextual.</p>
+          <p id="p-kit-origem" class="suave">Selecione uma história e uma classe ou especialidade para receber uma sugestão contextual.</p><p id="p-inventario-aviso" class="inventario-aviso" role="status" aria-live="polite">Selecione uma ficha existente ou crie e salve um personagem antes de alterar o inventário.</p>
           <label for="p-equipamentos" class="sr-only">Resumo dos equipamentos</label>
           <textarea id="p-equipamentos" rows="7" maxlength="1800" hidden></textarea>
           <div class="ficha-criar-item">
@@ -217,6 +217,7 @@
   </section>
   <section id="v-assistente" hidden>
     <div class="pagina-intro"><span class="sobretitulo">TUTOR DE REGRAS</span><h1>Assistente D&D 2024</h1><p>Aprenda o funcionamento do jogo com exemplos claros.</p></div>
+    <div class="folha dnd-trilha-aprendizado"><span class="sobretitulo">COMECE DO ZERO</span><h2>Aprenda D&D do primeiro dado às regras avançadas</h2><p>Não sabe o que é RPG? Comece pela introdução oficial. Depois explore as regras gratuitas de D&D 2024: criação de personagens, testes, combate, classes, magias, equipamentos, condições e evolução.</p><div class="dnd-trilha-links"><a class="guia-abrir" href="https://www.dndbeyond.com/en/how-to-play-dnd" target="_blank" rel="noopener noreferrer">① Como jogar D&D — guia inicial ↗</a><a class="guia-abrir" href="https://www.dndbeyond.com/sources/dnd/br-2024" target="_blank" rel="noopener noreferrer">② Regras gratuitas 2024 — compêndio ↗</a><button type="button" class="guia-abrir" id="dnd-tutorial-mesa">③ Como usar o Mesa para jogar ↗</button></div><p class="suave">Os recursos oficiais são em inglês. Use a tradução do navegador caso prefira ler em português. O conteúdo gratuito é extenso, mas não inclui todas as opções dos livros pagos.</p></div>
     <div class="folha assistente-painel"><h2>O que você quer aprender?</h2><p>O assistente explica regras e dá exemplos. Ele não modifica personagens e pode cometer erros: confirme decisões importantes na fonte oficial.</p><form id="f-ajuda-dnd"><label for="pergunta-dnd">Sua pergunta</label><textarea id="pergunta-dnd" rows="4" maxlength="450" required placeholder="Ex.: Como funcionam os testes de habilidade e a dificuldade (CD)?"></textarea><div class="acoes"><button class="principal" id="ajuda-enviar" type="submit">✦ Pedir explicação</button></div></form><div id="resposta-dnd" class="assistente-resposta" role="status" aria-live="polite"></div><p class="suave">Base de referência: <a target="_blank" rel="noopener noreferrer" href="https://www.dndbeyond.com/srd">SRD 5.2.1 — D&D Beyond</a>. Limite inicial: seis consultas diárias por conta.</p></div>
   </section>
   <section id="v-conta" hidden>
