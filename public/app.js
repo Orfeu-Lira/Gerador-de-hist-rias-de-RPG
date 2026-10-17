@@ -31,32 +31,106 @@ async function api(url, metodo = 'GET', corpo) {
 function aviso(texto, bom) { const a = $('aviso'); a.textContent = texto || ''; a.className = bom ? 'bom' : ''; }
 
 // ---- Navegação entre telas ----
-const TELAS = ['gerador', 'dados', 'historico', 'personagens', 'assistente', 'conta', 'admin'];
+const TELAS = ['gerador','dados','historico','personagens','assistente','tutorial','conta','admin'];
+const tutorialEtapas = [
+ {titulo:'Bem-vindo ao Mesa',sub:'Seu espaço de histórias',texto:'O Mesa reúne aventuras, dados e fichas em um só lugar. Use o menu lateral para alternar de ferramenta. Você pode deixá-lo expandido ou compacto, e no celular basta tocar em Menu.',dicas:['O tutorial fica disponível sempre no menu lateral.','Sua conta guarda o histórico e as fichas privadas.'],tela:'gerador',rotulo:'Conhecer o gerador'},
+ {titulo:'Crie sua primeira aventura',sub:'Gerador de histórias',texto:'Escolha o gênero, defina o tom e o número de jogadores. Escreva uma ideia opcional, como uma vila cercada por névoa, e clique em Gerar minha aventura. O Mesa usa IA e aplica limites de uso.',dicas:['Uma ideia curta pode orientar toda a aventura.','Leia a história gerada e adapte-a livremente à sua mesa.'],tela:'gerador',rotulo:'Ir ao gerador'},
+ {titulo:'Role os dados',sub:'Oráculo dos dados',texto:'Os dados introduzem sorte no jogo. Um d20 tem 20 faces; d4, d6, d8, d10 e d12 possuem as quantidades de faces indicadas. No Oráculo dos dados você encontra botões para rolar e um tutorial ilustrado para iniciantes.',dicas:['O mestre determina quando uma rolagem é necessária.','Os efeitos de cada resultado dependem das regras da campanha.'],tela:'dados',rotulo:'Abrir os dados'},
+ {titulo:'Crie uma conta',sub:'Acesso ao seu espaço',texto:'Ao entrar ou criar uma conta, você pode guardar aventuras, fichas e preferências. A opção Manter conectado preserva a sessão por até 30 dias. Se perder sua senha, use o link de recuperação da tela de entrada.',dicas:['Nunca compartilhe sua senha.','O login e o cadastro ficam em Entrar, no menu.'],tela:'conta',rotulo:'Abrir acesso'},
+ {titulo:'Consulte suas aventuras',sub:'Histórico',texto:'Após entrar na conta, abra Histórico para rever histórias anteriores. Dessa forma, você pode reutilizar locais, personagens e ideias sem precisar gerar tudo novamente.',dicas:['O histórico requer login.','Se a seção não aparecer, entre primeiro na sua conta.'],tela:'historico',rotulo:'Abrir histórico',requerLogin:true},
+ {titulo:'Monte sua ficha',sub:'Personagens',texto:'Acesse Personagens, clique em Nova ficha e selecione o cenário. Para fantasia, o Mesa oferece a ficha D&D 2024 com atributos de compra de 27 pontos; nos outros mundos, a ficha usa uma abordagem narrativa.',dicas:['As abas dividem a ficha em Identidade, Atributos, Inventário, Habilidades e História.','Salve a ficha antes de enviar um retrato.'],tela:'personagens',rotulo:'Criar personagem',requerLogin:true},
+ {titulo:'Organize a mochila',sub:'Inventário',texto:'Na ficha, abra a aba Inventário. Você pode sugerir um kit inicial, adicionar itens, definir categorias, quantidades, descrição e marcar o que está equipado. Salve a ficha para preservar as alterações.',dicas:['Equipado é uma marcação manual, não calcula automaticamente dano ou defesa.','Confira itens e proficiências com as regras da campanha.'],tela:'personagens',rotulo:'Abrir personagens',requerLogin:true},
+ {titulo:'Escreva habilidades e conquistas',sub:'Grimório e evolução',texto:'Na aba Habilidades, registre perícias, magias, talentos e características, com suas descrições. Na aba História, registre missões, conquistas, mudanças e anotações do personagem.',dicas:['Temas sugeridos não liberam poderes nem proficiências automaticamente.','O mestre valida as regras utilizadas.'],tela:'personagens',rotulo:'Abrir fichas',requerLogin:true},
+ {titulo:'Peça ajuda ao tutor',sub:'Tutor D&D',texto:'O Tutor D&D responde dúvidas sobre conceitos e regras, com base de referência na SRD 5.2.1. Abra a ferramenta, descreva a dúvida e examine a resposta. Existem limites de perguntas por conta.',dicas:['Uma pergunta específica costuma render uma explicação mais útil.','O tutor não substitui a decisão do mestre.'],tela:'assistente',rotulo:'Abrir tutor',requerLogin:true},
+ {titulo:'Crie a atmosfera da mesa',sub:'Música e ajustes finais',texto:'O botão ♫ Música fica no canto inferior direito, inclusive no login. Abra-o para escolher entre três gravações medievais licenciadas, controlar volume e pausar. A reprodução começa somente quando você solicitar.',dicas:['O player mostra autor, licença e fonte das gravações.','Se preferir silêncio, deixe o player pausado. Pronto: sua aventura pode começar!'],tela:'gerador',rotulo:'Começar aventura'}
+];
+let tutorialPasso=0;
+function tutorialMostrarPasso(indice){
+  tutorialPasso=Math.max(0,Math.min(tutorialEtapas.length-1,indice));
+  const etapa=tutorialEtapas[tutorialPasso];
+  $('tutorial-contagem').textContent='Passo '+(tutorialPasso+1)+' de '+tutorialEtapas.length;
+  $('tutorial-progresso').value=tutorialPasso+1;
+  $('tutorial-progresso').max=tutorialEtapas.length;
+  const conteudo=$('tutorial-conteudo');conteudo.replaceChildren();
+  conteudo.append(el('span',etapa.sub,'sobretitulo'),el('h2',etapa.titulo),el('p',etapa.texto));
+  const ul=el('ul');etapa.dicas.forEach(d=>ul.appendChild(el('li',d)));conteudo.append(ul);
+  $('tutorial-anterior').disabled=tutorialPasso===0;
+  $('tutorial-proximo').textContent=tutorialPasso===tutorialEtapas.length-1?'✓ Concluir tutorial':'Próximo capítulo →';
+  $('tutorial-ir').textContent=etapa.rotulo+' ↗';
+  try{localStorage.setItem('mesa-tutorial-etapa',String(tutorialPasso));}catch{}
+}
+$('tutorial-anterior').onclick=()=>tutorialMostrarPasso(tutorialPasso-1);
+$('tutorial-proximo').onclick=()=>{if(tutorialPasso===tutorialEtapas.length-1){mostrar('gerador');return;}tutorialMostrarPasso(tutorialPasso+1);};
+$('tutorial-recomecar').onclick=()=>tutorialMostrarPasso(0);
+$('tutorial-ir').onclick=()=>{
+  const etapa=tutorialEtapas[tutorialPasso];
+  if(etapa.requerLogin&&!eu.logado){aviso('Entre na sua conta primeiro para usar essa ferramenta.');mostrar('conta');return;}
+  mostrar(etapa.tela);
+};
+try{const guardado=Number(localStorage.getItem('mesa-tutorial-etapa'));if(Number.isInteger(guardado))tutorialPasso=Math.max(0,Math.min(tutorialEtapas.length-1,guardado));}catch{}
+tutorialMostrarPasso(tutorialPasso);
+
+// Menu lateral: recolhível no computador e gaveta no celular.
+const preferirMobile=()=>window.matchMedia('(max-width:850px)').matches;
+function menuRecolher(recolher){
+  if(preferirMobile()){menuMobile(false);return;}
+  document.body.classList.toggle('menu-compacto',recolher);
+  $('menu-retrair').textContent=recolher?'›':'‹';
+  $('menu-retrair').setAttribute('aria-expanded',String(!recolher));
+  $('menu-retrair').setAttribute('aria-label',recolher?'Expandir menu lateral':'Recolher menu lateral');
+  $('menu-retrair').title=recolher?'Expandir menu':'Recolher menu';
+  try{localStorage.setItem('mesa-menu-compacto',recolher?'1':'0');}catch{}
+}
+function menuMobile(aberto){
+  const ativo=Boolean(aberto)&&preferirMobile();
+  document.body.classList.toggle('menu-mobile-aberto',ativo);
+  $('menu-fundo').hidden=!ativo;
+  $('menu-abrir-mobile').setAttribute('aria-expanded',String(ativo));
+  $('menu-abrir-mobile').setAttribute('aria-label',ativo?'Fechar menu lateral':'Abrir menu lateral');
+  if(!ativo&&preferirMobile()&&document.activeElement?.closest('#menu-lateral'))$('menu-abrir-mobile').focus();
+}
+$('menu-retrair').onclick=()=>preferirMobile()?menuMobile(false):menuRecolher(!document.body.classList.contains('menu-compacto'));
+$('menu-abrir-mobile').onclick=()=>menuMobile(!document.body.classList.contains('menu-mobile-aberto'));
+$('menu-fundo').onclick=()=>menuMobile(false);
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&document.body.classList.contains('menu-mobile-aberto'))menuMobile(false);});
+window.addEventListener('resize',()=>{if(!preferirMobile())menuMobile(false);});
+try{menuRecolher(localStorage.getItem('mesa-menu-compacto')==='1');}catch{menuRecolher(false);}
 function mostrar(tela) {
+  if(!TELAS.includes(tela))return;
   document.body.classList.toggle('tela-acesso', tela === 'conta');
   TELAS.forEach((t) => { $('v-' + t).hidden = t !== tela; });
-  document.querySelectorAll('#nav button[data-tela]').forEach((b) => b.setAttribute('aria-current', b.dataset.tela === tela));
+  document.querySelectorAll('#nav button[data-tela]').forEach((b) => b.setAttribute('aria-current', b.dataset.tela === tela?'page':'false'));
+  if(tela==='tutorial')tutorialMostrarPasso(tutorialPasso);
+  menuMobile(false);
   aviso('');
   if (tela === 'historico') carregarHistorico();
   if (tela === 'personagens') { carregarAventurasDaFicha().then(carregarPersonagens); }
   if (tela === 'admin') carregarResumo();
 }
-
+$('abrir-tutorial-menu').onclick=()=>mostrar('tutorial');
 function montarNav() {
   const nav = $('nav');
   nav.replaceChildren();
   const itens = [['gerador', '✦', 'Gerador'], ['dados', '◇', 'Dados']];
   if (eu.logado) itens.push(['historico', '▤', 'Histórico'], ['personagens', '♙', 'Personagens'], ['assistente', '✧', 'Tutor D&D']);
+  itens.push(['tutorial','❖','Tutorial']);
   if (eu.papel === 'admin') itens.push(['admin', '⚙', 'Painel']);
   if (!eu.logado) itens.push(['conta', '↪', 'Entrar']);
-  itens.forEach(([t, simbolo, nome]) => { const b = el('button', simbolo + '   ' + nome); b.dataset.tela = t; b.onclick = () => mostrar(t); nav.appendChild(b); });
-  if (eu.logado) {
-    const s = el('button', 'Sair');
-    s.onclick = async () => { await api('/api/logout', 'POST'); await atualizarEu(); mostrar('gerador'); };
-    nav.appendChild(s);
+  itens.forEach(([t,simbolo,nome])=>{
+    const botao=el('button','','menu-item');botao.dataset.tela=t;botao.type='button';
+    botao.title=nome;botao.setAttribute('aria-label',nome);
+    const icone=el('span',simbolo,'menu-item-icone');icone.setAttribute('aria-hidden','true');
+    botao.append(icone,el('span',nome,'menu-item-texto'));
+    botao.onclick=()=>mostrar(t);nav.appendChild(botao);
+  });
+  if(eu.logado){
+    const sair=el('button','','menu-item');sair.type='button';sair.title='Sair';sair.setAttribute('aria-label','Sair');
+    const icone=el('span','↪','menu-item-icone');icone.setAttribute('aria-hidden','true');
+    sair.append(icone,el('span','Sair','menu-item-texto'));
+    sair.onclick=async()=>{await api('/api/logout','POST');await atualizarEu();mostrar('gerador');};
+    nav.appendChild(sair);
   }
 }
-
 function textoInfo() {
   if (!eu.logado) return eu.restantes > 0 ? 'Teste grátis: ' + eu.restantes + ' geração. Crie uma conta para ter mais.' : 'O teste grátis acabou. Crie uma conta para continuar.';
   return eu.restantes === null ? 'Acesso total (administrador).' : 'Gerações restantes hoje: ' + eu.restantes;
