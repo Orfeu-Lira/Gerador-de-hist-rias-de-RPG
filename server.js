@@ -384,7 +384,7 @@ function validarFichaDnd(dados) {
      !dados.evolucao.every(x=>x&&typeof x==='object'&&!Array.isArray(x)&&
        typeof x.nota==='string'&&x.nota.trim().length>0&&x.nota.length<=160&&
        Number.isInteger(x.nivel)&&x.nivel>=1&&x.nivel<=20&&
-       typeof x.data==='string'&&/^\\d{4}-\\d{2}-\\d{2}$/.test(x.data)))) return false;
+       typeof x.data==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x.data)))) return false;
   if (typeof dados.classe !== 'string' || dados.classe.length > 70 ||
       typeof dados.especie !== 'string' || dados.especie.length > 70 ||
       typeof dados.antecedente !== 'string' || dados.antecedente.length > 70 ||
