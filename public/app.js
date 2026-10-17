@@ -626,11 +626,216 @@ $('p-avatar-remover').onclick=async()=>{
     aviso('Avatar removido.',true);
   }catch(e){aviso(e.message);}
 };
+// ---- Ficha em abas: preserva os campos e a compatibilidade com fichas antigas ----
+const secoesFicha=['identidade','atributos','inventario','habilidades','historia'];
+function abrirAbaFicha(nome){
+  if(!secoesFicha.includes(nome))return;
+  for(const secao of secoesFicha){
+    const ativo=secao===nome;
+    $('painel-'+secao).hidden=!ativo;
+    const botao=$('aba-'+secao);
+    botao.classList.toggle('ativa',ativo);
+    botao.setAttribute('aria-selected',String(ativo));
+    botao.tabIndex=ativo?0:-1;
+  }
+}
+for(const nome of secoesFicha){
+  $('aba-'+nome).onclick=()=>abrirAbaFicha(nome);
+  $('aba-'+nome).onkeydown=e=>{
+    if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;
+    e.preventDefault();
+    let pos=secoesFicha.indexOf(nome);
+    if(e.key==='ArrowLeft')pos=(pos+secoesFicha.length-1)%secoesFicha.length;
+    if(e.key==='ArrowRight')pos=(pos+1)%secoesFicha.length;
+    if(e.key==='Home')pos=0;
+    if(e.key==='End')pos=secoesFicha.length-1;
+    abrirAbaFicha(secoesFicha[pos]);$('aba-'+secoesFicha[pos]).focus();
+  };
+}
+const formularioFicha=$('f-personagem');
+function moverPara(secao,elemento){if(elemento)$('painel-'+secao).appendChild(elemento);}
+moverPara('identidade',formularioFicha.querySelector('.avatar-painel'));
+moverPara('identidade',formularioFicha.querySelector('.cenario-ficha'));
+moverPara('identidade',$('p-nome').closest('.grade'));
+moverPara('atributos',$('p-regras-dnd'));
+moverPara('atributos',$('p-perfil-narrativo'));
+moverPara('atributos',$('p-dnd-ressalva'));
+moverPara('inventario',formularioFicha.querySelector('.equipamento-ficha'));
+moverPara('habilidades',$('p-habilidades-secao'));
+moverPara('historia',$('p-evolucao-secao'));
+moverPara('historia',formularioFicha.querySelector('label[for="p-notas"]'));
+moverPara('historia',$('p-notas'));
+formularioFicha.noValidate=true; // As abas ocultas têm campos; a validação será feita na tela correta.
+abrirAbaFicha('identidade');
+
+// --- Inventário persistente e editável ---
+const categoriasInventario=['Arma','Armadura','Consumível','Ferramenta','Exploração','Outros'];
+let inventarioFicha=[],habilidadesFicha=[],evolucaoFicha=[];
+const textoLimitado=(valor,max)=>typeof valor==='string'?valor.trim().slice(0,max):'';
+function normalizarInventario(dados){
+  if(Array.isArray(dados.inventario))
+    return dados.inventario.slice(0,32).filter(x=>x&&typeof x.nome==='string').map(x=>({
+      nome:textoLimitado(x.nome,80),
+      tipo:categoriasInventario.includes(x.tipo)?x.tipo:'Outros',
+      quantidade:Math.max(1,Math.min(99,Number(x.quantidade)||1)),
+      equipado:Boolean(x.equipado),
+      descricao:textoLimitado(x.descricao,120)
+    })).filter(x=>x.nome);
+  return String(dados.equipamentos||'').split('\n').map(x=>x.trim()).filter(Boolean).slice(0,32)
+    .map(nome=>({nome:nome.slice(0,80),tipo:'Outros',quantidade:1,equipado:false,descricao:''}));
+}
+function sincronizarInventario(){
+  // Compatível com fichas anteriores: o texto antigo continua preservado.
+  $('p-equipamentos').value=inventarioFicha.map(x=>x.nome).join('\n').slice(0,1800);
+  $('p-inventario-resumo').textContent=inventarioFicha.length+' itens · '+inventarioFicha.reduce((n,x)=>n+x.quantidade,0)+' unidades · '+inventarioFicha.filter(x=>x.equipado).length+' equipados';
+}
+function pintarInventario(){
+  const lista=$('p-inventario-lista');lista.replaceChildren();
+  if(!inventarioFicha.length)lista.appendChild(el('p','Sua mochila ainda está vazia. Adicione itens ou gere um kit inicial.','suave'));
+  inventarioFicha.forEach((item,i)=>{
+    const card=el('div','','item-ficha');
+    const titulo=el('strong',item.nome),linha=el('div','','item-ficha-linha');
+    const tipo=document.createElement('select');tipo.setAttribute('aria-label','Categoria de '+item.nome);
+    categoriasInventario.forEach(t=>tipo.add(new Option(t,t)));tipo.value=item.tipo;
+    tipo.onchange=()=>{item.tipo=tipo.value;};
+    const quantidade=document.createElement('input');
+    quantidade.type='number';quantidade.min='1';quantidade.max='99';quantidade.value=item.quantidade;
+    quantidade.setAttribute('aria-label','Quantidade de '+item.nome);
+    quantidade.onchange=()=>{item.quantidade=Math.min(99,Math.max(1,Number(quantidade.value)||1));quantidade.value=item.quantidade;sincronizarInventario();};
+    const equipado=document.createElement('label');equipado.className='item-ficha-equipado';
+    const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.checked=item.equipado;
+    checkbox.onchange=()=>{item.equipado=checkbox.checked;sincronizarInventario();};
+    equipado.append(checkbox,document.createTextNode(' Equipado'));
+    const remover=el('button','Remover','link');remover.type='button';remover.onclick=()=>{inventarioFicha.splice(i,1);pintarInventario();};
+    const desc=document.createElement('input');desc.type='text';desc.maxLength=120;
+    desc.placeholder='Observações (opcional)';desc.value=item.descricao;
+    desc.setAttribute('aria-label','Descrição de '+item.nome);desc.oninput=()=>{item.descricao=desc.value;};
+    linha.append(tipo,quantidade,equipado,remover);
+    card.append(titulo,linha,desc);lista.appendChild(card);
+  });
+  sincronizarInventario();
+}
+function adicionarItemFicha(nome,tipo='Outros'){
+  const titulo=textoLimitado(nome,80);
+  if(!titulo){aviso('Informe o nome do item.');return;}
+  if(inventarioFicha.length>=32){aviso('Sua ficha atingiu o limite de 32 tipos de itens.');return;}
+  inventarioFicha.push({nome:titulo,tipo,quantidade:1,equipado:false,descricao:''});
+  $('p-item-nome').value='';pintarInventario();
+}
+$('p-item-adicionar').onclick=()=>adicionarItemFicha($('p-item-nome').value,$('p-item-tipo').value);
+$('p-item-nome').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('p-item-adicionar').click();}};
+const acaoKitOriginal=$('p-gerar-kit').onclick;
+$('p-gerar-kit').onclick=()=>{
+  // O botão antigo atualiza a lista textual; aproveitamos a mesma sugestão confirmada.
+  const anterior=$('p-equipamentos').value;
+  acaoKitOriginal();
+  const novo=$('p-equipamentos').value;
+  if(novo!==anterior){
+    inventarioFicha=normalizarInventario({equipamentos:novo});
+    pintarInventario();
+  }
+};
+
+// --- Habilidades sugeridas como temas, nunca poder concedido automaticamente ---
+const categoriasHabilidade=['Característica','Perícia','Magia','Talento','Narrativa'];
+const temasHabilidades={
+ 'Bárbaro':['Resistência em campo','Intimidação'],
+ 'Bardo':['Performance','Diplomacia'],
+ 'Bruxo':['Pacto e conhecimento oculto','Investigação arcana'],
+ 'Clérigo':['Tradições religiosas','Apoio ao grupo'],
+ 'Druida':['Conhecimento natural','Sobrevivência'],
+ 'Feiticeiro':['Controle narrativo de magia','História da origem mágica'],
+ 'Guerreiro':['Tática de combate','Treinamento com armas'],
+ 'Ladino':['Furtividade','Percepção de armadilhas'],
+ 'Mago':['Pesquisa arcana','Leitura de grimórios'],
+ 'Monge':['Disciplina','Acrobacia'],
+ 'Paladino':['Juramento e valores','Liderança'],
+ 'Patrulheiro':['Rastreamento','Sobrevivência'],
+ 'Capitão':['Comando da tripulação','Navegação'],
+ 'Navegador':['Cartografia','Orientação'],
+ 'Artilheiro':['Manutenção de equipamentos','Precisão'],
+ 'Detetive':['Dedução','Entrevista'],
+ 'Piloto':['Navegação espacial','Manobras'],
+ 'Engenheiro':['Manutenção técnica','Análise de sistemas'],
+ 'Médico':['Primeiros socorros','Diagnóstico']
+};
+function pintarHabilidades(){
+  const lista=$('p-habilidades-lista');lista.replaceChildren();
+  if(!habilidadesFicha.length)lista.appendChild(el('p','Nenhuma habilidade cadastrada. Adicione uma aprovada pelo mestre.','suave'));
+  habilidadesFicha.forEach((h,i)=>{
+    const card=el('div','','item-ficha');
+    const titulo=el('strong',h.nome);
+    const linha=el('div','','item-ficha-linha');
+    const tipo=document.createElement('select');tipo.setAttribute('aria-label','Tipo de '+h.nome);
+    categoriasHabilidade.forEach(t=>tipo.add(new Option(t,t)));tipo.value=h.tipo;
+    tipo.onchange=()=>{h.tipo=tipo.value;};
+    const remover=el('button','Remover','link');remover.type='button';remover.onclick=()=>{habilidadesFicha.splice(i,1);pintarHabilidades();};
+    linha.append(tipo,remover);
+    const desc=document.createElement('textarea');desc.rows=2;desc.maxLength=200;desc.placeholder='Descrição, requisitos, usos ou referência às regras';desc.value=h.descricao;
+    desc.setAttribute('aria-label','Descrição da habilidade '+h.nome);
+    desc.oninput=()=>{h.descricao=desc.value;};
+    card.append(titulo,linha,desc);lista.appendChild(card);
+  });
+}
+$('p-habilidade-adicionar').onclick=()=>{
+  const nome=textoLimitado($('p-habilidade-nome').value,80);
+  if(!nome){aviso('Dê um nome à habilidade.');return;}
+  if(habilidadesFicha.length>=24){aviso('Limite de 24 habilidades por ficha.');return;}
+  habilidadesFicha.push({nome,tipo:$('p-habilidade-tipo').value,descricao:''});
+  $('p-habilidade-nome').value='';pintarHabilidades();
+};
+$('p-habilidade-nome').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('p-habilidade-adicionar').click();}};
+$('p-sugerir-habilidades').onclick=()=>{
+  const nome=fichaNarrativa() ? $('p-especialidade').value : $('p-classe').value;
+  if(!nome){aviso('Selecione antes uma classe ou especialidade na aba Identidade.');abrirAbaFicha('identidade');return;}
+  const sugestoes=temasHabilidades[nome]||['Conhecimento do cenário','Trabalho em equipe'];
+  const disponiveis=sugestoes.filter(x=>!habilidadesFicha.some(y=>y.nome===x));
+  if(!disponiveis.length){aviso('As sugestões já estão na ficha.');return;}
+  if(!confirm('Adicionar temas para revisar com seu mestre? Isso não concede poderes nem proficiências automaticamente.'))return;
+  for(const titulo of disponiveis.slice(0,Math.max(0,24-habilidadesFicha.length))){
+    habilidadesFicha.push({nome:titulo,tipo:'Narrativa',descricao:'Ideia narrativa para discutir com o mestre; efeitos e permissões ainda não definidos.'});
+  }
+  pintarHabilidades();
+};
+
+// --- Diário permanente de conquistas ---
+function pintarEvolucao(){
+  const lista=$('p-evolucao-lista');lista.replaceChildren();
+  if(!evolucaoFicha.length)lista.appendChild(el('p','Nenhuma conquista registrada ainda.','suave'));
+  evolucaoFicha.forEach((e,i)=>{
+    const card=el('div','','evolucao-item');
+    card.append(el('strong','Nível '+e.nivel+' · '+e.data),el('p',e.nota));
+    const remover=el('button','Excluir registro','link');remover.type='button';
+    remover.onclick=()=>{evolucaoFicha.splice(i,1);pintarEvolucao();};
+    card.appendChild(remover);lista.appendChild(card);
+  });
+}
+$('p-evolucao-adicionar').onclick=()=>{
+  const nota=textoLimitado($('p-evolucao-nota').value,160);
+  if(!nota){aviso('Escreva o que aconteceu com o personagem.');return;}
+  if(evolucaoFicha.length>=30){aviso('Limite de 30 registros de evolução por ficha.');return;}
+  evolucaoFicha.push({nota,nivel:fichaNarrativa()?1:Math.min(20,Math.max(1,Number($('p-nivel').value)||1)),data:new Date().toISOString().slice(0,10)});
+  $('p-evolucao-nota').value='';pintarEvolucao();
+};
+$('p-evolucao-nota').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('p-evolucao-adicionar').click();}};
+function restaurarExtrasFicha(d){
+  inventarioFicha=normalizarInventario(d||{});
+  habilidadesFicha=Array.isArray(d?.habilidades)?d.habilidades.slice(0,24).filter(x=>x&&typeof x.nome==='string').map(x=>({
+    nome:textoLimitado(x.nome,80),tipo:categoriasHabilidade.includes(x.tipo)?x.tipo:'Narrativa',descricao:textoLimitado(x.descricao,200)
+  })).filter(x=>x.nome):[];
+  evolucaoFicha=Array.isArray(d?.evolucao)?d.evolucao.slice(0,30).filter(x=>x&&typeof x.nota==='string').map(x=>({
+    nota:textoLimitado(x.nota,160),nivel:Math.max(1,Math.min(20,Number(x.nivel)||1)),
+    data:/^\d{4}-\d{2}-\d{2}$/.test(x.data)?x.data:new Date().toISOString().slice(0,10)
+  })).filter(x=>x.nota):[];
+  pintarInventario();pintarHabilidades();pintarEvolucao();
+}
 function limparFicha(){
   fichaAbertaId=null;
   limparPreviewAvatar();
   atualizarEstadoAvatar();
   $('f-personagem').reset();
+  restaurarExtrasFicha({});
+  abrirAbaFicha('identidade');
   atributosDnd.forEach(([sigla])=>$('at-'+sigla).value='8');
   $('ficha-form-titulo').textContent='Nova personagem';
   $('p-remover').hidden=true;
@@ -658,7 +863,8 @@ async function carregarPersonagens(){
         $('p-antecedente').value=d.antecedente||'';
         $('p-nivel').value=d.nivel||1;
         $('p-notas').value=d.notas||'';
-        $('p-equipamentos').value=d.equipamentos||'';
+        restaurarExtrasFicha(d);
+        abrirAbaFicha('identidade');
         $('p-cenario').value=contextosDnd[d.cenario]?d.cenario:'';
         atualizarContextoDnd();
         $('p-especialidade').value=contextosDnd[d.cenario]?.papeis.includes(d.especialidade)?d.especialidade:'';
@@ -681,15 +887,19 @@ async function carregarPersonagens(){
 $('f-personagem').onsubmit=async ev=>{
   ev.preventDefault();
   const narrativa=fichaNarrativa();
-  if(!$('p-cenario').value){aviso('Escolha primeiro o cenário da personagem.');return;}
-  if(!narrativa && pontosDnd()>27){aviso('Você ultrapassou 27 pontos. Ajuste os atributos.');return;}
-  if(narrativa && !$('p-especialidade').value){aviso('Selecione a especialidade da personagem neste cenário.');return;}
+  if(!$('p-nome').value.trim()){aviso('Informe o nome da personagem.');abrirAbaFicha('identidade');$('p-nome').focus();return;}
+  if(!$('p-cenario').value){aviso('Escolha primeiro o cenário da personagem.');abrirAbaFicha('identidade');return;}
+  if(!narrativa && pontosDnd()>27){aviso('Você ultrapassou 27 pontos. Ajuste os atributos.');abrirAbaFicha('atributos');return;}
+  if(narrativa && !$('p-especialidade').value){aviso('Selecione a especialidade da personagem neste cenário.');abrirAbaFicha('identidade');return;}
   const dados={
     edicao:narrativa?'narrativo':'2024',metodo:narrativa?'livre':'compra27',
     nome:$('p-nome').value.trim(),classe:narrativa?'':$('p-classe').value.trim(),
     especie:narrativa?'':$('p-especie').value.trim(),antecedente:narrativa?'':$('p-antecedente').value.trim(),
     nivel:narrativa?1:Number($('p-nivel').value),notas:$('p-notas').value.trim(),
     equipamentos:$('p-equipamentos').value.trim(),
+    inventario:inventarioFicha.map(x=>({...x})),
+    habilidades:habilidadesFicha.map(x=>({...x})),
+    evolucao:evolucaoFicha.map(x=>({...x})),
     cenario:$('p-cenario').value,especialidade:narrativa?$('p-especialidade').value:'',
     funcao:'',aventuraId:$('p-aventura').value?Number($('p-aventura').value):null
   };
