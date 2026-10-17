@@ -20,11 +20,15 @@ Atualização de 16/10/2026. Implementado somente na branch `feature/mesa-redesi
 - **Sugerir temas** apresenta ideias narrativas contextualizadas pela classe/especialidade, explicitamente **sem conceder poderes, proficiências ou magias**. O mestre valida toda habilidade.
 - Diário de até 30 registros com data, nível no momento e descrição; `dados.evolucao`. Não aumenta atributos nem libera habilidades automaticamente.
 
-## Música folk original
-- Player próximo ao topo do site com botão **Tocar/Pausar**, seleção de **Folk medieval**, **Floresta** ou **Jornada** e controle de volume.
-- Os sons são sintetizados localmente pela Web Audio API com melodia e acordes próprios do Mesa — **não** um arquivo musical de terceiros nem uma gravação profissional. Não há direitos musicais externos ou custo de streaming.
-- A música só começa depois de clicar em Tocar; seleção de clima e volume ficam no armazenamento local do navegador. O áudio prossegue ao navegar entre seções do app enquanto a mesma página permanecer aberta.
-- Nenhum custo de API nem reprodução automática.
+## Música medieval gravada — seleção online com crédito
+- Player no topo com **Tocar/Pausar**, seleção de ambiente e volume persistente. Reproduz áudio real do Wikimedia Commons (requer conexão), sem autoplay e sem cobrança de IA.
+- **Taverna:** "Medieval Story", Frank Schröter — CC BY 4.0 — https://commons.wikimedia.org/wiki/File:Medieval_Story_by_Frank_Schr%C3%B6ter.ogg
+- **Floresta:** "Medieval Dream", Frank Schröter — CC BY 4.0 — https://commons.wikimedia.org/wiki/File:Medieval_Dream_by_Frank_Schr%C3%B6ter.ogg
+- **Jornada:** "Chominciamento de Gioia", gravação Ririkuku — CC BY-SA 4.0 — https://commons.wikimedia.org/wiki/File:Chominciamento_de_Gioia1.ogg
+- Há indicação de autor, música, licença Creative Commons e link à fonte na própria interface. Não foram modificadas as gravações.
+- Arquivos continuam no Wikimedia Commons e são acessados pelo player por meio de URLs de redirecionamento oficial da Wikimedia. É necessário verificar no Preview se os redirecionamentos e a reprodução Ogg funcionam no navegador.
+- Se uma faixa não carregar, a interface indica falha e mantém a opção de abrir a fonte para ouvi-la. Sem reproduzir áudio automaticamente, sem custos de API de música.
+- Se no futuro quisermos hospedar as faixas no próprio Mesa, precisamos preservar os mesmos créditos e condições de licença, incluindo compartilhamento sob mesma licença para modificações de obra CC BY-SA.
 
 ## Segurança e persistência
 - Backend aceita até 32KB nas rotas de salvar fichas; outras rotas JSON mantêm 10KB (exceto avatar).
@@ -39,7 +43,7 @@ Atualização de 16/10/2026. Implementado somente na branch `feature/mesa-redesi
 4. Em **Habilidades**, criar uma habilidade própria, editar sua descrição, usar **Sugerir temas** e salvar; conferir persistência.
 5. Na aba **História**, registrar conquista no diário, editar anotações, salvar e recarregar; conferir persistência.
 6. Testar uma ficha de Piratas e mares: campos narrativos, sugestões pertinentes e **ausência** de cálculos D&D.
-7. Testar **Tocar**, mudar entre Folk, Floresta e Jornada, pausar e controlar volume. Testar silêncio automático antes do primeiro clique.
+7. Testar **Tocar**, mudar entre Taverna, Floresta e Jornada, pausar e controlar volume. Confirmar três gravações reais (não síntese), links de créditos e mensagem de falha caso o Commons fique indisponível. Testar silêncio automático antes do clique.
 8. Testar no celular: abas horizontais flexíveis, inventário e player.
 9. Testar acesso de outra conta (cada ficha pertence ao seu usuário).
 10. Testar funcionalidades anteriores: aventuras, histórico, dados, login, upload de avatar.
