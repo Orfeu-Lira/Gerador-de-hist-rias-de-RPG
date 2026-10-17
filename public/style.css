@@ -245,15 +245,31 @@ body.tela-acesso .menu-legenda,body.tela-acesso .menu-rodape{display:none}
 .evolucao-item{background:#fffaf1;border-left:3px solid #ba8e4b;border-radius:8px;padding:12px 15px}
 .evolucao-item strong{font-size:.86rem;color:#58412c}
 .evolucao-item p{font-size:.85rem;margin:5px 0}
-.musica-ambiente{max-width:1180px;margin:10px auto 0;padding:12px 18px;border:1px solid #c4a26c5b;border-radius:12px;background:#20352f;display:flex;align-items:center;flex-wrap:wrap;gap:12px;color:#f6ebd4;box-shadow:0 5px 22px #050e1225}
-.musica-ambiente-titulo{display:flex;align-items:center;gap:10px;white-space:nowrap;font-size:.87rem}
-.musica-ambiente-titulo span{font-size:1.3rem;color:#e6c586}
-.musica-ambiente-controles{display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:1}
-.musica-ambiente-controles button{border:1px solid #baa072;border-radius:8px;color:#f7ecd5;background:#2c5349;padding:8px 14px;cursor:pointer}
-.musica-ambiente-controles label{font-size:.76rem;color:#dcc6a0}
-.musica-ambiente-controles select{max-width:158px;min-height:36px;padding:5px 8px;background:#fbf1dc;color:#30291e;border-radius:7px}
-.musica-ambiente-controles input[type=range]{width:90px;accent-color:#d1a75c}
-.musica-ambiente .suave{margin:0;font-size:.7rem;color:#dac8ad}
+/* Gaveta de música discreta, disponível também no login. */
+.musica-ambiente{position:fixed;z-index:90;right:clamp(12px,3vw,34px);bottom:clamp(12px,3vw,30px);width:auto;max-width:calc(100vw - 24px);margin:0;padding:0;border:0;background:transparent;box-shadow:none;color:#f6ebd4;display:block}
+.musica-gatilho{display:flex;align-items:center;gap:9px;border:1px solid #d8b97988;background:linear-gradient(145deg,#1e4a40,#102b2b);color:#f4e6c9;box-shadow:0 10px 32px #030f0eca,0 0 0 1px #102c2e;min-height:52px;padding:9px 16px;border-radius:999px;cursor:pointer;font-weight:700;letter-spacing:.01em;transition:transform .2s ease,box-shadow .25s ease,background .2s ease}
+.musica-gatilho:hover{transform:translateY(-3px);box-shadow:0 14px 35px #030f0cbb,0 0 0 1px #e2be7466}
+.musica-gatilho:active{transform:translateY(0) scale(.97)}
+.musica-gatilho-icone{font-size:1.35rem;color:#f0ca83;line-height:1}
+.musica-gatilho-texto{font-size:.84rem}
+.musica-indicador{display:block;width:7px;height:7px;background:#82968b;border-radius:50%;margin-left:3px}
+.musica-indicador.tocando{background:#c6e7ab;box-shadow:0 0 0 4px #c6e7ab19,0 0 12px #c6e7abb8;animation:mesa-pulsar 2.3s ease-in-out infinite}
+@keyframes mesa-pulsar{50%{box-shadow:0 0 0 7px #c6e7ab09,0 0 16px #c6e7abdd}}
+.musica-painel{position:absolute;right:0;bottom:calc(100% + 12px);width:min(360px,calc(100vw - 24px));padding:20px;background:linear-gradient(155deg,#23483d,#102e30);border:1px solid #d8b97977;border-radius:17px;box-shadow:0 22px 56px #020b0bd9;color:#f5ecd8;animation:mesa-abrir-musica .24s cubic-bezier(.2,.75,.3,1) both}
+@keyframes mesa-abrir-musica{from{opacity:0;transform:translateY(9px) scale(.975)}to{opacity:1;transform:translateY(0) scale(1)}}
+.musica-painel-topo{display:flex;align-items:start;justify-content:space-between;gap:12px;margin-bottom:14px}
+.musica-painel-topo .sobretitulo{color:#d6b779;font-size:.66rem}
+.musica-painel-topo h2{font:600 1.03rem/1.4 Cinzel,Georgia,serif;color:#f7e8cb;margin:5px 0 0}
+.musica-fechar{background:#ffffff13;color:#f1e1c3;border:1px solid #ffffff2c;border-radius:9px;min-width:35px;min-height:35px;font-size:1.3rem;line-height:1;cursor:pointer}
+.musica-ambiente-controles{display:grid;grid-template-columns:auto 1fr;gap:11px 12px;align-items:center}
+.musica-ambiente-controles button{grid-column:1 / -1;border:1px solid #baa072;border-radius:9px;color:#f7ecd5;background:#2c5349;padding:10px 14px;cursor:pointer;font-weight:700}
+.musica-ambiente-controles label{font-size:.81rem;color:#e3cfa9}
+.musica-ambiente-controles select{width:100%;max-width:100%;min-width:0;min-height:40px;padding:7px 9px;background:#fbf1dc;color:#30291e;border-radius:8px;border:1px solid #bda16c}
+.musica-ambiente-controles input[type=range]{width:100%;min-width:0;accent-color:#d1a75c}
+.musica-ambiente .suave{margin:15px 0 4px;font-size:.77rem;line-height:1.5;color:#dac8ad}
+.musica-ambiente .musica-creditos{margin:6px 0 0;color:#e1d0ad;font-size:.72rem;line-height:1.45}
+.musica-creditos a{color:#f3dba3;text-decoration:underline;text-underline-offset:2px}
+.musica-creditos a:hover{color:#fff6dd}
 .sr-only{position:absolute;width:1px;height:1px;clip:rect(0,0,0,0);overflow:hidden;white-space:nowrap}
 @media(max-width:640px){
  .ficha-aba{flex:1;min-width:92px}
@@ -264,7 +280,27 @@ body.tela-acesso .menu-legenda,body.tela-acesso .menu-rodape{display:none}
  .musica-ambiente .suave{width:100%}
 }
 
-/* Créditos obrigatórios das gravações Creative Commons */
-.musica-ambiente .musica-creditos{margin:0;color:#e1d0ad;font-size:.72rem;line-height:1.45;width:100%}
-.musica-creditos a{color:#f3dba3;text-decoration:underline;text-underline-offset:2px}
-.musica-creditos a:hover{color:#fff6dd}
+
+/* Microinterações de fantasia: leves, sem alterar a lógica dos formulários. */
+:where(button,.guia-abrir,.personagem-item,.avatar-upload,.dado,a.marca){-webkit-tap-highlight-color:transparent}
+:where(button,.guia-abrir,.personagem-item,.avatar-upload,.dado){transition:transform .2s ease,box-shadow .25s ease,background-color .2s ease,border-color .2s ease,filter .2s ease,opacity .2s ease}
+:where(.principal,.guia-abrir,.dado,.personagem-item,.ficha-aba):not(:disabled):hover{transform:translateY(-2px)}
+:where(.principal,.guia-abrir,.dado,.personagem-item,.ficha-aba):not(:disabled):active{transform:translateY(1px) scale(.985)}
+:where(.principal,.guia-abrir,.ficha-aba,.personagem-item,.dado):focus-visible,
+.musica-ambiente :is(button,select,input):focus-visible,
+:where(input,textarea,select):focus-visible{outline:3px solid #dfb660;outline-offset:3px}
+.folha,.acesso-cartao,.hero-copia{animation:mesa-surgir .4s ease both}
+@keyframes mesa-surgir{from{opacity:.6;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+#v-gerador:not([hidden]),#v-conta:not([hidden]),#v-dados:not([hidden]),#v-historico:not([hidden]),#v-personagens:not([hidden]),#v-assistente:not([hidden]),#v-admin:not([hidden]){animation:mesa-surgir .32s ease both}
+.marca-emblema{transition:transform .35s ease,box-shadow .35s ease}
+.marca:hover .marca-emblema{transform:rotate(-9deg) scale(1.05);box-shadow:0 0 18px #e0ba7040}
+:where(button,.guia-abrir):disabled{transform:none!important;cursor:not-allowed}
+@media(max-width:560px){
+ .musica-ambiente{right:14px;bottom:14px}
+ .musica-painel{max-height:min(75vh,510px);overflow-y:auto}
+ .musica-gatilho{min-height:48px;padding:9px 14px}
+}
+@media(prefers-reduced-motion:reduce){
+ html{scroll-behavior:auto}
+ *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+}
