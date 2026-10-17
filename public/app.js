@@ -401,6 +401,28 @@ const trilhasAmbiente = {
     termos:'Dança medieval com flautas, viela e percussão'
   }
 };
+// Gaveta recolhível de trilha: não bloqueia a navegação nem o login.
+const ambienteGatilho=$('ambiente-menu');
+const ambientePainel=$('ambiente-painel');
+const ambienteFechar=$('ambiente-fechar');
+function ambienteAlternarMenu(aberto,retornarFoco=false){
+  ambientePainel.hidden=!aberto;
+  ambienteGatilho.setAttribute('aria-expanded',String(aberto));
+  ambienteGatilho.setAttribute('aria-label',aberto?'Fechar opções da música ambiente':'Abrir opções da música ambiente');
+  if(!aberto&&retornarFoco)ambienteGatilho.focus();
+}
+ambienteGatilho.onclick=()=>ambienteAlternarMenu(ambientePainel.hidden);
+ambienteFechar.onclick=()=>ambienteAlternarMenu(false,true);
+document.addEventListener('keydown',ev=>{
+  if(ev.key==='Escape'&&!ambientePainel.hidden)ambienteAlternarMenu(false,true);
+});
+document.addEventListener('pointerdown',ev=>{
+  if(!ambientePainel.hidden&&!ev.target.closest('.musica-ambiente'))ambienteAlternarMenu(false);
+});
+function ambienteAtualizarIndicador(){
+  $('ambiente-indicador').classList.toggle('tocando',!ambienteAudio.paused);
+  ambienteGatilho.title=ambienteAudio.paused?'Abrir música ambiente':'Música tocando · abrir controles';
+}
 const ambienteAudio=new Audio();
 ambienteAudio.loop=true;
 ambienteAudio.preload='none';
@@ -416,6 +438,7 @@ function ambienteCreditos(){
 }
 function ambienteParar(){
   ambienteAudio.pause();
+  ambienteAtualizarIndicador();
   $('ambiente-tocar').textContent='▶ Tocar';
   $('ambiente-tocar').setAttribute('aria-pressed','false');
   $('ambiente-estado').textContent='Pausado. Clique em Tocar para continuar.';
@@ -434,6 +457,7 @@ $('ambiente-tocar').onclick=async()=>{
   try{
     ambienteCarregar();
     await ambienteAudio.play();
+    ambienteAtualizarIndicador();
     $('ambiente-tocar').textContent='❚❚ Pausar';
     $('ambiente-tocar').setAttribute('aria-pressed','true');
     $('ambiente-estado').textContent='Tocando: '+trilhasAmbiente[$('ambiente-estilo').value].titulo;
@@ -447,7 +471,7 @@ $('ambiente-estilo').onchange=async()=>{
   const tocando=!ambienteAudio.paused;
   ambienteCarregar();
   if(tocando){
-    try{await ambienteAudio.play();$('ambiente-tocar').textContent='❚❚ Pausar';$('ambiente-tocar').setAttribute('aria-pressed','true');}
+    try{await ambienteAudio.play();ambienteAtualizarIndicador();$('ambiente-tocar').textContent='❚❚ Pausar';$('ambiente-tocar').setAttribute('aria-pressed','true');}
     catch{ambienteParar();$('ambiente-estado').textContent='A faixa selecionada não pôde ser carregada.';}
   } else $('ambiente-estado').textContent='Pronto para tocar: '+trilhasAmbiente[$('ambiente-estilo').value].titulo;
 };
@@ -467,6 +491,7 @@ try{
 }catch{}
 ambienteAudio.volume=Number($('ambiente-volume').value)/100;
 ambienteCreditos();
+ambienteAtualizarIndicador();
 
 // ---- Fichas D&D 5e 2024: atributos-base e compra com 27 pontos ----
 const atributosDnd = [['for','Força'],['des','Destreza'],['con','Constituição'],['int','Inteligência'],['sab','Sabedoria'],['car','Carisma']];
