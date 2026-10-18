@@ -592,6 +592,12 @@ const trilhasAmbiente = {
     fonte:'https://commons.wikimedia.org/wiki/File:Chominciamento_de_Gioia1.ogg',
     audio:'https://commons.wikimedia.org/wiki/Special:Redirect/file/Chominciamento_de_Gioia1.ogg',
     termos:'Dança medieval com flautas, viela e percussão'
+  },
+  frieren:{
+    titulo:'Time Flows Ever Onward',artista:'Evan Call',licenca:'Trilha comercial · reprodução via YouTube',
+    fonte:'https://www.youtube.com/watch?v=2E_qlyy5N-I',
+    youtubeId:'2E_qlyy5N-I',
+    termos:'Trilha original de Frieren — fantasia tranquila'
   }
 };
 // Gaveta recolhível de trilha: não bloqueia a navegação nem o login.
@@ -612,78 +618,108 @@ document.addEventListener('keydown',ev=>{
 document.addEventListener('pointerdown',ev=>{
   if(!ambientePainel.hidden&&!ev.target.closest('.musica-ambiente'))ambienteAlternarMenu(false);
 });
-function ambienteAtualizarIndicador(){
-  $('ambiente-indicador').classList.toggle('tocando',!ambienteAudio.paused);
-  ambienteGatilho.title=ambienteAudio.paused?'Abrir música ambiente':'Música tocando · abrir controles';
-}
 const ambienteAudio=new Audio();
 ambienteAudio.loop=true;
 ambienteAudio.preload='none';
 let ambienteFaixaAtiva=null;
+let ambienteYouTubeAtivo=false;
+const ambienteIframe=$('ambiente-youtube-iframe');
+const ambienteYouTubeArea=$('ambiente-youtube');
+const ambienteEscolhida=()=>trilhasAmbiente[$('ambiente-estilo').value]||trilhasAmbiente.taverna;
+function ambienteAtualizarIndicador(){
+ const tocando=ambienteYouTubeAtivo||!ambienteAudio.paused;
+ $('ambiente-indicador').classList.toggle('tocando',tocando);
+ ambienteGatilho.title=tocando?'Trilha selecionada · abrir controles':'Abrir música ambiente';
+}
 function ambienteCreditos(){
-  const dados=trilhasAmbiente[$('ambiente-estilo').value]||trilhasAmbiente.taverna;
-  const caixa=$('ambiente-creditos');
-  caixa.replaceChildren();
-  caixa.append(document.createTextNode(dados.titulo+' — '+dados.artista+' · '+dados.licenca+' · '));
-  const fonte=el('a','Fonte e licença ↗');fonte.href=dados.fonte;
-  fonte.target='_blank';fonte.rel='noopener noreferrer';
-  caixa.appendChild(fonte);
+ const dados=ambienteEscolhida();
+ const caixa=$('ambiente-creditos');
+ caixa.replaceChildren();
+ caixa.append(document.createTextNode(dados.titulo+' — '+dados.artista+' · '+dados.licenca+' · '));
+ const fonte=el('a',dados.youtubeId?'Abrir no YouTube ↗':'Fonte e licença ↗');
+ fonte.href=dados.fonte;fonte.target='_blank';fonte.rel='noopener noreferrer';
+ caixa.appendChild(fonte);
 }
 function ambienteParar(){
-  ambienteAudio.pause();
-  ambienteAtualizarIndicador();
-  $('ambiente-tocar').textContent='▶ Tocar';
-  $('ambiente-tocar').setAttribute('aria-pressed','false');
-  $('ambiente-estado').textContent='Pausado. Clique em Tocar para continuar.';
+ ambienteAudio.pause();
+ ambienteIframe.removeAttribute('src'); // Descarta o vídeo e interrompe a reprodução.
+ ambienteYouTubeAtivo=false;
+ ambienteAtualizarIndicador();
+ $('ambiente-tocar').textContent='▶ Tocar';
+ $('ambiente-tocar').setAttribute('aria-pressed','false');
+ $('ambiente-estado').textContent='Pausado. Clique em Tocar para continuar.';
 }
 function ambienteCarregar(){
-  const key=$('ambiente-estilo').value;
-  if(ambienteFaixaAtiva===key)return;
-  ambienteAudio.pause();
-  ambienteFaixaAtiva=key;
-  ambienteAudio.src=trilhasAmbiente[key].audio;
+ const key=$('ambiente-estilo').value;
+ if(ambienteFaixaAtiva===key)return;
+ ambienteParar();
+ ambienteFaixaAtiva=key;
+ const dados=ambienteEscolhida();
+ ambienteYouTubeArea.hidden=!dados.youtubeId;
+ if(dados.youtubeId){
+  ambienteAudio.removeAttribute('src');
+ }else{
+  ambienteAudio.src=dados.audio;
   ambienteAudio.load();
-  ambienteCreditos();
+ }
+ ambienteCreditos();
 }
 $('ambiente-tocar').onclick=async()=>{
-  if(!ambienteAudio.paused){ambienteParar();return;}
-  try{
-    ambienteCarregar();
-    await ambienteAudio.play();
-    ambienteAtualizarIndicador();
-    $('ambiente-tocar').textContent='❚❚ Pausar';
-    $('ambiente-tocar').setAttribute('aria-pressed','true');
-    $('ambiente-estado').textContent='Tocando: '+trilhasAmbiente[$('ambiente-estilo').value].titulo;
-  }catch{
-    ambienteParar();
-    $('ambiente-estado').textContent='Não foi possível reproduzir a faixa online. Confira a conexão ou abra a fonte para ouvi-la.';
-  }
+ const dados=ambienteEscolhida();
+ if(dados.youtubeId){
+  if(ambienteYouTubeAtivo){ambienteParar();return;}
+  ambienteAudio.pause();
+  ambienteCarregar();
+  // A música não é copiada ou retransmitida pelo Mesa: o vídeo é servido pelo YouTube.
+  ambienteIframe.src='https://www.youtube-nocookie.com/embed/'+dados.youtubeId+'?autoplay=1&rel=0&playsinline=1';
+  ambienteYouTubeAtivo=true;
+  ambienteAtualizarIndicador();
+  $('ambiente-tocar').textContent='■ Parar vídeo';
+  $('ambiente-tocar').setAttribute('aria-pressed','true');
+  $('ambiente-estado').textContent='YouTube: '+dados.titulo+'. Se necessário, toque em ▶ no vídeo. O volume é controlado pelo player do YouTube.';
+  return;
+ }
+ if(!ambienteAudio.paused){ambienteParar();return;}
+ try{
+  ambienteCarregar();
+  await ambienteAudio.play();
+  ambienteAtualizarIndicador();
+  $('ambiente-tocar').textContent='❚❚ Pausar';
+  $('ambiente-tocar').setAttribute('aria-pressed','true');
+  $('ambiente-estado').textContent='Tocando: '+dados.titulo;
+ }catch{
+  ambienteParar();
+  $('ambiente-estado').textContent='Não foi possível reproduzir a faixa online. Confira a conexão ou abra a fonte para ouvi-la.';
+ }
 };
 $('ambiente-estilo').onchange=async()=>{
-  try{localStorage.setItem('mesa-ambiente-estilo',$('ambiente-estilo').value);}catch{}
-  const tocando=!ambienteAudio.paused;
-  ambienteCarregar();
-  if(tocando){
-    try{await ambienteAudio.play();ambienteAtualizarIndicador();$('ambiente-tocar').textContent='❚❚ Pausar';$('ambiente-tocar').setAttribute('aria-pressed','true');}
-    catch{ambienteParar();$('ambiente-estado').textContent='A faixa selecionada não pôde ser carregada.';}
-  } else $('ambiente-estado').textContent='Pronto para tocar: '+trilhasAmbiente[$('ambiente-estilo').value].titulo;
+ try{localStorage.setItem('mesa-ambiente-estilo',$('ambiente-estilo').value);}catch{}
+ const tocando=ambienteYouTubeAtivo||!ambienteAudio.paused;
+ ambienteFaixaAtiva=null;
+ ambienteParar();
+ ambienteCarregar();
+ if(tocando){
+  $('ambiente-tocar').click();
+ }else{
+  $('ambiente-estado').textContent='Pronto para tocar: '+ambienteEscolhida().titulo;
+ }
 };
 $('ambiente-volume').oninput=()=>{
-  ambienteAudio.volume=Number($('ambiente-volume').value)/100;
-  try{localStorage.setItem('mesa-ambiente-volume',$('ambiente-volume').value);}catch{}
+ ambienteAudio.volume=Number($('ambiente-volume').value)/100;
+ try{localStorage.setItem('mesa-ambiente-volume',$('ambiente-volume').value);}catch{}
 };
 ambienteAudio.onerror=()=>{
-  ambienteParar();
-  $('ambiente-estado').textContent='Falha ao carregar o áudio do Wikimedia Commons. Você pode abrir a fonte no link ao lado.';
+ ambienteParar();
+ $('ambiente-estado').textContent='Falha ao carregar o áudio do Wikimedia Commons. Você pode abrir a fonte no link ao lado.';
 };
 try{
-  const estilo=localStorage.getItem('mesa-ambiente-estilo');
-  if(Object.hasOwn(trilhasAmbiente,estilo))$('ambiente-estilo').value=estilo;
-  const guardado=localStorage.getItem('mesa-ambiente-volume');
-  if(guardado!==null&&Number.isFinite(Number(guardado)))$('ambiente-volume').value=String(Math.min(100,Math.max(0,Number(guardado))));
+ const estilo=localStorage.getItem('mesa-ambiente-estilo');
+ if(Object.hasOwn(trilhasAmbiente,estilo))$('ambiente-estilo').value=estilo;
+ const guardado=localStorage.getItem('mesa-ambiente-volume');
+ if(guardado!==null&&Number.isFinite(Number(guardado)))$('ambiente-volume').value=String(Math.min(100,Math.max(0,Number(guardado))));
 }catch{}
 ambienteAudio.volume=Number($('ambiente-volume').value)/100;
-ambienteCreditos();
+ambienteCarregar();
 ambienteAtualizarIndicador();
 
 // ---- Fichas D&D 5e 2024: atributos-base e compra com 27 pontos ----
