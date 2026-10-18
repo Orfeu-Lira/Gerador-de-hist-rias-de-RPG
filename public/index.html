@@ -61,10 +61,11 @@
       <div class="musica-ambiente-controles">
         <button id="ambiente-tocar" type="button" aria-pressed="false">▶ Tocar</button>
         <label for="ambiente-estilo">Atmosfera</label>
-        <select id="ambiente-estilo"><option value="taverna">Taverna · Medieval Story</option><option value="floresta">Floresta · Medieval Dream</option><option value="jornada">Jornada · Chominciamento de Gioia</option></select>
+        <select id="ambiente-estilo"><option value="taverna">Taverna · Medieval Story</option><option value="floresta">Floresta · Medieval Dream</option><option value="jornada">Jornada · Chominciamento de Gioia</option><option value="frieren">Frieren · Time Flows Ever Onward (YouTube)</option></select>
         <label for="ambiente-volume">Volume</label>
         <input id="ambiente-volume" type="range" min="0" max="100" value="30" step="5" aria-label="Volume da música ambiente">
       </div>
+      <div id="ambiente-youtube" class="musica-youtube" hidden><iframe id="ambiente-youtube-iframe" title="Time Flows Ever Onward — Evan Call (YouTube)" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe><p>Reprodução pelo YouTube. Use os controles do vídeo para ajustar o volume. Se o vídeo não abrir, utilize o link da fonte abaixo.</p></div>
       <p id="ambiente-estado" class="suave" role="status">Músicas medievais reais com licenças Creative Commons. Clique em Tocar para iniciar.</p>
       <p id="ambiente-creditos" class="musica-creditos" aria-live="polite"></p>
     </div>
