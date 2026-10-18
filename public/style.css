@@ -563,3 +563,9 @@ main select,main textarea{max-width:100%;min-width:0}
   .admin-barra-linha{grid-template-columns:minmax(0,.9fr) minmax(0,2fr) 30px}
   .admin-abas button{min-width:0}
 }
+
+/* Vídeo do YouTube para a trilha de Frieren: somente embed oficial. */
+.musica-youtube{margin:14px 0 8px;max-width:100%;overflow:hidden}
+.musica-youtube iframe{display:block;width:100%;aspect-ratio:16/9;height:auto;border:1px solid #d8b97977;border-radius:11px;background:#071b1a}
+.musica-youtube p{color:#dbc9a9;font-size:.74rem;line-height:1.5;margin:8px 0 0}
+.musica-painel{max-height:min(85dvh,780px);overflow-y:auto}
