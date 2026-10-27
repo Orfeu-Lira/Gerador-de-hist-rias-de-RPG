@@ -5,7 +5,7 @@ const session = require('express-session');
 const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
 const { query } = require('./postgres');
-const { gerarAventura } = require('./ia');
+const { gerarAventura, gerarNpc } = require('./ia');
 
 const PRODUCAO = process.env.NODE_ENV === 'production';
 const ORIGEM = (process.env.FRONTEND_ORIGIN || '').replace(/\/+$/, '');
@@ -255,7 +255,7 @@ const modoManutencao=asyncHandler(async(req,res,next)=>{
  if(r.rows[0]?.valor==='true')return res.status(503).json({erro:'Mesa em manutenção temporária. O gerador e o tutor estão pausados.'});
  next();
 });
-app.use(['/api/gerar','/api/dnd/ajuda'],modoManutencao);
+app.use(['/api/gerar','/api/npcs/gerar','/api/dnd/ajuda'],modoManutencao);
 app.post('/api/gerar',asyncHandler(async(req,res) => {
   const {genero,tom,ideia} = req.body || {};
   const jogadores=Number(req.body?.jogadores);
@@ -352,6 +352,56 @@ app.post('/api/musicas',musicaLimite,asyncHandler(async(req,res)=>{
     console.error('Pesquisa musical indisponível:',e.name);
     return res.status(503).json({erro:'Não foi possível pesquisar músicas agora. Tente novamente mais tarde.',buscaGoogle:pesquisaUrl});
   }
+}));
+// NPCs criados com IA: a campanha vinculada deve pertencer à mesma conta.
+// Geração compartilhada com a cota existente (1 visitante, 5 usuário, admin livre).
+app.post('/api/npcs/gerar',asyncHandler(async(req,res)=>{
+ const {genero,tom}=req.body||{},descricao=req.body?.descricao;
+ const aventuraId=req.body?.aventuraId;
+ if(!GENEROS.includes(genero)||!TONS.includes(tom)||typeof descricao!=='string'||descricao.length>1500||
+    (aventuraId!==null&&aventuraId!==undefined&&(!Number.isSafeInteger(Number(aventuraId))||Number(aventuraId)<1)))
+   return res.status(400).json({erro:'Informe um cenário, tom e descrição válidos.'});
+ const u=await atual(req);
+ let contexto='',id=null;
+ if(aventuraId!==null&&aventuraId!==undefined){
+   if(!u)return res.status(401).json({erro:'Entre na sua conta para usar uma aventura salva.'});
+   id=Number(aventuraId);
+   const r=await query('SELECT genero,tom,conteudo FROM public.aventuras WHERE id=$1 AND usuario_id=$2',[id,u.id]);
+   if(!r.rowCount)return res.status(404).json({erro:'Aventura não encontrada na sua conta.'});
+   const a=r.rows[0].conteudo;
+   // Limites de tamanho evitam prompts descontrolados e custos inesperados.
+   contexto=JSON.stringify({genero:r.rows[0].genero,tom:r.rows[0].tom,titulo:a.titulo,gancho:a.gancho,
+     locais:a.locais,npcs:a.npcs,vilao:a.vilao}).slice(0,4500);
+ }
+ if(!descricao.trim()&&!id)return res.status(400).json({erro:'Descreva o NPC ou selecione uma aventura salva.'});
+ const key=quotaKey(req,u),limit=u?5:1,bypass=u?.papel==='admin';
+ if(!bypass){
+   const claimed=await query(
+     'INSERT INTO public.geracoes_limite(identificador,total) VALUES($1,1) ON CONFLICT(identificador) DO UPDATE SET total=public.geracoes_limite.total+1 WHERE public.geracoes_limite.total<$2 RETURNING total',
+     [key,limit]);
+   if(!claimed.rowCount)return res.status(403).json({erro:u?'Você usou todas as gerações de hoje.':'O teste grátis acabou. Crie uma conta para continuar.',codigo:u?'limite_diario':'limite_visitante'});
+ }
+ try{
+   const npc=await gerarNpc({genero,tom,descricao:descricao.trim(),contexto});
+   if(u)await query('INSERT INTO public.mesa_npcs(usuario_id,aventura_id,conteudo) VALUES($1,$2,$3::jsonb)',[u.id,id,JSON.stringify(npc)]);
+   res.json({npc,restantes:await restantes(req,u)});
+ }catch(e){
+   if(!bypass)await query('UPDATE public.geracoes_limite SET total=GREATEST(0,total-1) WHERE identificador=$1',[key]).catch(err=>console.error('Falha ao devolver cota NPC',err.code));
+   if(e.upstreamStatus||['AbortError','TimeoutError'].includes(e.name))
+     return res.status(503).json({erro:'A IA está indisponível no momento. Sua geração não foi consumida.'});
+   throw e;
+ }
+}));
+app.get('/api/npcs',asyncHandler(async(req,res)=>{
+ const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre para ver seus NPCs.'});
+ const r=await query('SELECT id,aventura_id,conteudo,criado_em FROM public.mesa_npcs WHERE usuario_id=$1 ORDER BY id DESC LIMIT 40',[u.id]);
+ res.set('Cache-Control','private, no-store');res.json(r.rows);
+}));
+app.delete('/api/npcs/:id',asyncHandler(async(req,res)=>{
+ const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre para continuar.'});
+ const id=Number(req.params.id);
+ if(!Number.isSafeInteger(id)||id<1)return res.status(400).json({erro:'NPC inválido.'});
+ await query('DELETE FROM public.mesa_npcs WHERE id=$1 AND usuario_id=$2',[id,u.id]);res.json({ok:true});
 }));
 app.get('/api/aventuras',asyncHandler(async(req,res)=>{
   const u=await atual(req);
