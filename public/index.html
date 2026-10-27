@@ -76,7 +76,11 @@
   <!-- Gerador: qualquer visitante vê; o servidor aplica os limites -->
   <section id="v-gerador">
     <div class="hero"><div class="hero-copia"><span class="sobretitulo">✧ O ATELIÊ DE AVENTURAS</span><h1>Grandes histórias <em>começam aqui.</em></h1><p>Transforme uma ideia em uma jornada inesquecível. Escolha o mundo, reúna seu grupo e deixe a imaginação conduzir o próximo capítulo.</p><div class="hero-tracos"><span>✦ Histórias com IA</span><span>✦ Feito para mestres</span><span>✦ Suas aventuras salvas</span></div></div><div class="hero-arte" aria-hidden="true"><span>✧</span></div></div>
-    <div class="secao-intro"><span class="sobretitulo">01 / CRIAÇÃO</span><h2>Crie uma aventura</h2><p>Os primeiros detalhes de uma história extraordinária.</p></div>
+    <div class="secao-intro"><span class="sobretitulo">01 / CRIAÇÃO</span><h2>Gerador de aventuras e NPCs</h2><p>Crie uma história completa ou desenvolva apenas um personagem para a sua campanha.</p></div>
+    <div class="gerador-modos" role="group" aria-label="O que deseja gerar?">
+      <button type="button" id="modo-aventura" aria-pressed="true" class="gerador-modo ativo">✦ Aventura completa</button>
+      <button type="button" id="modo-npc" aria-pressed="false" class="gerador-modo">♙ Apenas NPC</button>
+    </div>
     <form id="f-gerar" class="folha formulario">
       <div class="grade">
         <div><label for="genero">Gênero da aventura</label><select id="genero"></select></div>
@@ -88,6 +92,24 @@
       <p class="suave">Dê à IA uma pista, um mistério ou um lugar para começar.</p>
       <div class="acoes gerador-acoes"><span id="info" class="cota"></span><button class="principal" id="b-gerar" type="submit">✦ Gerar minha aventura <span aria-hidden="true">↗</span></button></div>
     </form>
+    <form id="f-gerar-npc" class="folha formulario" hidden>
+      <div class="npc-intro"><h3>♙ Crie um personagem não jogável</h3><p>Escolha uma aventura sua como referência ou descreva livremente quem deve ser o NPC.</p></div>
+      <label for="npc-origem">Base do NPC</label>
+      <select id="npc-origem"><option value="livre">Descrição livre (sem aventura vinculada)</option></select>
+      <p id="npc-origem-info" class="suave">Para usar aventuras salvas, entre na sua conta do Mesa.</p>
+      <div class="grade">
+        <div><label for="npc-genero">Gênero do mundo</label><select id="npc-genero" required></select></div>
+        <div><label for="npc-tom">Tom da história</label><select id="npc-tom" required></select></div>
+      </div>
+      <label for="npc-descricao">Como esse NPC deve ser? <span class="opcional">(opcional ao escolher uma aventura)</span></label>
+      <textarea id="npc-descricao" maxlength="1500" rows="5" placeholder="Ex.: Uma alquimista misteriosa que mora perto do castelo, esconde um pacto antigo e pode ajudar ou trair o grupo..."></textarea>
+      <p class="suave">Detalhe aparência, personalidade, papel, passado e objetivos, se desejar. O Mesa vai construir apenas um NPC, não outra aventura.</p>
+      <div class="acoes gerador-acoes"><span class="cota">Usa a mesma cota diária de gerações das aventuras.</span><button type="submit" id="b-gerar-npc" class="principal">♙ Gerar meu NPC ↗</button></div>
+    </form>
+    <section id="npc-biblioteca" class="npc-biblioteca" hidden>
+      <div class="secao-intro"><span class="sobretitulo">PERSONAGENS CRIADOS</span><h2>Meus NPCs</h2><p>Seus últimos NPCs ficam salvos na sua conta.</p></div>
+      <div id="npc-biblioteca-lista"></div>
+    </section>
     <div id="saida"></div>
     <div class="como-funciona"><span class="sobretitulo">O PRÓXIMO CAPÍTULO</span><h2>Seu universo em três passos</h2><div class="passos"><article><b>01</b><h3>Escolha o mundo</h3><p>Defina o gênero e a atmosfera.</p></article><article><b>02</b><h3>Compartilhe uma ideia</h3><p>Dê vida à sua inspiração.</p></article><article><b>03</b><h3>Viva a história</h3><p>Receba aventuras, locais e personagens.</p></article></div></div>
   </section>

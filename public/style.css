@@ -643,3 +643,24 @@ main select,main textarea{max-width:100%;min-width:0}
 .mesa-sobre-vibe p{margin:0;font-size:.81rem;line-height:1.75;overflow-wrap:break-word}
 .mesa-sobre-vibe strong{color:#edd5a5;font-weight:700}
 @media(max-width:600px){.mesa-sobre-vibe{margin-top:36px}.mesa-sobre-vibe p{font-size:.76rem}}
+
+/* Gerador dedicado de NPCs */
+.gerador-modos{display:flex;flex-wrap:wrap;gap:11px;margin:0 0 20px}
+.gerador-modo{border:1px solid #c9ac74;border-radius:11px;background:#173f37;color:#f8e8c6;padding:13px 18px;min-height:47px;font-weight:700;cursor:pointer}
+.gerador-modo:hover,.gerador-modo.ativo,.gerador-modo[aria-pressed=true]{background:#e7c891;color:#29473c;border-color:#e9d0a7}
+.npc-intro{margin:0 0 22px}
+.npc-intro h3{font-size:1.17rem;color:#4c3c28;margin:0 0 9px}
+.npc-intro p{margin:0;color:#6a5848;line-height:1.65}
+#f-gerar-npc{max-width:100%}
+#f-gerar-npc>select,#f-gerar-npc>textarea{width:100%;max-width:100%;min-width:0}
+.npc-ficha{margin:22px auto 0;max-width:930px}
+.npc-ficha>.sobretitulo{display:block;margin-bottom:12px}
+.npc-ficha>h2{color:#4d3928;margin-top:0}
+.npc-ficha-campo{padding:13px 0;border-top:1px solid #d9c6a5}
+.npc-ficha-campo h3{font-size:.86rem;letter-spacing:.03em;text-transform:uppercase;color:#8e5d35;margin:0 0 7px}
+.npc-ficha-campo p{color:#453a2d;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+.npc-biblioteca{margin:35px 0 15px}
+.npc-biblioteca-item{display:flex;flex-wrap:wrap;align-items:center;gap:11px;padding:12px 15px;margin:8px 0;border:1px solid #bdac86;border-radius:11px;background:#fff8e8;color:#51412f}
+.npc-biblioteca-item button:first-child{margin-right:auto}
+.npc-biblioteca-item .suave{font-size:.8rem;color:#665845}
+@media(max-width:600px){.gerador-modo{flex:1 1 100%;width:100%}.npc-biblioteca-item{gap:8px}.npc-biblioteca-item button:first-child{flex:1 1 100%}}

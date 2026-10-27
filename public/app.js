@@ -117,6 +117,7 @@ function mostrar(tela) {
   if(tela==='tutorial')tutorialMostrarPasso(tutorialPasso);
   menuMobile(false);
   aviso('');
+  if (tela === 'gerador' && !$('f-gerar-npc').hidden) { carregarOrigensNPC(); if(eu.logado)carregarBibliotecaNPC(); }
   if (tela === 'historico') carregarHistorico();
   if (tela === 'personagens') { carregarAventurasDaFicha().then(carregarPersonagens); }
   if (tela === 'admin') {carregarResumo();notificacoesAtualizar();}
@@ -331,6 +332,108 @@ $('f-gerar').onsubmit = async (ev) => {
     await atualizarEu();
   }
   $('b-gerar').disabled = false;
+};
+
+// ---- Gerador independente de NPCs, a partir de campanhas salvas ou de descrição livre ----
+GENEROS.forEach(g=>$('npc-genero').appendChild(new Option(g,g)));
+TONS.forEach(t=>$('npc-tom').appendChild(new Option(t,t)));
+function modoGeradorNPC(ativar){
+ $('f-gerar').hidden=ativar;
+ $('f-gerar-npc').hidden=!ativar;
+ $('modo-aventura').setAttribute('aria-pressed',String(!ativar));
+ $('modo-npc').setAttribute('aria-pressed',String(ativar));
+ $('modo-aventura').classList.toggle('ativo',!ativar);
+ $('modo-npc').classList.toggle('ativo',ativar);
+ $('saida').replaceChildren();
+ $('npc-biblioteca').hidden=!ativar||!eu.logado;
+ if(ativar){carregarOrigensNPC();if(eu.logado)carregarBibliotecaNPC();}
+}
+$('modo-aventura').onclick=()=>modoGeradorNPC(false);
+$('modo-npc').onclick=()=>modoGeradorNPC(true);
+let aventurasNpcSalvas=[];
+async function carregarOrigensNPC(){
+ const select=$('npc-origem'),anterior=select.value;
+ select.replaceChildren(new Option('Descrição livre (sem aventura vinculada)','livre'));
+ aventurasNpcSalvas=[];
+ if(!eu.logado){
+  $('npc-origem-info').textContent='Entre na sua conta para criar NPCs ligados a aventuras salvas.';
+  return;
+ }
+ try{
+  aventurasNpcSalvas=await api('/api/aventuras');
+  for(const a of aventurasNpcSalvas){
+   select.appendChild(new Option((a.conteudo?.titulo||'Aventura')+' · '+new Date(a.criado_em).toLocaleDateString('pt-BR'),String(a.id)));
+  }
+  if([...select.options].some(o=>o.value===anterior))select.value=anterior;
+  $('npc-origem-info').textContent=aventurasNpcSalvas.length?'O NPC usará os locais, conflitos e personagens dessa aventura como contexto.':'Você ainda não tem aventuras salvas. Pode criar um NPC com descrição livre.';
+ }catch(e){$('npc-origem-info').textContent='Não foi possível carregar suas aventuras: '+e.message;}
+}
+$('npc-origem').onchange=()=>{
+ const a=aventurasNpcSalvas.find(x=>String(x.id)===$('npc-origem').value);
+ if(a){
+  if(GENEROS.includes(a.genero))$('npc-genero').value=a.genero;
+  if(TONS.includes(a.tom))$('npc-tom').value=a.tom;
+ }
+};
+function desenharNPC(npc,alvo){
+ alvo.replaceChildren();
+ const art=el('article','','folha npc-ficha');
+ art.appendChild(el('span','✧ DOSSIÊ DO NPC','sobretitulo'));
+ art.appendChild(el('h2',npc.nome||'NPC sem nome'));
+ const campos=[['Papel na história','papel'],['Aparência','aparencia'],['Personalidade','personalidade'],
+ ['História','historia'],['Objetivo','objetivo'],['Segredo','segredo'],['Vínculo com a aventura','vinculo'],
+ ['Como interpretar','interpretacao'],['Gancho de encontro','gancho']];
+ for(const [titulo,chave] of campos){
+  if(!npc[chave])continue;
+  const bloco=el('section','','npc-ficha-campo');
+  bloco.appendChild(el('h3',titulo));bloco.appendChild(el('p',npc[chave]));
+  art.appendChild(bloco);
+ }
+ const botao=el('button','⧉ Copiar NPC','guia-abrir');botao.type='button';
+ botao.onclick=async()=>{
+  const texto=[npc.nome,...campos.map(([t,k])=>npc[k]?t+': '+npc[k]:'').filter(Boolean)].join('\n\n');
+  try{await navigator.clipboard.writeText(texto);aviso('NPC copiado!',true);}
+  catch{aviso('Não foi possível copiar automaticamente. Selecione o texto da ficha.');}
+ };
+ art.appendChild(botao);alvo.appendChild(art);
+}
+async function carregarBibliotecaNPC(){
+ const lista=$('npc-biblioteca-lista');lista.replaceChildren();
+ if(!eu.logado)return;
+ try{
+  const itens=await api('/api/npcs');
+  if(!itens.length){lista.appendChild(el('p','Nenhum NPC salvo ainda.','suave'));return;}
+  for(const item of itens){
+   const linha=el('article','','npc-biblioteca-item');
+   const titulo=el('button',item.conteudo?.nome||'NPC','guia-abrir');titulo.type='button';
+   titulo.onclick=()=>{desenharNPC(item.conteudo,$('saida'));$('saida').scrollIntoView({behavior:'smooth',block:'start'});};
+   const apagar=el('button','Excluir','apagar');apagar.type='button';
+   apagar.onclick=async()=>{
+    if(!confirm('Excluir este NPC salvo?'))return;
+    try{await api('/api/npcs/'+item.id,'DELETE');await carregarBibliotecaNPC();}
+    catch(e){aviso(e.message);}
+   };
+   linha.append(titulo,el('span',new Date(item.criado_em).toLocaleDateString('pt-BR'),'suave'),apagar);
+   lista.appendChild(linha);
+  }
+ }catch(e){lista.appendChild(el('p','Não foi possível carregar seus NPCs: '+e.message,'suave'));}
+}
+$('f-gerar-npc').onsubmit=async ev=>{
+ ev.preventDefault();
+ const b=$('b-gerar-npc');b.disabled=true;aviso('Criando NPC...');
+ try{
+  const aventuraId=$('npc-origem').value;
+  const descricao=$('npc-descricao').value.trim();
+  if(aventuraId==='livre'&&!descricao){throw new Error('Descreva o NPC ou selecione uma aventura salva.');}
+  const resposta=await api('/api/npcs/gerar','POST',{
+   genero:$('npc-genero').value,tom:$('npc-tom').value,descricao,
+   aventuraId:aventuraId==='livre'?null:Number(aventuraId)
+  });
+  desenharNPC(resposta.npc,$('saida'));
+  if(eu.logado)await carregarBibliotecaNPC();
+  await atualizarEu();aviso('NPC criado com sucesso!',true);
+ }catch(e){aviso(e.message);try{await atualizarEu();}catch{}}
+ finally{b.disabled=false;}
 };
 
 // ---- Dados e tutorial para iniciantes ----
