@@ -629,3 +629,17 @@ main select,main textarea{max-width:100%;min-width:0}
   .musica-ambiente-controles{grid-template-columns:1fr;gap:8px}
   .musica-ambiente-controles button{grid-column:1}
 }
+
+/* Crédito de criação do Mesa, visível em todas as telas. */
+.mesa-sobre-vibe{
+  width:100%;
+  max-width:940px;
+  margin:clamp(36px,5vw,70px) auto 4px;
+  padding:20px clamp(16px,3vw,28px) 4px;
+  border-top:1px solid #d2b77955;
+  text-align:center;
+  color:#d1c4aa;
+}
+.mesa-sobre-vibe p{margin:0;font-size:.81rem;line-height:1.75;overflow-wrap:break-word}
+.mesa-sobre-vibe strong{color:#edd5a5;font-weight:700}
+@media(max-width:600px){.mesa-sobre-vibe{margin-top:36px}.mesa-sobre-vibe p{font-size:.76rem}}
