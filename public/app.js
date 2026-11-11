@@ -108,6 +108,7 @@ window.addEventListener('resize',()=>{if(!preferirMobile())menuMobile(false);});
 try{menuRecolher(localStorage.getItem('mesa-menu-compacto')==='1');}catch{menuRecolher(false);}
 function mostrar(tela) {
   if(!TELAS.includes(tela))return;
+  pararJornada();
   if(!eu.logado&&['historico','personagens','assistente','admin'].includes(tela))tela='conta';
   if(tela==='admin'&&eu.papel!=='admin')tela='gerador';
   estadoNavegacao.gravar('tela',tela);
@@ -247,7 +248,7 @@ async function atualizarEu() {
 }
 
 // ---- Mostrar uma aventura na tela ----
-function desenharAventura(a, alvo) {
+function desenharAventura(a, alvo, aventuraId=null, genero='', tom='') {
   alvo.replaceChildren();
   const f = el('article', '', 'folha aventura');
   f.appendChild(el('h2', a.titulo || 'Aventura'));
@@ -255,63 +256,11 @@ function desenharAventura(a, alvo) {
   if (a.locais && a.locais.length) { f.appendChild(el('h3', 'Locais')); const ul = el('ul'); a.locais.forEach((l) => ul.appendChild(el('li', l))); f.appendChild(ul); }
   if (a.npcs && a.npcs.length) { f.appendChild(el('h3', 'NPCs')); const ul = el('ul'); a.npcs.forEach((n) => ul.appendChild(el('li', n.nome + ': ' + n.descricao))); f.appendChild(ul); }
   if (a.vilao) { f.appendChild(el('h3', 'Vilão')); f.appendChild(el('p', a.vilao)); }
-  if (a.trilha) {
-    f.appendChild(el('h3','Trilha sonora'));
-    f.appendChild(el('p',a.trilha));
-    const musica=el('section','','musica-recomendacao');
-    musica.appendChild(el('p','Busque trilhas para a atmosfera da aventura. Links de busca disponíveis mesmo sem IA ou login.','suave'));
-    // Links são PESQUISAS, não faixas verificadas. Não dependem da API Gemini.
-    const termos=('RPG instrumental ambience playlist '+a.trilha).slice(0,170);
-    const opcoes=el('div','','musica-buscas');
-    for(const [nome,base] of [
-      ['♫ Pesquisar no YouTube','https://www.youtube.com/results?search_query='],
-      ['♫ Pesquisar no Spotify','https://open.spotify.com/search/'],
-      ['⌕ Pesquisar no Google','https://www.google.com/search?q=']
-    ]){
-      const link=el('a',nome,'guia-abrir');
-      link.href=base+encodeURIComponent(termos);
-      link.target='_blank';
-      link.rel='noopener noreferrer';
-      opcoes.appendChild(link);
-    }
-    musica.appendChild(opcoes);
-    musica.appendChild(el('p','Esses botões abrem buscas com termos sugeridos pelo Mesa; não são links de músicas verificadas.','suave'));
-    const botao=el('button','✦ Refinar trilha com pesquisa por IA','guia-abrir');
-    botao.type='button';
-    const resultado=el('div','','musica-links');
-    resultado.setAttribute('aria-live','polite');
-    botao.onclick=async()=>{
-      if(!eu.logado){
-        resultado.replaceChildren(el('p','A pesquisa com IA requer login. Você já pode usar os três links de busca acima.','suave'));
-        return;
-      }
-      botao.disabled=true;
-      resultado.replaceChildren(el('p','Pesquisando playlists com a IA...','suave'));
-      try{
-        const dados=await api('/api/musicas','POST',{estilo:a.trilha,titulo:a.titulo||''});
-        resultado.replaceChildren();
-        if(dados.explicacao)resultado.appendChild(el('p',dados.explicacao));
-        if(Array.isArray(dados.links)&&dados.links.length){
-          const ul=el('ul');
-          for(const item of dados.links){
-            try{
-              const url=new URL(item.url);
-              if(url.protocol!=='https:')continue;
-              const link=el('a',item.titulo||'Abrir resultado musical');
-              link.href=url.href;link.target='_blank';link.rel='noopener noreferrer';
-              const li=el('li');li.appendChild(link);ul.appendChild(li);
-            }catch{}
-          }
-          resultado.appendChild(ul);
-        }
-        if(dados.aviso)resultado.appendChild(el('p',dados.aviso,'suave'));
-      }catch(e){
-        resultado.replaceChildren(el('p',e.message+' Você ainda pode pesquisar pelo YouTube, Spotify ou Google nos links acima.','suave'));
-      }finally{botao.disabled=false;}
-    };
-    musica.append(botao,resultado);
-    f.appendChild(musica);
-  }
+  playerDaHistoria(f,genero,tom,a.trilha||'');
+  if(eu.logado){const b=el('button','✦ Iniciar jornada com personagem','principal');b.type='button';
+    b.onclick=()=>{soloOrigemPreferida=Number(aventuraId)||null;soloTituloPreferido=a.titulo||'';mostrar('solo');};
+    const area=el('div','','jornada-inicio');area.append(b);f.append(area);
+  }else f.append(el('p','Entre na sua conta para iniciar uma campanha com personagem e progresso salvo.','suave'));
   alvo.appendChild(f);
 }
 
@@ -327,7 +276,7 @@ $('f-gerar').onsubmit = async (ev) => {
       genero: $('genero').value, tom: $('tom').value,
       jogadores: Number($('jogadores').value), ideia: $('ideia').value
     });
-    desenharAventura(r.aventura, $('saida'));
+    desenharAventura(r.aventura, $('saida'),r.aventuraId,$('genero').value,$('tom').value);
     await atualizarEu(); aviso('');
   } catch (e) {
     aviso(e.message);
@@ -446,6 +395,15 @@ TONS.forEach(t=>$('solo-tom').appendChild(new Option(t,t)));
 let soloCampanhaId=null;
 let soloOrigens=[];
 let soloOcupado=false;
+let soloOrigemPreferida=null,soloTituloPreferido='',soloPersonagemPreferido=null,soloRetomarFicha=false,soloPersonagens=[];
+$('solo-personagem').onchange=()=>{$('solo-personagem-info').textContent=$('solo-personagem').value?'A ficha orienta o Mestre IA, que não decide as ações do protagonista.':'Use uma ficha já criada ou faça outra.';};
+$('solo-criar-personagem').onclick=()=>{
+ if(!eu.logado){mostrar('conta');return;}
+ soloOrigemPreferida=Number($('solo-aventura').value)||soloOrigemPreferida;
+ soloTituloPreferido=$('solo-titulo-campanha').value;
+ soloRetomarFicha=true;mostrar('personagens');limparFicha();
+ aviso('Salve a nova ficha para voltar à preparação da jornada.');
+};
 function soloEstado(mensagem,erro=false){
  const e=$('solo-alerta');e.textContent=mensagem||'';e.classList.toggle('erro',erro);
 }
@@ -461,10 +419,18 @@ async function soloAtualizarInicio(){
  }
  $('solo-criar').disabled=false;soloEstado('');
  try{
-  const [aventuras,campanhas]=await Promise.all([api('/api/aventuras'),api('/api/solo/campanhas')]);
+  const [aventuras,campanhas,personagens]=await Promise.all([api('/api/aventuras'),api('/api/solo/campanhas'),api('/api/personagens')]);
+  soloPersonagens=personagens;
+  const psel=$('solo-personagem');psel.replaceChildren(new Option('Sem ficha por enquanto',''));
+  for(const p of personagens)psel.add(new Option(p.nome+(p.dados?.classe?' · '+p.dados.classe:''),String(p.id)));
+  if(soloPersonagemPreferido&&personagens.some(p=>Number(p.id)===Number(soloPersonagemPreferido)))psel.value=String(soloPersonagemPreferido);
+  psel.onchange();
   soloOrigens=aventuras;
   for(const a of aventuras)select.appendChild(new Option(a.conteudo?.titulo||'Aventura sem título',String(a.id)));
-  if([...select.options].some(o=>o.value===anterior))select.value=anterior;
+  if(soloOrigemPreferida&&aventuras.some(a=>Number(a.id)===Number(soloOrigemPreferida)))select.value=String(soloOrigemPreferida);
+  else if([...select.options].some(o=>o.value===anterior))select.value=anterior;
+  if(select.value)select.onchange();
+  if(soloTituloPreferido&&!$('solo-titulo-campanha').value.trim())$('solo-titulo-campanha').value=soloTituloPreferido;
   if(!campanhas.length)lista.appendChild(el('p','Você ainda não possui campanhas solo. Crie uma acima!','suave'));
   for(const c of campanhas){
    const linha=el('article','','solo-salva');
@@ -508,10 +474,12 @@ async function soloAbrir(id){
   $('solo-jogo-titulo').textContent=r.campanha.titulo;
   $('solo-mensagens').replaceChildren();
   for(const msg of r.mensagens)soloMensagem(msg.papel,msg.texto,msg.tipo);
+  soloMostrarTrilha(r.campanha.genero,r.campanha.tom);
   $('solo-entrada').hidden=true;$('solo-jogo').hidden=false;
   $('solo-acao').value='';soloFimLista();
  }catch(e){soloEstado(e.message,true);}
 }
+function soloMostrarTrilha(genero,tom,sugestao=''){$('solo-trilha').replaceChildren();playerDaHistoria($('solo-trilha'),genero,tom,sugestao);}
 $('solo-voltar').onclick=()=>{
  if(soloOcupado)return;
  soloAtualizarInicio();
@@ -519,9 +487,11 @@ $('solo-voltar').onclick=()=>{
 $('solo-form').onsubmit=async ev=>{
  ev.preventDefault();if(soloOcupado)return;
  const origem=$('solo-aventura').value,ideiaOriginal=$('solo-ideia').value.trim();
+ const personagem=soloPersonagens.find(p=>String(p.id)===$('solo-personagem').value);
+ const protagonista=personagem?'\n\n[Protagonista: '+JSON.stringify({nome:personagem.nome,classe:personagem.dados?.classe,cenario:personagem.dados?.cenario,nivel:personagem.dados?.nivel,especialidade:personagem.dados?.especialidade,historia:personagem.dados?.notas,habilidades:personagem.dados?.habilidades?.slice(0,8)?.map(h=>h.nome)}).slice(0,650)+'. Respeite a ficha e não controle o protagonista.]':'';
  const nivel=$('solo-experiencia').value,regras=$('solo-regras').value,guia=$('solo-guia').value;
  const preferencias=`[Preferências de jogo: experiência=${nivel}; regras=${regras}; tutorial=${guia}. ${guia==='sim'?'Apresente instruções curtas sobre ações, testes e escolhas durante a primeira cena.':'Não faça tutorial inicial, explique regras quando solicitado.'} Não controle as ações do personagem.]`;
- const ideia=(ideiaOriginal?ideiaOriginal+'\n\n':'')+preferencias;
+ const ideia=((ideiaOriginal?ideiaOriginal+'\n\n':'')+preferencias+protagonista).slice(0,3000);
  if(!origem&&!ideiaOriginal){soloEstado('Selecione uma história do Gerador ou descreva sua ideia.',true);return;}
  soloOcupado=true;$('solo-criar').disabled=true;soloEstado('O Mestre IA está preparando a primeira cena...');
  try{
@@ -538,6 +508,7 @@ async function soloAbrirDepoisCriar(r){
  $('solo-jogo-titulo').textContent=r.campanha.titulo;
  $('solo-mensagens').replaceChildren();
  soloMensagem('mestre',r.mestre,'inicio');
+  soloMostrarTrilha($('solo-genero').value,$('solo-tom').value,soloOrigens.find(a=>String(a.id)===$('solo-aventura').value)?.conteudo?.trilha||'');
  $('solo-entrada').hidden=true;$('solo-jogo').hidden=false;soloEstado('');
  $('solo-acao').value='';soloFimLista();
 }
@@ -587,7 +558,7 @@ async function carregarHistorico() {
     itens.forEach((i) => {
       const linha = el('div', '', 'item');
       const abrir = el('button', (i.conteudo.titulo || 'Aventura') + ' (' + i.criado_em.slice(0, 10) + ')', 'abrir');
-      abrir.onclick = () => desenharAventura(i.conteudo, $('saida-hist'));
+      abrir.onclick = () => {pararJornada();desenharAventura(i.conteudo,$('saida-hist'),i.id,i.genero,i.tom);};
       const apagar = el('button', 'Apagar', 'apagar');
       apagar.onclick = async () => { if (confirm('Apagar esta aventura?')) { await api('/api/aventuras/' + i.id, 'DELETE'); carregarHistorico(); } };
       linha.append(abrir, apagar); lista.appendChild(linha);
@@ -798,156 +769,39 @@ async function carregarAventurasDaFicha(){
   }catch(e){aventurasFicha=[];op.replaceChildren(new Option('Aventuras indisponíveis',''));}
 }
 
-// ---- Trilha ambiente: gravações medievais sob licenças Creative Commons ----
-// As faixas permanecem hospedadas no Wikimedia Commons: crédito obrigatório e link ao original.
-const trilhasAmbiente = {
-  taverna:{
-    titulo:'Medieval Story',artista:'Frank Schröter',licenca:'CC BY 4.0',
-    fonte:'https://commons.wikimedia.org/wiki/File:Medieval_Story_by_Frank_Schr%C3%B6ter.ogg',
-    audio:'https://commons.wikimedia.org/wiki/Special:Redirect/file/Medieval_Story_by_Frank_Schr%C3%B6ter.ogg',
-    termos:'Música medieval alegre, adequada à taverna'
-  },
-  floresta:{
-    titulo:'Medieval Dream',artista:'Frank Schröter',licenca:'CC BY 4.0',
-    fonte:'https://commons.wikimedia.org/wiki/File:Medieval_Dream_by_Frank_Schr%C3%B6ter.ogg',
-    audio:'https://commons.wikimedia.org/wiki/Special:Redirect/file/Medieval_Dream_by_Frank_Schr%C3%B6ter.ogg',
-    termos:'Melodia medieval tranquila para exploração'
-  },
-  jornada:{
-    titulo:'Chominciamento de Gioia',artista:'Ririkuku',licenca:'CC BY-SA 4.0',
-    fonte:'https://commons.wikimedia.org/wiki/File:Chominciamento_de_Gioia1.ogg',
-    audio:'https://commons.wikimedia.org/wiki/Special:Redirect/file/Chominciamento_de_Gioia1.ogg',
-    termos:'Dança medieval com flautas, viela e percussão'
-  },
-  frieren:{
-    titulo:'Time Flows Ever Onward',artista:'Evan Call',licenca:'Trilha comercial · reprodução via YouTube',
-    fonte:'https://www.youtube.com/watch?v=2E_qlyy5N-I',
-    youtubeId:'2E_qlyy5N-I',
-    termos:'Trilha original de Frieren — fantasia tranquila'
-  }
-};
-// Gaveta recolhível de trilha: não bloqueia a navegação nem o login.
-const ambienteGatilho=$('ambiente-menu');
-const ambientePainel=$('ambiente-painel');
-const ambienteFechar=$('ambiente-fechar');
-function ambienteAlternarMenu(aberto,retornarFoco=false){
-  ambientePainel.hidden=!aberto;
-  ambienteGatilho.setAttribute('aria-expanded',String(aberto));
-  ambienteGatilho.setAttribute('aria-label',aberto?'Fechar opções da música ambiente':'Abrir opções da música ambiente');
-  if(!aberto&&retornarFoco)ambienteGatilho.focus();
-}
-ambienteGatilho.onclick=()=>ambienteAlternarMenu(ambientePainel.hidden);
-ambienteFechar.onclick=()=>ambienteAlternarMenu(false,true);
-document.addEventListener('keydown',ev=>{
-  if(ev.key==='Escape'&&!ambientePainel.hidden)ambienteAlternarMenu(false,true);
-});
-document.addEventListener('pointerdown',ev=>{
-  if(!ambientePainel.hidden&&!ev.target.closest('.musica-ambiente'))ambienteAlternarMenu(false);
-});
-const ambienteAudio=new Audio();
-ambienteAudio.loop=true;
-ambienteAudio.preload='none';
-let ambienteFaixaAtiva=null;
-let ambienteYouTubeAtivo=false;
-const ambienteIframe=$('ambiente-youtube-iframe');
-const ambienteYouTubeArea=$('ambiente-youtube');
-const ambienteEscolhida=()=>trilhasAmbiente[$('ambiente-estilo').value]||trilhasAmbiente.taverna;
-function ambienteAtualizarIndicador(){
- const tocando=ambienteYouTubeAtivo||!ambienteAudio.paused;
- $('ambiente-indicador').classList.toggle('tocando',tocando);
- ambienteGatilho.title=tocando?'Trilha selecionada · abrir controles':'Abrir música ambiente';
-}
-function ambienteCreditos(){
- const dados=ambienteEscolhida();
- const caixa=$('ambiente-creditos');
- caixa.replaceChildren();
- caixa.append(document.createTextNode(dados.titulo+' — '+dados.artista+' · '+dados.licenca+' · '));
- const fonte=el('a',dados.youtubeId?'Abrir no YouTube ↗':'Fonte e licença ↗');
- fonte.href=dados.fonte;fonte.target='_blank';fonte.rel='noopener noreferrer';
- caixa.appendChild(fonte);
-}
-function ambienteParar(){
- ambienteAudio.pause();
- ambienteIframe.removeAttribute('src'); // Descarta o vídeo e interrompe a reprodução.
- ambienteYouTubeAtivo=false;
- ambienteAtualizarIndicador();
- $('ambiente-tocar').textContent='▶ Tocar';
- $('ambiente-tocar').setAttribute('aria-pressed','false');
- $('ambiente-estado').textContent='Pausado. Clique em Tocar para continuar.';
-}
-function ambienteCarregar(){
- const key=$('ambiente-estilo').value;
- if(ambienteFaixaAtiva===key)return;
- ambienteParar();
- ambienteFaixaAtiva=key;
- const dados=ambienteEscolhida();
- ambienteYouTubeArea.hidden=!dados.youtubeId;
- if(dados.youtubeId){
-  ambienteAudio.removeAttribute('src');
- }else{
-  ambienteAudio.src=dados.audio;
-  ambienteAudio.load();
- }
- ambienteCreditos();
-}
-$('ambiente-tocar').onclick=async()=>{
- const dados=ambienteEscolhida();
- if(dados.youtubeId){
-  if(ambienteYouTubeAtivo){ambienteParar();return;}
-  ambienteAudio.pause();
-  ambienteCarregar();
-  // A música não é copiada ou retransmitida pelo Mesa: o vídeo é servido pelo YouTube.
-  ambienteIframe.src='https://www.youtube-nocookie.com/embed/'+dados.youtubeId+'?autoplay=1&rel=0&playsinline=1';
-  ambienteYouTubeAtivo=true;
-  ambienteAtualizarIndicador();
-  $('ambiente-tocar').textContent='■ Parar vídeo';
-  $('ambiente-tocar').setAttribute('aria-pressed','true');
-  $('ambiente-estado').textContent='YouTube: '+dados.titulo+'. Se necessário, toque em ▶ no vídeo. O volume é controlado pelo player do YouTube.';
-  return;
- }
- if(!ambienteAudio.paused){ambienteParar();return;}
- try{
-  ambienteCarregar();
-  await ambienteAudio.play();
-  ambienteAtualizarIndicador();
-  $('ambiente-tocar').textContent='❚❚ Pausar';
-  $('ambiente-tocar').setAttribute('aria-pressed','true');
-  $('ambiente-estado').textContent='Tocando: '+dados.titulo;
- }catch{
-  ambienteParar();
-  $('ambiente-estado').textContent='Não foi possível reproduzir a faixa online. Confira a conexão ou abra a fonte para ouvi-la.';
- }
-};
-$('ambiente-estilo').onchange=async()=>{
- try{localStorage.setItem('mesa-ambiente-estilo',$('ambiente-estilo').value);}catch{}
- const tocando=ambienteYouTubeAtivo||!ambienteAudio.paused;
- ambienteFaixaAtiva=null;
- ambienteParar();
- ambienteCarregar();
- if(tocando){
-  $('ambiente-tocar').click();
- }else{
-  $('ambiente-estado').textContent='Pronto para tocar: '+ambienteEscolhida().titulo;
- }
-};
-$('ambiente-volume').oninput=()=>{
- ambienteAudio.volume=Number($('ambiente-volume').value)/100;
- try{localStorage.setItem('mesa-ambiente-volume',$('ambiente-volume').value);}catch{}
-};
-ambienteAudio.onerror=()=>{
- ambienteParar();
- $('ambiente-estado').textContent='Falha ao carregar o áudio do Wikimedia Commons. Você pode abrir a fonte no link ao lado.';
-};
-try{
- const estilo=localStorage.getItem('mesa-ambiente-estilo');
- if(Object.hasOwn(trilhasAmbiente,estilo))$('ambiente-estilo').value=estilo;
- const guardado=localStorage.getItem('mesa-ambiente-volume');
- if(guardado!==null&&Number.isFinite(Number(guardado)))$('ambiente-volume').value=String(Math.min(100,Math.max(0,Number(guardado))));
-}catch{}
-ambienteAudio.volume=Number($('ambiente-volume').value)/100;
-ambienteCarregar();
-ambienteAtualizarIndicador();
 
+const sons={
+ floresta:['Medieval Dream','Frank Schröter','CC BY 4.0','Medieval_Dream_by_Frank_Schr%C3%B6ter.ogg'],
+ taverna:['Medieval Story','Frank Schröter','CC BY 4.0','Medieval_Story_by_Frank_Schr%C3%B6ter.ogg'],
+ jornada:['Chominciamento de Gioia','Ririkuku','CC BY-SA 4.0','Chominciamento_de_Gioia1.ogg']
+};
+const audioJornada=new Audio();audioJornada.loop=true;let tocadorJornada=null;
+function pararJornada(){audioJornada.pause();audioJornada.removeAttribute('src');if(tocadorJornada){tocadorJornada.b.textContent='▶ Tocar';tocadorJornada.s.textContent='Pausado';}tocadorJornada=null;}
+function playerDaHistoria(alvo,genero='',tom='',sugestao=''){
+ const p=el('section','','jornada-player');p.append(el('span','♫ TRILHA DA JORNADA','sobretitulo'),el('h3','Música ambiente'));
+ if(sugestao)p.append(el('p','Atmosfera sugerida: '+sugestao,'jornada-sugestao'));
+ p.append(el('p','Ouça uma das gravações licenciadas que combinam com o cenário. Não são necessariamente as faixas citadas pela IA.','suave'));
+ const linha=el('div','','jornada-controles'),sel=document.createElement('select');sel.setAttribute('aria-label','Música da jornada');
+ for(const [id,v] of Object.entries(sons))sel.add(new Option(v[0]+' · '+v[1],id));
+ const texto=(genero+' '+tom+' '+sugestao).toLowerCase();
+ sel.value=/terror|sombr|florest|investiga|mist[eé]r/.test(texto)?'floresta':/pirata|mar|taverna|leve|alegr/.test(texto)?'taverna':'jornada';
+ const b=el('button','▶ Tocar','guia-abrir');b.type='button';
+ const volume=document.createElement('input');volume.type='range';volume.min=0;volume.max=100;volume.value=30;volume.setAttribute('aria-label','Volume');
+ const estado=el('p','Pronto para tocar','suave'),fonte=el('a','','jornada-fonte');fonte.target='_blank';fonte.rel='noopener noreferrer';
+ const url=(base,v)=>'https://commons.wikimedia.org/wiki/'+base+v[3];
+ const atualiza=()=>{const v=sons[sel.value];fonte.href=url('File:',v);fonte.textContent=v[1]+' · '+v[2]+' · Fonte ↗';};atualiza();
+ sel.onchange=()=>{if(tocadorJornada?.b===b)pararJornada();atualiza();};
+ volume.oninput=()=>{if(tocadorJornada?.b===b)audioJornada.volume=Number(volume.value)/100;};
+ b.onclick=async()=>{
+  if(tocadorJornada?.b===b&&!audioJornada.paused){pararJornada();return;}
+  pararJornada();const v=sons[sel.value];tocadorJornada={b,s:estado};audioJornada.src=url('Special:Redirect/file/',v);audioJornada.volume=Number(volume.value)/100;b.disabled=true;b.textContent='Carregando...';
+  try{await audioJornada.play();b.textContent='❚❚ Pausar';estado.textContent='Tocando '+v[0];}
+  catch{pararJornada();estado.textContent='Não foi possível carregar. Abra a fonte para ouvir.';}
+  finally{b.disabled=false;}
+ };
+ linha.append(sel,b,volume);p.append(linha,estado,fonte);alvo.append(p);
+}
+window.addEventListener('pagehide',pararJornada);
 // ---- Fichas D&D 5e 2024: atributos-base e compra com 27 pontos ----
 const atributosDnd = [['for','Força'],['des','Destreza'],['con','Constituição'],['int','Inteligência'],['sab','Sabedoria'],['car','Carisma']];
 const custosDnd = {8:0,9:1,10:2,11:3,12:4,13:5,14:7,15:9};
@@ -1482,6 +1336,7 @@ $('f-personagem').onsubmit=async ev=>{
     abrirAbaFicha(abaAtual);
     aviso('Ficha salva com sucesso! O personagem continua selecionado.',true);
     if(fotoAEnviar&&fichaAbertaId)await enviarAvatar(fotoAEnviar,fichaAbertaId);
+    if(soloRetomarFicha){soloRetomarFicha=false;soloPersonagemPreferido=fichaAbertaId;mostrar('solo');}
   }catch(e){aviso(e.message);}
   finally{botao.disabled=false;}
 };
