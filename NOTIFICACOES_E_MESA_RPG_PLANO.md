@@ -16,6 +16,27 @@
 - As notificações dependem de conexão com a internet e sessão de administrador válida.
 - Sem chat em tempo real nesta etapa.
 
+## Proposta futura — RPG Solo com Mestre IA
+**Visão:** permitir que pessoas sem um grupo de RPG também possam viver campanhas completas no Mesa. Um jogador controla o próprio personagem e a IA atua como mestre, narrando acontecimentos e reagindo a cada decisão. O modo solo complementa, mas não substitui, o futuro modo multiplayer.
+
+### Experiência desejada
+1. **Iniciar campanha solo:** escolher gênero, tom, cenário, nível de experiência e personagem (incluindo ficha já criada no Mesa).
+2. **Mestre IA narrativo:** apresentar uma cena curta, personagens e um problema inicial. A cada ação escrita pelo jogador, narrar consequências coerentes com o que aconteceu anteriormente.
+3. **Escolhas livres:** o jogador pode escrever qualquer ação razoável; sugestões de ações são opcionais, não menus obrigatórios.
+4. **Regras e dados:** inicialmente modo narrativo, com rolagens feitas pelo jogador e resultados validados pelo servidor. Depois, suporte opcional a sistemas de regras específicos, com mecânicas testadas.
+5. **Memória de campanha:** salvar cenas, decisões, locais, NPCs, missões, estado da ficha e um resumo de longo prazo para manter a continuidade ao reabrir a partida.
+6. **Agência do jogador:** a IA não decide pensamentos, falas ou ações do personagem do usuário; descreve ambiente, NPCs e consequências, indicando claramente quando uma jogada precisa ser resolvida.
+7. **Controles:** pausar, continuar, revisar acontecimentos, reiniciar cena quando apropriado, exportar campanha, excluir dados e controlar limites de custo/uso de IA.
+
+### MVP sugerido
+- Uma campanha solo por conta durante o teste inicial, com histórico persistente e interface de chat em turnos.
+- Resposta da IA com **narração + estado atualizado + indicação de teste de dado (quando necessário)**, estruturada e validada no backend.
+- Resumos periódicos de memória para evitar que a IA esqueça personagens e acontecimentos, e limites explícitos de tamanho de contexto.
+- IA não recebe acesso irrestrito ao banco de dados; alterações de vida, inventário e progresso passam por validação no servidor.
+- Testar consistência, retomada após desconexão, uso em celular/PWA, moderação de conteúdo e custos antes de liberar a todos.
+
+**Status:** ideia aprovada para o planejamento; ainda não implementada nem liberada para jogadores.
+
 ## Roteiro futuro — Mesa como lugar de jogar RPG
 1. **Comunicação:** chat por mesa, canais, notificações push opcionais e avisos por e-mail transacional. Exigir opt-in de notificações e proteção contra spam.
 2. **Mesas e convites:** criar mesas de jogo, papéis de mestre/jogador, convites privados, presença e sessões agendadas.
