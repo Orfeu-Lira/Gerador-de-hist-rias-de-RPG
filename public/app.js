@@ -31,7 +31,7 @@ async function api(url, metodo = 'GET', corpo) {
 function aviso(texto, bom) { const a = $('aviso'); a.textContent = texto || ''; a.className = bom ? 'bom' : ''; }
 
 // ---- Navegação entre telas ----
-const TELAS = ['gerador','dados','historico','personagens','assistente','tutorial','novidades','suporte','instalar','conta','admin'];
+const TELAS = ['gerador','solo','dados','historico','personagens','assistente','tutorial','novidades','suporte','instalar','conta','admin'];
 const estadoNavegacao={
   ler(chave){try{return sessionStorage.getItem('mesa:'+chave);}catch{return null;}},
   gravar(chave,valor){try{if(valor===null)sessionStorage.removeItem('mesa:'+chave);else sessionStorage.setItem('mesa:'+chave,String(valor));}catch{}}
@@ -125,6 +125,7 @@ function mostrar(tela) {
   if (tela === 'novidades') noticiasMesa();
 }
 $('abrir-tutorial-menu').onclick=()=>mostrar('tutorial');
+$('solo-ir-gerador').onclick=()=>mostrar('gerador');
 // Notificações internas do administrador: novos chamados de suporte e feedback.
 let notificacoesAberto=false;
 let notificacoesUltimoCarregamento=0;
@@ -202,7 +203,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&eu.papel=
 function montarNav() {
   const nav = $('nav');
   nav.replaceChildren();
-  const itens = [['gerador', '✦', 'Gerador'], ['dados', '◇', 'Dados']];
+  const itens = [['gerador', '✦', 'Gerador'], ['solo', '✧', 'RPG Solo · IA'], ['dados', '◇', 'Dados']];
   if (eu.logado) itens.push(['historico', '▤', 'Histórico'], ['personagens', '♙', 'Personagens'], ['assistente', '✧', 'Tutor D&D']);
   itens.push(['tutorial','❖','Tutorial'],['novidades','✦','Novidades'],['instalar','⬇','Instalar Mesa']);
   if(eu.logado)itens.push(['suporte','✉','Suporte']);
