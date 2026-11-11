@@ -731,3 +731,14 @@ main select,main textarea{max-width:100%;min-width:0}
 .jornada-controles select{min-height:47px}.jornada-controles input{accent-color:#ac7e42}.jornada-fonte{font-size:.8rem;color:#80522a;text-decoration:underline}
 .jornada-inicio{margin:17px 0 0}#solo-trilha .jornada-player{margin:0 0 16px}.solo-iniciacao button.guia-abrir{justify-self:start}
 @media(max-width:650px){.jornada-controles{grid-template-columns:1fr 1fr}.jornada-controles select{grid-column:1/-1}.jornada-inicio button{width:100%}}
+
+/* RPG Solo: teste de perícia contextual, sem sair da conversa */
+.solo-teste{margin:15px 0 0;padding:15px;border-radius:12px;border:1px solid #c9a66c;background:#fff6df;color:#483725;display:grid;gap:8px}
+.solo-teste>strong{color:#6a4528;font-size:.91rem}
+.solo-teste p{margin:0;line-height:1.55;font-size:.84rem;color:#604d37}
+.solo-teste .solo-teste-formula{font-weight:800;color:#314e43}
+.solo-teste .guia-abrir{justify-self:start;min-height:44px;border-color:#b28c53;background:#27584b;color:#fff2d8}
+.solo-teste .guia-abrir:hover{background:#39715f;color:white}
+.solo-teste .guia-abrir:disabled{opacity:.6}
+.solo-teste-status{font-weight:700}
+@media(max-width:570px){.solo-teste{padding:12px}.solo-teste .guia-abrir{width:100%}}
