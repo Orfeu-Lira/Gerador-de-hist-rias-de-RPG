@@ -456,11 +456,37 @@ $('solo-aventura').onchange=()=>{
   $('solo-ajuda-origem').textContent='Você pode adicionar novas ideias abaixo. A IA usará a história salva como ponto de partida.';
  }else $('solo-ajuda-origem').textContent='Escreva uma ideia própria para iniciar uma campanha nova.';
 };
-function soloMensagem(papel,texto,tipo='acao'){
+function soloMensagem(papel,texto,tipo='acao',teste=null,numero=null){
  const art=el('article','','solo-mensagem '+(papel==='mestre'?'mestre':'jogador'));
  art.appendChild(el('strong',papel==='mestre'?'✧ Mestre IA':tipo==='ajuste'?'✎ Modificação solicitada':'♙ Você'));
  const p=el('p',texto);art.appendChild(p);$('solo-mensagens').appendChild(art);
+ if(papel==='mestre'&&teste&&Number.isInteger(Number(numero)))soloAdicionarTeste(art,teste,Number(numero));
  return art;
+}
+function soloAdicionarTeste(art,teste,numero){
+ if(!teste||![4,6,8,10,12,20,100].includes(Number(teste.dado))||!Number.isInteger(Number(teste.quantidade))||Number(teste.quantidade)<1||Number(teste.quantidade)>5)return;
+ const caixa=el('div','','solo-teste');
+ caixa.appendChild(el('strong','🎲 '+(teste.nome||'Teste solicitado'),'solo-teste-nome'));
+ const formula=Number(teste.quantidade)+'d'+Number(teste.dado)+(Number(teste.modificador)?(teste.modificador>0?'+':'')+teste.modificador:'');
+ caixa.appendChild(el('p','Role '+formula+(Number.isInteger(teste.dificuldade)?' · Dificuldade '+teste.dificuldade:''),'solo-teste-formula'));
+ caixa.appendChild(el('p',teste.explicacao||'O dado indica o resultado de uma ação incerta.','solo-teste-explicacao'));
+ const botao=el('button','🎲 Rolar '+formula,'guia-abrir');botao.type='button';
+ botao.onclick=async()=>{
+  if(soloOcupado||!soloCampanhaId)return;
+  soloOcupado=true;botao.disabled=true;$('solo-enviar').disabled=true;$('solo-voltar').disabled=true;
+  const texto=el('p','Rolando e consultando o Mestre IA...','solo-teste-status');caixa.appendChild(texto);
+  try{
+   const r=await api('/api/solo/campanhas/'+soloCampanhaId+'/turnos','POST',{tipo:'rolagem',numero});
+   const v=r.rolagem;
+   const resultado='🎲 '+v.nome+': '+v.valores.join(' + ')+' ('+v.quantidade+'d'+v.dado+') '+(v.modificador>=0?'+ ':'- ')+Math.abs(v.modificador)+' = '+v.total+(v.passou===null?'':v.passou?' · Sucesso!':' · Falha');
+   soloMensagem('jogador',resultado,'acao');
+   soloMensagem('mestre',r.narracao,'acao',r.teste,r.numero);
+   botao.remove();texto.textContent='Resultado registrado nesta campanha.';
+   soloEstado('');
+  }catch(e){texto.textContent=e.message;botao.disabled=false;soloEstado('Não foi possível concluir a rolagem: '+e.message,true);}
+  finally{soloOcupado=false;$('solo-enviar').disabled=false;$('solo-voltar').disabled=false;soloFimLista();}
+ };
+ caixa.appendChild(botao);art.appendChild(caixa);
 }
 function soloFimLista(){
  const painel=$('solo-mensagens');painel.scrollTop=painel.scrollHeight;
@@ -473,7 +499,8 @@ async function soloAbrir(id){
   soloCampanhaId=r.campanha.id;
   $('solo-jogo-titulo').textContent=r.campanha.titulo;
   $('solo-mensagens').replaceChildren();
-  for(const msg of r.mensagens)soloMensagem(msg.papel,msg.texto,msg.tipo);
+  for(const msg of r.mensagens)soloMensagem(msg.papel,msg.texto,msg.tipo,
+    msg.papel==='mestre'&&Number(msg.numero)===Number(r.campanha.turno_atual)?msg.teste:null,msg.numero);
   soloMostrarTrilha(r.campanha.genero,r.campanha.tom);
   $('solo-entrada').hidden=true;$('solo-jogo').hidden=false;
   $('solo-acao').value='';soloFimLista();
@@ -507,7 +534,7 @@ async function soloAbrirDepoisCriar(r){
  soloCampanhaId=r.campanha.id;
  $('solo-jogo-titulo').textContent=r.campanha.titulo;
  $('solo-mensagens').replaceChildren();
- soloMensagem('mestre',r.mestre,'inicio');
+ soloMensagem('mestre',r.mestre,'inicio',r.teste,0);
   soloMostrarTrilha($('solo-genero').value,$('solo-tom').value,soloOrigens.find(a=>String(a.id)===$('solo-aventura').value)?.conteudo?.trilha||'');
  $('solo-entrada').hidden=true;$('solo-jogo').hidden=false;soloEstado('');
  $('solo-acao').value='';soloFimLista();
@@ -524,6 +551,7 @@ $('solo-acao-form').onsubmit=async ev=>{
  try{
   const r=await api('/api/solo/campanhas/'+soloCampanhaId+'/turnos','POST',{acao,tipo});
   esperando.querySelector('p').textContent=r.narracao;
+  if(r.teste)soloAdicionarTeste(esperando,r.teste,r.numero);
   $('solo-acao').value='';soloEstado('');
  }catch(e){
   rascunho.remove();esperando.remove();soloEstado(e.message,true);
