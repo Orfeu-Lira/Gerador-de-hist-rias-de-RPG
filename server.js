@@ -507,7 +507,7 @@ app.post('/api/solo/campanhas/:id/turnos',asyncHandler(async(req,res)=>{
    await client.query('COMMIT');
    res.json({numero:n,narracao:resposta.narracao});
   }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
- }catch(e){await soloDevolver(quota);console.error('Falha em turno solo',e.name);soloErroIA(res,e);}
+ }catch(e){await soloDevolver(quota);if(e.status===429)return res.status(429).json({erro:e.message});console.error('Falha em turno solo',e.name);soloErroIA(res,e);}
  finally{await query('UPDATE public.mesa_solo_campanhas SET processando=false WHERE id=$1 AND usuario_id=$2 AND turno_atual=$3',[id,u.id,c.turno_atual]).catch(()=>{});}
 }));
 app.delete('/api/solo/campanhas/:id',asyncHandler(async(req,res)=>{
