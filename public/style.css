@@ -716,3 +716,10 @@ main select,main textarea{max-width:100%;min-width:0}
  .solo-apresentacao form .principal{width:100%}
  .solo-jogo-topo{gap:12px}
 }
+
+/* Opções da página inicial e introdução opcional do RPG Solo */
+.gerador-modos .gerador-modo{flex:1 1 190px;white-space:normal;text-align:center}
+.solo-iniciacao{display:grid;gap:10px;min-width:0;border:1px solid #d8c29a;border-radius:12px;padding:18px;background:#fff9eb}
+.solo-iniciacao legend{padding:0 8px;font-weight:700;color:#493a2c}
+.solo-iniciacao label{font-weight:600;color:#493a2c}
+.solo-iniciacao a{color:#765021;text-decoration:underline}
