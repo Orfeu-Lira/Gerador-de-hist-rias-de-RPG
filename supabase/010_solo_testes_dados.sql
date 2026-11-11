@@ -1,0 +1,2 @@
+ALTER TABLE public.mesa_solo_mensagens ADD COLUMN IF NOT EXISTS teste jsonb DEFAULT NULL;
+COMMENT ON COLUMN public.mesa_solo_mensagens.teste IS 'Structured optional dice test requested by the AI game master; validated by the backend.';
