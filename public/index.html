@@ -46,30 +46,6 @@
       <p class="notificacoes-legenda">Avisos dentro do Mesa enquanto você estiver conectado. E-mails e notificações do sistema ficam para uma próxima etapa.</p>
     </div>
   </div>
-  <!-- Painel de trilha sonora flutuante: disponível inclusive no login. -->
-  <section class="musica-ambiente" aria-label="Trilha ambiente do Mesa">
-    <button class="musica-gatilho" id="ambiente-menu" type="button" aria-expanded="false" aria-controls="ambiente-painel" aria-label="Abrir opções da música ambiente">
-      <span class="musica-gatilho-icone" aria-hidden="true">♫</span>
-      <span class="musica-gatilho-texto">Música</span>
-      <span class="musica-indicador" id="ambiente-indicador" aria-hidden="true"></span>
-    </button>
-    <div class="musica-painel" id="ambiente-painel" hidden>
-      <div class="musica-painel-topo">
-        <div><span class="sobretitulo">TRILHA SONORA</span><h2>Melodias da Taverna</h2></div>
-        <button id="ambiente-fechar" class="musica-fechar" type="button" aria-label="Fechar controles de música">×</button>
-      </div>
-      <div class="musica-ambiente-controles">
-        <button id="ambiente-tocar" type="button" aria-pressed="false">▶ Tocar</button>
-        <label for="ambiente-estilo">Atmosfera</label>
-        <select id="ambiente-estilo"><option value="taverna">Taverna · Medieval Story</option><option value="floresta">Floresta · Medieval Dream</option><option value="jornada">Jornada · Chominciamento de Gioia</option><option value="frieren">Frieren · Time Flows Ever Onward (YouTube)</option></select>
-        <label for="ambiente-volume">Volume</label>
-        <input id="ambiente-volume" type="range" min="0" max="100" value="30" step="5" aria-label="Volume da música ambiente">
-      </div>
-      <div id="ambiente-youtube" class="musica-youtube" hidden><iframe id="ambiente-youtube-iframe" title="Time Flows Ever Onward — Evan Call (YouTube)" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe><p>Reprodução pelo YouTube. Use os controles do vídeo para ajustar o volume. Se o vídeo não abrir, utilize o link da fonte abaixo.</p></div>
-      <p id="ambiente-estado" class="suave" role="status">Músicas medievais reais com licenças Creative Commons. Clique em Tocar para iniciar.</p>
-      <p id="ambiente-creditos" class="musica-creditos" aria-live="polite"></p>
-    </div>
-  </section>
   <div id="aviso-publico" role="status" hidden></div>
   <p id="aviso" role="status"></p>
 
@@ -147,6 +123,10 @@
           <select id="solo-guia"><option value="sim">Sim, me ensine enquanto jogo</option><option value="nao">Não, quero começar direto</option></select>
           <p class="suave">Você não precisa aprender D&amp;D para jogar solo. <a href="/?tela=tutorial" target="_blank" rel="noopener noreferrer">Abrir o tutorial do Mesa em outra aba ↗</a></p>
         </fieldset>
+        <fieldset class="solo-iniciacao"><legend>Protagonista da jornada</legend>
+          <label for="solo-personagem">Escolher personagem</label><select id="solo-personagem"><option value="">Sem ficha por enquanto</option></select>
+          <p id="solo-personagem-info" class="suave">Use uma ficha salva ou crie outra para esta história.</p>
+          <button type="button" id="solo-criar-personagem" class="guia-abrir">+ Criar personagem para esta jornada</button></fieldset>
         <label for="solo-ideia">Minha ideia ou modificações da história</label>
         <textarea id="solo-ideia" maxlength="3000" rows="5" placeholder="Descreva onde começa, quem é seu personagem e o que gostaria de viver. Se escolher uma aventura salva, use este espaço para personalizá-la."></textarea>
         <p class="suave">O Mestre IA não controla seu personagem. Você escreve suas ações e pode mudar elementos da história ao longo da campanha.</p>
@@ -160,6 +140,7 @@
         <button id="solo-voltar" type="button" class="guia-abrir">← Minhas campanhas</button>
         <div><span class="sobretitulo">CAMPANHA SOLO</span><h2 id="solo-jogo-titulo"></h2></div>
       </div>
+      <div id="solo-trilha"></div>
       <div id="solo-mensagens" class="solo-mensagens" role="log" aria-label="Narração e ações da campanha" aria-live="polite"></div>
       <form id="solo-acao-form" class="folha solo-compositor">
         <label for="solo-tipo">O que deseja fazer?</label>
