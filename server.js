@@ -485,7 +485,9 @@ app.post('/api/solo/campanhas/:id/turnos',asyncHandler(async(req,res)=>{
  const id=soloId(req.params.id);
  const tipo=req.body?.tipo,rolando=tipo==='rolagem',acao=req.body?.acao;
  const numeroTeste=Number(req.body?.numero);
- if(!id||rolando?(!id||!Number.isSafeInteger(numeroTeste)||numeroTeste<0):(!id||typeof acao!=='string'||!acao.trim()||acao.length>1600||!['acao','ajuste'].includes(tipo)))
+ if(!id||(rolando
+     ? !Number.isSafeInteger(numeroTeste)||numeroTeste<0
+     : typeof acao!=='string'||!acao.trim()||acao.length>1600||!['acao','ajuste'].includes(tipo)))
   return res.status(400).json({erro:'Informe uma ação, modificação ou solicitação de rolagem válida.'});
  // Evita turnos concorrentes na mesma campanha; recupera locks de funções expiradas.
  const claim=await query(
