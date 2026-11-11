@@ -126,7 +126,7 @@ function mostrar(tela) {
   if (tela === 'novidades') noticiasMesa();
 }
 $('abrir-tutorial-menu').onclick=()=>mostrar('tutorial');
-$('solo-ir-gerador').onclick=()=>mostrar('gerador');
+$('solo-ir-gerador')?.addEventListener('click',()=>mostrar('gerador'));
 // Notificações internas do administrador: novos chamados de suporte e feedback.
 let notificacoesAberto=false;
 let notificacoesUltimoCarregamento=0;
@@ -350,6 +350,7 @@ function modoGeradorNPC(ativar){
  $('npc-biblioteca').hidden=!ativar||!eu.logado;
  if(ativar){carregarOrigensNPC();if(eu.logado)carregarBibliotecaNPC();}
 }
+$('modo-solo').onclick=()=>mostrar('solo');
 $('modo-aventura').onclick=()=>modoGeradorNPC(false);
 $('modo-npc').onclick=()=>modoGeradorNPC(true);
 let aventurasNpcSalvas=[];
@@ -517,8 +518,11 @@ $('solo-voltar').onclick=()=>{
 };
 $('solo-form').onsubmit=async ev=>{
  ev.preventDefault();if(soloOcupado)return;
- const origem=$('solo-aventura').value,ideia=$('solo-ideia').value.trim();
- if(!origem&&!ideia){soloEstado('Selecione uma história do Gerador ou descreva sua ideia.',true);return;}
+ const origem=$('solo-aventura').value,ideiaOriginal=$('solo-ideia').value.trim();
+ const nivel=$('solo-experiencia').value,regras=$('solo-regras').value,guia=$('solo-guia').value;
+ const preferencias=`[Preferências de jogo: experiência=${nivel}; regras=${regras}; tutorial=${guia}. ${guia==='sim'?'Apresente instruções curtas sobre ações, testes e escolhas durante a primeira cena.':'Não faça tutorial inicial, explique regras quando solicitado.'} Não controle as ações do personagem.]`;
+ const ideia=(ideiaOriginal?ideiaOriginal+'\n\n':'')+preferencias;
+ if(!origem&&!ideiaOriginal){soloEstado('Selecione uma história do Gerador ou descreva sua ideia.',true);return;}
  soloOcupado=true;$('solo-criar').disabled=true;soloEstado('O Mestre IA está preparando a primeira cena...');
  try{
   const r=await api('/api/solo/campanhas','POST',{
@@ -1789,8 +1793,9 @@ atualizarEu().then(() => {
   if (new URL(location.href).searchParams.has('reset_token')) {
     abrirFormularioConta('f-redefinir'); mostrar('conta');
   } else {
+    const pedida=new URL(location.href).searchParams.get('tela');
     const anterior=estadoNavegacao.ler('tela');
-    mostrar(TELAS.includes(anterior)?anterior:'gerador');
+    mostrar(TELAS.includes(pedida)?pedida:TELAS.includes(anterior)?anterior:'gerador');
   }
 }).catch((e) => {
   // Um erro de rede/banco na inicialização não significa que o usuário saiu.
