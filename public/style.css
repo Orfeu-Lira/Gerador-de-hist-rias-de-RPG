@@ -664,3 +664,17 @@ main select,main textarea{max-width:100%;min-width:0}
 .npc-biblioteca-item button:first-child{margin-right:auto}
 .npc-biblioteca-item .suave{font-size:.8rem;color:#665845}
 @media(max-width:600px){.gerador-modo{flex:1 1 100%;width:100%}.npc-biblioteca-item{gap:8px}.npc-biblioteca-item button:first-child{flex:1 1 100%}}
+
+/* RPG Solo: segunda ferramenta do menu, independente do gerador de aventuras. */
+.solo-cabecalho{max-width:900px}
+.solo-apresentacao{max-width:1000px;margin:0 auto;padding:clamp(22px,3.5vw,38px)}
+.solo-apresentacao>h2{font:700 clamp(1.3rem,2.6vw,2rem)/1.35 Cinzel,Georgia,serif;color:#473727;margin:14px 0}
+.solo-apresentacao>p{line-height:1.78;color:#594b3a;max-width:850px}
+.solo-selo{display:inline-block;color:#66491f;background:#f5dfae;border:1px solid #cda862;border-radius:999px;padding:7px 12px;letter-spacing:.07em;font-size:.69rem;font-weight:800}
+.solo-recursos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:27px 0}
+.solo-recursos article{min-width:0;background:#fff9e9;border:1px solid #dbc6a4;border-radius:12px;padding:19px}
+.solo-recursos article>span{font-size:1.8rem;color:#966f35}
+.solo-recursos h3{font-size:1rem;color:#513e2e;margin:10px 0}
+.solo-recursos p{font-size:.87rem;line-height:1.65;color:#66533e;margin:0}
+.solo-apresentacao .solo-aviso{border-left:4px solid #ad8748;background:#fff3d9;padding:13px 17px;border-radius:7px;color:#674b2b;margin:25px 0}
+@media(max-width:800px){.solo-recursos{grid-template-columns:minmax(0,1fr)}.solo-recursos article{padding:16px}}
