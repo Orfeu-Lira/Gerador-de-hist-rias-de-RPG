@@ -255,7 +255,10 @@ const modoManutencao=asyncHandler(async(req,res,next)=>{
  if(r.rows[0]?.valor==='true')return res.status(503).json({erro:'Mesa em manutenção temporária. O gerador e o tutor estão pausados.'});
  next();
 });
-app.use(['/api/gerar','/api/npcs/gerar','/api/solo/campanhas','/api/solo/campanhas/:id/turnos','/api/dnd/ajuda'],modoManutencao);
+app.use(['/api/gerar','/api/npcs/gerar','/api/dnd/ajuda'],modoManutencao);
+// Manutenção bloqueia somente novas narrações, não consultas e exclusões de campanhas salvas.
+app.post('/api/solo/campanhas',modoManutencao);
+app.post('/api/solo/campanhas/:id/turnos',modoManutencao);
 app.post('/api/gerar',asyncHandler(async(req,res) => {
   const {genero,tom,ideia} = req.body || {};
   const jogadores=Number(req.body?.jogadores);
