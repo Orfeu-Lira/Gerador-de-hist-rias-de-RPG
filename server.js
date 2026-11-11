@@ -277,9 +277,10 @@ app.post('/api/gerar',asyncHandler(async(req,res) => {
   }
   try {
     const aventura=await gerarAventura({genero,tom,jogadores,ideia:typeof ideia==='string'?ideia.trim().slice(0,200):''});
-    if (u) await query('INSERT INTO public.aventuras(usuario_id,genero,tom,jogadores,conteudo) VALUES($1,$2,$3,$4,$5::jsonb)',
-      [u.id,genero,tom,jogadores,JSON.stringify(aventura)]);
-    res.json({aventura,restantes:await restantes(req,u)});
+    let aventuraId=null;
+    if(u){const salvo=await query('INSERT INTO public.aventuras(usuario_id,genero,tom,jogadores,conteudo) VALUES($1,$2,$3,$4,$5::jsonb) RETURNING id',
+      [u.id,genero,tom,jogadores,JSON.stringify(aventura)]);aventuraId=salvo.rows[0].id;}
+    res.json({aventura,aventuraId,restantes:await restantes(req,u)});
   } catch(e) {
     if (!bypass) await query('UPDATE public.geracoes_limite SET total=GREATEST(0,total-1) WHERE identificador=$1',[key]).catch(err=>console.error('Falha ao devolver cota',err.code));
     if (e.upstreamStatus || e.name === 'AbortError') {
