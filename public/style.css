@@ -723,3 +723,11 @@ main select,main textarea{max-width:100%;min-width:0}
 .solo-iniciacao legend{padding:0 8px;font-weight:700;color:#493a2c}
 .solo-iniciacao label{font-weight:600;color:#493a2c}
 .solo-iniciacao a{color:#765021;text-decoration:underline}
+
+.jornada-player{background:#fff9e9;color:#423525;border:1px solid #dac59f;border-radius:12px;padding:19px;margin:20px 0}
+.jornada-player h3{margin:8px 0;color:#59422a}.jornada-player .sobretitulo{color:#986c32}
+.jornada-sugestao{color:#5e4930;font-size:.9rem}.jornada-player .suave{color:#71614d}
+.jornada-controles{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(90px,.4fr);gap:12px;align-items:center;margin:13px 0}
+.jornada-controles select{min-height:47px}.jornada-controles input{accent-color:#ac7e42}.jornada-fonte{font-size:.8rem;color:#80522a;text-decoration:underline}
+.jornada-inicio{margin:17px 0 0}#solo-trilha .jornada-player{margin:0 0 16px}.solo-iniciacao button.guia-abrir{justify-self:start}
+@media(max-width:650px){.jornada-controles{grid-template-columns:1fr 1fr}.jornada-controles select{grid-column:1/-1}.jornada-inicio button{width:100%}}
