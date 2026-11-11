@@ -80,6 +80,7 @@
     <div class="gerador-modos" role="group" aria-label="O que deseja gerar?">
       <button type="button" id="modo-aventura" aria-pressed="true" class="gerador-modo ativo">✦ Aventura completa</button>
       <button type="button" id="modo-npc" aria-pressed="false" class="gerador-modo">♙ Apenas NPC</button>
+      <button type="button" id="modo-solo" class="gerador-modo">✧ RPG Solo · Mestre IA</button>
     </div>
     <form id="f-gerar" class="folha formulario">
       <div class="grade">
@@ -136,6 +137,16 @@
           <div><label for="solo-genero">Gênero</label><select id="solo-genero" required></select></div>
           <div><label for="solo-tom">Tom</label><select id="solo-tom" required></select></div>
         </div>
+        <fieldset class="solo-iniciacao">
+          <legend>Antes de começar: conte um pouco sobre você</legend>
+          <label for="solo-experiencia">1. Há quanto tempo você joga RPG?</label>
+          <select id="solo-experiencia"><option value="primeira vez">É minha primeira vez</option><option value="iniciante">Comecei recentemente</option><option value="experiente">Já jogo há algum tempo</option></select>
+          <label for="solo-regras">2. Você já conhece as regras de RPG?</label>
+          <select id="solo-regras"><option value="nao">Não, preciso de explicações</option><option value="basico">Conheço o básico</option><option value="sim">Sim, conheço bem</option></select>
+          <label for="solo-guia">3. Quer um pequeno tutorial durante a primeira cena?</label>
+          <select id="solo-guia"><option value="sim">Sim, me ensine enquanto jogo</option><option value="nao">Não, quero começar direto</option></select>
+          <p class="suave">Você não precisa aprender D&amp;D para jogar solo. <a href="/?tela=tutorial" target="_blank" rel="noopener noreferrer">Abrir o tutorial do Mesa em outra aba ↗</a></p>
+        </fieldset>
         <label for="solo-ideia">Minha ideia ou modificações da história</label>
         <textarea id="solo-ideia" maxlength="3000" rows="5" placeholder="Descreva onde começa, quem é seu personagem e o que gostaria de viver. Se escolher uma aventura salva, use este espaço para personalizá-la."></textarea>
         <p class="suave">O Mestre IA não controla seu personagem. Você escreve suas ações e pode mudar elementos da história ao longo da campanha.</p>
