@@ -445,7 +445,7 @@ app.get('/api/solo/campanhas/:id',asyncHandler(async(req,res)=>{
  const id=soloId(req.params.id);if(!id)return res.status(400).json({erro:'Campanha inválida.'});
  const r=await query('SELECT id,titulo,genero,tom,premissa,aventura_id,turno_atual,atualizado_em FROM public.mesa_solo_campanhas WHERE id=$1 AND usuario_id=$2',[id,u.id]);
  if(!r.rowCount)return res.status(404).json({erro:'Campanha não encontrada.'});
- const m=await query('SELECT id,numero,papel,tipo,texto,criado_em FROM public.mesa_solo_mensagens WHERE campanha_id=$1 ORDER BY numero ASC,CASE WHEN papel=\'jogador\' THEN 0 ELSE 1 END ASC',[id]);
+ const m=await query('SELECT id,numero,papel,tipo,texto,teste,criado_em FROM public.mesa_solo_mensagens WHERE campanha_id=$1 ORDER BY numero ASC,CASE WHEN papel=\'jogador\' THEN 0 ELSE 1 END ASC',[id]);
  res.set('Cache-Control','private, no-store').json({campanha:r.rows[0],mensagens:m.rows});
 }));
 app.post('/api/solo/campanhas',asyncHandler(async(req,res)=>{
@@ -474,18 +474,19 @@ app.post('/api/solo/campanhas',asyncHandler(async(req,res)=>{
    await client.query('BEGIN');
    const r=await client.query('INSERT INTO public.mesa_solo_campanhas(usuario_id,aventura_id,titulo,genero,tom,premissa,resumo) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id,titulo,turno_atual',[u.id,aventuraId,titulo.trim(),genero,tom,premissa,resposta.resumo]);
    campanha=r.rows[0];
-   await client.query("INSERT INTO public.mesa_solo_mensagens(campanha_id,numero,papel,tipo,texto) VALUES($1,0,'mestre','inicio',$2)",[campanha.id,resposta.narracao]);
+   await client.query("INSERT INTO public.mesa_solo_mensagens(campanha_id,numero,papel,tipo,texto,teste) VALUES($1,0,'mestre','inicio',$2,$3::jsonb)",[campanha.id,resposta.narracao,JSON.stringify(resposta.teste)]);
    await client.query('COMMIT');
   }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
-  res.status(201).json({campanha,mestre:resposta.narracao});
+  res.status(201).json({campanha,mestre:resposta.narracao,teste:resposta.teste});
  }catch(e){await soloDevolver(quota);console.error('Falha ao iniciar solo',e.name);soloErroIA(res,e);}
 }));
 app.post('/api/solo/campanhas/:id/turnos',asyncHandler(async(req,res)=>{
  const u=await soloRequerConta(req,res);if(!u)return;
  const id=soloId(req.params.id);
- const acao=req.body?.acao,tipo=req.body?.tipo;
- if(!id||typeof acao!=='string'||!acao.trim()||acao.length>1600||!['acao','ajuste'].includes(tipo))
-  return res.status(400).json({erro:'Informe uma ação ou modificação de até 1600 caracteres.'});
+ const tipo=req.body?.tipo,rolando=tipo==='rolagem',acao=req.body?.acao;
+ const numeroTeste=Number(req.body?.numero);
+ if(!id||rolando?(!id||!Number.isSafeInteger(numeroTeste)||numeroTeste<0):(!id||typeof acao!=='string'||!acao.trim()||acao.length>1600||!['acao','ajuste'].includes(tipo)))
+  return res.status(400).json({erro:'Informe uma ação, modificação ou solicitação de rolagem válida.'});
  // Evita turnos concorrentes na mesma campanha; recupera locks de funções expiradas.
  const claim=await query(
  "UPDATE public.mesa_solo_campanhas SET processando=true,atualizado_em=now() WHERE id=$1 AND usuario_id=$2 AND (processando=false OR atualizado_em<now()-interval '90 seconds') AND turno_atual<300 RETURNING id,titulo,genero,tom,premissa,resumo,turno_atual",[id,u.id]);
@@ -495,23 +496,38 @@ app.post('/api/solo/campanhas/:id/turnos',asyncHandler(async(req,res)=>{
   return res.status(409).json({erro:own.rows[0].turno_atual>=300?'Esta campanha chegou ao limite de 300 turnos.':'Já existe uma ação sendo narrada. Aguarde sua conclusão e tente novamente.'});
  }
  const c=claim.rows[0];
+ let textoAcao=rolando?'':acao.trim(),rolagem=null;
  let quota=null;
  try{
+  if(rolando){
+   const pedido=await query("SELECT numero,teste FROM public.mesa_solo_mensagens WHERE campanha_id=$1 AND papel='mestre' ORDER BY numero DESC LIMIT 1",[id]);
+   const ultima=pedido.rows[0],teste=ultima?.teste;
+   if(!teste||ultima.numero!==numeroTeste||c.turno_atual!==numeroTeste){
+    const erro=new Error('Este teste já foi concluído ou não está mais disponível. Atualize a campanha.');erro.status=409;throw erro;
+   }
+   const faces=Number(teste.dado),quant=Number(teste.quantidade),mod=Number(teste.modificador);
+   if(![4,6,8,10,12,20,100].includes(faces)||!Number.isInteger(quant)||quant<1||quant>5||!Number.isInteger(mod)||Math.abs(mod)>20)throw new Error('Pedido de teste inválido.');
+   const valores=Array.from({length:quant},()=>crypto.randomInt(1,faces+1));
+   const soma=valores.reduce((a,b)=>a+b,0),total=soma+mod;
+   const dificuldade=Number.isInteger(teste.dificuldade)?teste.dificuldade:null;
+   rolagem={nome:String(teste.nome).slice(0,80),dado:faces,quantidade:quant,modificador:mod,valores,total,dificuldade,passou:dificuldade===null?null:total>=dificuldade};
+   textoAcao='[Resultado de rolagem validado pelo servidor: '+rolagem.nome+': '+quant+'d'+faces+' = ['+valores.join(', ')+']; soma '+soma+'; modificador '+(mod>=0?'+':'')+mod+'; total '+total+(dificuldade===null?'; sem dificuldade fixada':'; dificuldade '+dificuldade+'; '+(rolagem.passou?'sucesso':'falha'))+'. Narre a consequência desta rolagem; não peça novo teste para a mesma ação.]';
+  }
   quota=await soloCota(u);
   const h=await query('SELECT papel,tipo,texto FROM public.mesa_solo_mensagens WHERE campanha_id=$1 ORDER BY numero DESC,CASE WHEN papel=\'mestre\' THEN 0 ELSE 1 END ASC LIMIT 16',[id]);
   const historico=h.rows.reverse();
-  const resposta=await narrarSolo({genero:c.genero,tom:c.tom,premissa:c.premissa,resumo:c.resumo,historico,acao:acao.trim(),tipo,inicio:false});
+  const resposta=await narrarSolo({genero:c.genero,tom:c.tom,premissa:c.premissa,resumo:c.resumo,historico,acao:textoAcao,tipo:rolando?'rolagem':tipo,inicio:false});
   const {pool}=require('./postgres'),client=await pool.connect();
   try{
    await client.query('BEGIN');
    const gravado=await client.query('UPDATE public.mesa_solo_campanhas SET turno_atual=turno_atual+1,resumo=$3,processando=false,atualizado_em=now() WHERE id=$1 AND usuario_id=$2 AND processando=true AND turno_atual=$4 RETURNING turno_atual',[id,u.id,resposta.resumo,c.turno_atual]);
    if(!gravado.rowCount)throw Error('Campanha foi modificada durante a narração.');
    const n=gravado.rows[0].turno_atual;
-   await client.query("INSERT INTO public.mesa_solo_mensagens(campanha_id,numero,papel,tipo,texto) VALUES($1,$2,'jogador',$3,$4),($1,$2,'mestre','acao',$5)",[id,n,tipo,acao.trim(),resposta.narracao]);
+   await client.query("INSERT INTO public.mesa_solo_mensagens(campanha_id,numero,papel,tipo,texto,teste) VALUES($1,$2,'jogador','acao',$3,NULL),($1,$2,'mestre','acao',$4,$5::jsonb)",[id,n,textoAcao,resposta.narracao,JSON.stringify(resposta.teste)]);
    await client.query('COMMIT');
-   res.json({numero:n,narracao:resposta.narracao});
+   res.json({numero:n,narracao:resposta.narracao,teste:resposta.teste,rolagem});
   }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
- }catch(e){await soloDevolver(quota);if(e.status===429)return res.status(429).json({erro:e.message});console.error('Falha em turno solo',e.name);soloErroIA(res,e);}
+ }catch(e){await soloDevolver(quota);if(e.status===429||e.status===409)return res.status(e.status).json({erro:e.message});console.error('Falha em turno solo',e.name);soloErroIA(res,e);}
  finally{await query('UPDATE public.mesa_solo_campanhas SET processando=false WHERE id=$1 AND usuario_id=$2 AND turno_atual=$3',[id,u.id,c.turno_atual]).catch(()=>{});}
 }));
 app.delete('/api/solo/campanhas/:id',asyncHandler(async(req,res)=>{
