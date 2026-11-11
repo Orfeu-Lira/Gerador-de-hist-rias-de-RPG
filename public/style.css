@@ -678,3 +678,41 @@ main select,main textarea{max-width:100%;min-width:0}
 .solo-recursos p{font-size:.87rem;line-height:1.65;color:#66533e;margin:0}
 .solo-apresentacao .solo-aviso{border-left:4px solid #ad8748;background:#fff3d9;padding:13px 17px;border-radius:7px;color:#674b2b;margin:25px 0}
 @media(max-width:800px){.solo-recursos{grid-template-columns:minmax(0,1fr)}.solo-recursos article{padding:16px}}
+
+/* RPG Solo jogável: modo independente, histórico salvo, mestre e jogador legíveis. */
+#v-solo{max-width:1150px;margin:0 auto}
+.solo-cabecalho{max-width:960px}
+.solo-apresentacao{max-width:960px}
+.solo-apresentacao h2,.solo-lista-cabecalho h2{color:#513e28}
+.solo-apresentacao form{display:grid;gap:12px;margin:18px 0 26px}
+.solo-apresentacao form :is(input,textarea,select){max-width:100%;width:100%;min-width:0}
+.solo-apresentacao form .principal{justify-self:start}
+.solo-lista-cabecalho{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:27px 0 13px;border-top:1px solid #d7c4a2;padding-top:20px}
+.solo-lista-cabecalho h2{margin:0;font-size:1.12rem}
+.solo-salva{display:flex;align-items:center;flex-wrap:wrap;gap:10px;background:#fff8e9;border:1px solid #dbcaa7;border-radius:11px;padding:13px;margin:9px 0}
+.solo-salva button:first-child{margin-right:auto;max-width:100%;overflow-wrap:anywhere;text-align:left}
+.solo-salva .suave{font-size:.78rem;color:#675743}
+#solo-alerta:not(:empty){max-width:960px;margin:15px auto;padding:13px 17px;background:#f6ebcb;border-left:4px solid #ab8546;border-radius:8px;color:#61472f;overflow-wrap:anywhere}
+#solo-alerta.erro:not(:empty){background:#fbe2da;border-color:#ad5238;color:#813928}
+.solo-jogo{max-width:1020px;margin:0 auto}
+.solo-jogo-topo{display:flex;align-items:center;gap:22px;flex-wrap:wrap;margin:7px 0 18px}
+.solo-jogo-topo h2{font:700 clamp(1.1rem,2.5vw,1.6rem)/1.4 Cinzel,Georgia,serif;margin:5px 0;color:#f3e2bd;overflow-wrap:anywhere}
+.solo-mensagens{min-height:300px;max-height:min(62vh,760px);overflow-y:auto;display:flex;flex-direction:column;gap:15px;padding:clamp(14px,2.4vw,26px);background:linear-gradient(150deg,#173a34,#102927);border:1px solid #bfa36a77;border-radius:16px;box-shadow:0 12px 38px #071b1b42;scrollbar-color:#a88a5d transparent}
+.solo-mensagem{min-width:0;max-width:88%;border-radius:12px;padding:16px 19px;overflow-wrap:anywhere}
+.solo-mensagem.mestre{align-self:flex-start;background:#f9efd8;border:1px solid #d6bd8e;color:#423424}
+.solo-mensagem.jogador{align-self:flex-end;background:#2b5a4b;border:1px solid #b8a2776b;color:#ffefd3}
+.solo-mensagem strong{display:block;font-size:.84rem;margin-bottom:8px;letter-spacing:.02em}
+.solo-mensagem p{margin:0;white-space:pre-wrap;line-height:1.8;font-size:.94rem}
+.solo-compositor{display:grid;gap:10px;margin-top:16px}
+.solo-compositor :is(select,textarea){width:100%;max-width:100%;min-width:0}
+.solo-acoes{display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap}
+.solo-acoes .suave{flex:1 1 240px;font-size:.78rem}
+.solo-acoes button{flex:none}
+@media(max-width:650px){
+ .solo-mensagens{max-height:57vh;min-height:280px;padding:12px}
+ .solo-mensagem{max-width:96%;padding:12px 14px}
+ .solo-mensagem p{font-size:.88rem}
+ .solo-acoes button{width:100%}
+ .solo-apresentacao form .principal{width:100%}
+ .solo-jogo-topo{gap:12px}
+}

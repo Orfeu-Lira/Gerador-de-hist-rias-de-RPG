@@ -114,24 +114,55 @@
     <div class="como-funciona"><span class="sobretitulo">O PRÓXIMO CAPÍTULO</span><h2>Seu universo em três passos</h2><div class="passos"><article><b>01</b><h3>Escolha o mundo</h3><p>Defina o gênero e a atmosfera.</p></article><article><b>02</b><h3>Compartilhe uma ideia</h3><p>Dê vida à sua inspiração.</p></article><article><b>03</b><h3>Viva a história</h3><p>Receba aventuras, locais e personagens.</p></article></div></div>
   </section>
 
-  <!-- Modo solo independente; motor narrativo será desenvolvido em etapa posterior. -->
+
+  <!-- RPG Solo independente do Gerador: conta, campanhas e narração persistente. -->
   <section id="v-solo" hidden aria-labelledby="solo-titulo">
     <div class="pagina-intro solo-cabecalho">
       <span class="sobretitulo">✧ UMA AVENTURA PARA UM JOGADOR</span>
       <h1 id="solo-titulo">RPG Solo · Mestre IA</h1>
-      <p>Sem grupo para jogar? O Mesa está preparando uma experiência em que você será protagonista e uma inteligência artificial narrará sua jornada, reagindo às suas decisões.</p>
+      <p>Você decide o que fazer. O Mestre IA narra o mundo e reage às suas escolhas. Comece com uma aventura criada no Gerador ou com uma ideia inteiramente sua.</p>
     </div>
-    <div class="folha solo-apresentacao">
-      <span class="solo-selo">✦ EM DESENVOLVIMENTO</span>
-      <h2>Seu mundo. Suas escolhas. Sua história.</h2>
-      <p>Este será um modo separado do gerador: você poderá criar uma campanha, escolher seu personagem e escrever livremente o que deseja fazer. O Mestre IA narrará o mundo, interpretará NPCs e acompanhará as consequências de cada ação.</p>
-      <div class="solo-recursos">
-        <article><span aria-hidden="true">♙</span><h3>Seu personagem</h3><p>Use uma ficha do Mesa para protagonizar a campanha.</p></article>
-        <article><span aria-hidden="true">✧</span><h3>Mestre IA</h3><p>Receba cenas narradas em resposta às ações que você escolher.</p></article>
-        <article><span aria-hidden="true">▤</span><h3>História contínua</h3><p>Retome a aventura com lembranças de decisões, NPCs e acontecimentos.</p></article>
+    <div id="solo-alerta" class="solo-aviso" role="status" aria-live="polite"></div>
+    <div id="solo-entrada" class="folha solo-apresentacao">
+      <h2>Comece uma campanha</h2>
+      <p>Suas aventuras são salvas na sua conta do Mesa e podem ser retomadas a qualquer momento.</p>
+      <form id="solo-form" class="formulario">
+        <label for="solo-titulo-campanha">Nome da campanha</label>
+        <input id="solo-titulo-campanha" required maxlength="140" placeholder="Ex.: Os sussurros de Elladanéa">
+        <label for="solo-aventura">História inicial</label>
+        <select id="solo-aventura"><option value="">Criar com uma ideia minha</option></select>
+        <p id="solo-ajuda-origem" class="suave">Selecione uma história do seu Gerador ou escreva uma ideia original abaixo.</p>
+        <div class="grade">
+          <div><label for="solo-genero">Gênero</label><select id="solo-genero" required></select></div>
+          <div><label for="solo-tom">Tom</label><select id="solo-tom" required></select></div>
+        </div>
+        <label for="solo-ideia">Minha ideia ou modificações da história</label>
+        <textarea id="solo-ideia" maxlength="3000" rows="5" placeholder="Descreva onde começa, quem é seu personagem e o que gostaria de viver. Se escolher uma aventura salva, use este espaço para personalizá-la."></textarea>
+        <p class="suave">O Mestre IA não controla seu personagem. Você escreve suas ações e pode mudar elementos da história ao longo da campanha.</p>
+        <button id="solo-criar" class="principal" type="submit">✦ Iniciar aventura solo</button>
+      </form>
+      <div class="solo-lista-cabecalho"><h2>Minhas campanhas salvas</h2><button id="solo-recarregar" type="button" class="guia-abrir">Atualizar lista</button></div>
+      <div id="solo-lista"></div>
+    </div>
+    <div id="solo-jogo" class="solo-jogo" hidden>
+      <div class="solo-jogo-topo">
+        <button id="solo-voltar" type="button" class="guia-abrir">← Minhas campanhas</button>
+        <div><span class="sobretitulo">CAMPANHA SOLO</span><h2 id="solo-jogo-titulo"></h2></div>
       </div>
-      <p class="solo-aviso">O RPG Solo ainda não está disponível para jogar. Esta aba apresenta o futuro recurso; as funções existentes do Mesa continuam funcionando normalmente.</p>
-      <button id="solo-ir-gerador" type="button" class="principal">✦ Explorar o Gerador enquanto isso</button>
+      <div id="solo-mensagens" class="solo-mensagens" role="log" aria-label="Narração e ações da campanha" aria-live="polite"></div>
+      <form id="solo-acao-form" class="folha solo-compositor">
+        <label for="solo-tipo">O que deseja fazer?</label>
+        <select id="solo-tipo">
+          <option value="acao">Ação do meu personagem</option>
+          <option value="ajuste">Pedir modificação da história</option>
+        </select>
+        <label for="solo-acao">Escreva sua ação ou modificação</label>
+        <textarea id="solo-acao" maxlength="1600" required rows="4" placeholder="Eu me aproximo da porta e tento escutar o que acontece lá dentro..."></textarea>
+        <div class="solo-acoes">
+          <span class="suave">Cada ação gera uma nova resposta do Mestre IA. Limite: 30 narrações por dia para contas comuns.</span>
+          <button id="solo-enviar" class="principal" type="submit">✦ Enviar ao Mestre IA</button>
+        </div>
+      </form>
     </div>
   </section>
   <section id="v-instalar" hidden>

@@ -118,6 +118,7 @@ function mostrar(tela) {
   menuMobile(false);
   aviso('');
   if (tela === 'gerador' && !$('f-gerar-npc').hidden) { carregarOrigensNPC(); if(eu.logado)carregarBibliotecaNPC(); }
+  if (tela === 'solo') soloAtualizarInicio();
   if (tela === 'historico') carregarHistorico();
   if (tela === 'personagens') { carregarAventurasDaFicha().then(carregarPersonagens); }
   if (tela === 'admin') {carregarResumo();notificacoesAtualizar();}
@@ -435,6 +436,123 @@ $('f-gerar-npc').onsubmit=async ev=>{
   await atualizarEu();aviso('NPC criado com sucesso!',true);
  }catch(e){aviso(e.message);try{await atualizarEu();}catch{}}
  finally{b.disabled=false;}
+};
+
+
+/* RPG Solo independente: usuário autenticado, aventuras do Gerador e campanhas privadas. */
+GENEROS.forEach(g=>$('solo-genero').appendChild(new Option(g,g)));
+TONS.forEach(t=>$('solo-tom').appendChild(new Option(t,t)));
+let soloCampanhaId=null;
+let soloOrigens=[];
+let soloOcupado=false;
+function soloEstado(mensagem,erro=false){
+ const e=$('solo-alerta');e.textContent=mensagem||'';e.classList.toggle('erro',erro);
+}
+async function soloAtualizarInicio(){
+ $('solo-entrada').hidden=false;$('solo-jogo').hidden=true;soloCampanhaId=null;
+ const lista=$('solo-lista');lista.replaceChildren();
+ const select=$('solo-aventura'),anterior=select.value;select.replaceChildren(new Option('Criar com uma ideia minha',''));
+ if(!eu.logado){
+  soloEstado('Entre na sua conta para criar campanhas e salvar seu progresso.');
+  lista.appendChild(el('p','As campanhas solo ficam vinculadas à sua conta. Faça login pelo menu Entrar.','suave'));
+  $('solo-criar').disabled=true;
+  return;
+ }
+ $('solo-criar').disabled=false;soloEstado('');
+ try{
+  const [aventuras,campanhas]=await Promise.all([api('/api/aventuras'),api('/api/solo/campanhas')]);
+  soloOrigens=aventuras;
+  for(const a of aventuras)select.appendChild(new Option(a.conteudo?.titulo||'Aventura sem título',String(a.id)));
+  if([...select.options].some(o=>o.value===anterior))select.value=anterior;
+  if(!campanhas.length)lista.appendChild(el('p','Você ainda não possui campanhas solo. Crie uma acima!','suave'));
+  for(const c of campanhas){
+   const linha=el('article','','solo-salva');
+   const abrir=el('button',c.titulo,'guia-abrir');abrir.type='button';abrir.onclick=()=>soloAbrir(c.id);
+   const metadados=el('span',c.turno_atual+' ações · '+new Date(c.atualizado_em).toLocaleDateString('pt-BR'),'suave');
+   const excluir=el('button','Excluir','apagar');excluir.type='button';
+   excluir.onclick=async()=>{
+    if(!confirm('Excluir a campanha e TODO o histórico? Esta ação não pode ser desfeita.'))return;
+    try{await api('/api/solo/campanhas/'+c.id,'DELETE');await soloAtualizarInicio();}
+    catch(e){soloEstado(e.message,true);}
+   };
+   linha.append(abrir,metadados,excluir);lista.appendChild(linha);
+  }
+ }catch(e){soloEstado('Não foi possível carregar campanhas: '+e.message,true);}
+}
+$('solo-recarregar').onclick=soloAtualizarInicio;
+$('solo-aventura').onchange=()=>{
+ const origem=soloOrigens.find(x=>String(x.id)===$('solo-aventura').value);
+ if(origem){
+  if(GENEROS.includes(origem.genero))$('solo-genero').value=origem.genero;
+  if(TONS.includes(origem.tom))$('solo-tom').value=origem.tom;
+  if(!$('solo-titulo-campanha').value.trim())$('solo-titulo-campanha').value=(origem.conteudo?.titulo||'Minha campanha').slice(0,140);
+  $('solo-ajuda-origem').textContent='Você pode adicionar novas ideias abaixo. A IA usará a história salva como ponto de partida.';
+ }else $('solo-ajuda-origem').textContent='Escreva uma ideia própria para iniciar uma campanha nova.';
+};
+function soloMensagem(papel,texto,tipo='acao'){
+ const art=el('article','','solo-mensagem '+(papel==='mestre'?'mestre':'jogador'));
+ art.appendChild(el('strong',papel==='mestre'?'✧ Mestre IA':tipo==='ajuste'?'✎ Modificação solicitada':'♙ Você'));
+ const p=el('p',texto);art.appendChild(p);$('solo-mensagens').appendChild(art);
+ return art;
+}
+function soloFimLista(){
+ const painel=$('solo-mensagens');painel.scrollTop=painel.scrollHeight;
+}
+async function soloAbrir(id){
+ if(soloOcupado)return;
+ soloEstado('');
+ try{
+  const r=await api('/api/solo/campanhas/'+id);
+  soloCampanhaId=r.campanha.id;
+  $('solo-jogo-titulo').textContent=r.campanha.titulo;
+  $('solo-mensagens').replaceChildren();
+  for(const msg of r.mensagens)soloMensagem(msg.papel,msg.texto,msg.tipo);
+  $('solo-entrada').hidden=true;$('solo-jogo').hidden=false;
+  $('solo-acao').value='';soloFimLista();
+ }catch(e){soloEstado(e.message,true);}
+}
+$('solo-voltar').onclick=()=>{
+ if(soloOcupado)return;
+ soloAtualizarInicio();
+};
+$('solo-form').onsubmit=async ev=>{
+ ev.preventDefault();if(soloOcupado)return;
+ const origem=$('solo-aventura').value,ideia=$('solo-ideia').value.trim();
+ if(!origem&&!ideia){soloEstado('Selecione uma história do Gerador ou descreva sua ideia.',true);return;}
+ soloOcupado=true;$('solo-criar').disabled=true;soloEstado('O Mestre IA está preparando a primeira cena...');
+ try{
+  const r=await api('/api/solo/campanhas','POST',{
+   titulo:$('solo-titulo-campanha').value.trim(),genero:$('solo-genero').value,
+   tom:$('solo-tom').value,aventuraId:origem?Number(origem):null,ideia
+  });
+  await soloAbrirDepoisCriar(r);
+ }catch(e){soloEstado(e.message,true);}
+ finally{soloOcupado=false;$('solo-criar').disabled=false;}
+};
+async function soloAbrirDepoisCriar(r){
+ soloCampanhaId=r.campanha.id;
+ $('solo-jogo-titulo').textContent=r.campanha.titulo;
+ $('solo-mensagens').replaceChildren();
+ soloMensagem('mestre',r.mestre,'inicio');
+ $('solo-entrada').hidden=true;$('solo-jogo').hidden=false;soloEstado('');
+ $('solo-acao').value='';soloFimLista();
+}
+$('solo-acao-form').onsubmit=async ev=>{
+ ev.preventDefault();if(soloOcupado||!soloCampanhaId)return;
+ const acao=$('solo-acao').value.trim(),tipo=$('solo-tipo').value;
+ if(!acao)return;
+ soloOcupado=true;$('solo-enviar').disabled=true;$('solo-voltar').disabled=true;
+ soloEstado('O Mestre IA está narrando a consequência...');
+ const rascunho=soloMensagem('jogador',acao,tipo);
+ const esperando=soloMensagem('mestre','Escrevendo a próxima cena...');
+ soloFimLista();
+ try{
+  const r=await api('/api/solo/campanhas/'+soloCampanhaId+'/turnos','POST',{acao,tipo});
+  esperando.querySelector('p').textContent=r.narracao;
+  $('solo-acao').value='';soloEstado('');
+ }catch(e){
+  rascunho.remove();esperando.remove();soloEstado(e.message,true);
+ }finally{soloOcupado=false;$('solo-enviar').disabled=false;$('solo-voltar').disabled=false;soloFimLista();}
 };
 
 // ---- Dados e tutorial para iniciantes ----
