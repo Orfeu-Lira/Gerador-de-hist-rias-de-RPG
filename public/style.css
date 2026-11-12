@@ -770,3 +770,11 @@ main select,main textarea{max-width:100%;min-width:0}
 .mesa-exportar-dados p{line-height:1.65;overflow-wrap:break-word}
 .mesa-exportar-dados button{min-height:44px}
 @media (prefers-reduced-motion: reduce){.mesa-pular{transition:none!important}}
+
+/* Contexto opcional da criação de NPC: visual coerente com os formulários do Mesa. */
+.npc-contexto-cena{display:grid;gap:12px;border:1px solid #cdb58b;border-radius:12px;padding:18px;margin:8px 0;background:#fffaf0;color:#4b3825;min-width:0}
+.npc-contexto-cena legend{font-weight:800;color:#78552d;padding:0 8px}
+.npc-contexto-cena .grade{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.npc-contexto-cena :is(input,textarea){width:100%;max-width:100%;min-width:0}
+.npc-contexto-cena .suave{font-size:.86rem;color:#65543c}
+@media(max-width:680px){.npc-contexto-cena{padding:13px}.npc-contexto-cena .grade{grid-template-columns:minmax(0,1fr)}}
