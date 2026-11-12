@@ -2,7 +2,7 @@
 // Todas as regras de verdade (limites, permissões) ficam no servidor.
 const $ = (id) => document.getElementById(id);
 const API_BASE_URL = (window.MESA_CONFIG && window.MESA_CONFIG.apiBaseUrl || '').replace(/\/+$/, '');
-const GENEROS = ['Fantasia sombria', 'Fantasia épica', 'Ficção científica', 'Terror', 'Investigação', 'Piratas e mares'];
+const GENEROS = ['Fantasia sombria', 'Fantasia épica', 'D&D clássico', 'Ficção científica', 'Terror', 'Investigação', 'Piratas e mares'];
 const TONS = ['Misterioso', 'Aventureiro', 'Sombrio', 'Leve e bem-humorado', 'Tenso'];
 let eu = { logado: false };
 
@@ -376,9 +376,12 @@ $('f-gerar-npc').onsubmit=async ev=>{
  try{
   const aventuraId=$('npc-origem').value;
   const descricao=$('npc-descricao').value.trim();
-  if(aventuraId==='livre'&&!descricao){throw new Error('Descreva o NPC ou selecione uma aventura salva.');}
+  const resumo=$('npc-resumo').value.trim(),tematica=$('npc-tematica').value.trim(),situacao=$('npc-situacao').value.trim();
+  if(aventuraId==='livre'&&!descricao&&!resumo&&!tematica&&!situacao){
+    throw new Error('Descreva o NPC, a história, a temática ou a situação da cena, ou selecione uma aventura salva.');
+  }
   const resposta=await api('/api/npcs/gerar','POST',{
-   genero:$('npc-genero').value,tom:$('npc-tom').value,descricao,
+   genero:$('npc-genero').value,tom:$('npc-tom').value,descricao,resumo,tematica,situacao,
    aventuraId:aventuraId==='livre'?null:Number(aventuraId)
   });
   desenharNPC(resposta.npc,$('saida'));
