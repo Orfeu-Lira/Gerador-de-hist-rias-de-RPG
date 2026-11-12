@@ -1430,16 +1430,16 @@ $('f-redefinir').onsubmit = async ev => {
   } catch (e) { aviso(e.message); }
   finally { botao.disabled = false; }
 };
-async function entrar(url, email, senha, tokenBootstrap, manterConectado = false) {
+async function entrar(url, email, senha, tokenBootstrap, manterConectado = false, aceiteTermos = false) {
   try {
-    await api(url, 'POST', { email, senha, manterConectado, ...(tokenBootstrap ? { tokenBootstrap } : {}) });
+    await api(url, 'POST', { email, senha, manterConectado, aceiteTermos, ...(tokenBootstrap ? { tokenBootstrap } : {}) });
     await atualizarEu(); mostrar('gerador'); aviso('Tudo certo!', true);
   }
   catch (e) { aviso(e.message); }
   finally { if (tokenBootstrap) $('c-token-bootstrap').value = ''; }
 }
 $('f-login').onsubmit = (ev) => { ev.preventDefault(); entrar('/api/login', $('l-email').value, $('l-senha').value, undefined, $('l-manter').checked); };
-$('f-cadastro').onsubmit = (ev) => { ev.preventDefault(); if(!$('c-aceite-termos').checked){aviso('Leia e aceite os Termos de Uso para criar sua conta.');return;} entrar('/api/cadastro', $('c-email').value, $('c-senha').value, $('c-token-bootstrap').value); };
+$('f-cadastro').onsubmit = (ev) => { ev.preventDefault(); if(!$('c-aceite-termos').checked){aviso('Leia e aceite os Termos de Uso para criar sua conta.');return;} entrar('/api/cadastro', $('c-email').value, $('c-senha').value, $('c-token-bootstrap').value, false, true); };
 
 // ---- Painel do dono ----
 // Central do Mestre. Texto remoto sempre tratado como texto, nunca como HTML.
