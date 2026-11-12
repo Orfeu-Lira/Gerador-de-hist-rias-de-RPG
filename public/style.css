@@ -838,3 +838,19 @@ body.mesa-alto-contraste :is(button,a):focus-visible{outline:4px solid #f5c43b;o
 body.mesa-alto-contraste .solo-mensagem.jogador{background:#073e2a;color:#fff;border:2px solid #fff}
 html.mesa-movimento-reduzido *,html.mesa-movimento-reduzido *::before,html.mesa-movimento-reduzido *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
 @media(max-width:600px){.mesa-acessibilidade{right:9px;bottom:9px}.mesa-acessibilidade-painel{bottom:54px}.mesa-acessibilidade-atalho{font-size:.84rem;min-height:44px;padding:7px 11px}}
+
+/* Navegação lateral: barra discreta, integrada à paleta do Mesa.
+   Mantém a rolagem por mouse, toque, teclado e tecnologias assistivas. */
+.topo{
+  scrollbar-width:thin;
+  scrollbar-color:#9f8158 #112d2b;
+  scrollbar-gutter:stable;
+}
+.topo::-webkit-scrollbar{width:7px}
+.topo::-webkit-scrollbar-track{background:#112d2b}
+.topo::-webkit-scrollbar-thumb{
+  background:#9f8158;
+  border-radius:10px;
+  border:1px solid #112d2b;
+}
+.topo::-webkit-scrollbar-thumb:hover{background:#d1ad73}
