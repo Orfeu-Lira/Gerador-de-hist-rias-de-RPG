@@ -115,7 +115,8 @@ app.get('/api/db-health',asyncHandler(async(req,res)=>{
 }));
 
 app.post('/api/cadastro', asyncHandler(async(req,res) => {
-  const {email,senha,tokenBootstrap} = req.body || {};
+  const {email,senha,tokenBootstrap,aceiteTermos} = req.body || {};
+  if(aceiteTermos!==true)return res.status(400).json({erro:'Leia e aceite os Termos de Uso para criar sua conta.'});
   if (!emailValido(email) || !senhaValida(senha)) return res.status(400).json({erro:'Use um e-mail válido e senha de 8 a 72 caracteres.'});
   const hash = await bcrypt.hash(senha,12);
   const { pool } = require('./postgres');
@@ -126,7 +127,7 @@ app.post('/api/cadastro', asyncHandler(async(req,res) => {
     await client.query('SELECT pg_advisory_xact_lock(18452)');
     const {rows} = await client.query("SELECT 1 FROM public.usuarios WHERE papel='admin' LIMIT 1");
     const admin = !rows.length && compareSecret(tokenBootstrap,process.env.ADMIN_BOOTSTRAP_TOKEN);
-    const r = await client.query('INSERT INTO public.usuarios(email,senha_hash,papel) VALUES($1,$2,$3) RETURNING id',
+    const r = await client.query("INSERT INTO public.usuarios(email,senha_hash,papel,termos_aceitos_em,termos_versao) VALUES($1,$2,$3,now(),'2026-11-12') RETURNING id",
       [email.trim().toLowerCase(),hash,admin ? 'admin':'usuario']);
     id = Number(r.rows[0].id);
     await client.query('COMMIT');
