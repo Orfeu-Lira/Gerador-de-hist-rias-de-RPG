@@ -489,7 +489,7 @@ function soloAdicionarTeste(art,teste,numero){
   try{
    const r=await api('/api/solo/campanhas/'+soloCampanhaId+'/turnos','POST',{tipo:'rolagem',numero});
    const v=r.rolagem;
-   animacao.concluir(v.valores);acessibilidadeSomDado(true);
+   animacao.concluir(v.valores);
    const resultado='🎲 '+v.nome+': '+v.valores.join(' + ')+' ('+v.quantidade+'d'+v.dado+') '+(v.modificador>=0?'+ ':'- ')+Math.abs(v.modificador)+' = '+v.total+(v.passou===null?'':v.passou?' · Sucesso!':' · Falha');
    soloMensagem('jogador',resultado,'acao');
    soloMensagem('mestre',r.narracao,'acao',r.teste,r.numero);
@@ -640,7 +640,7 @@ $('abrir-guia-dados').onclick = () => {
   $('total').textContent='🎲';$('detalhe').textContent='Rolando '+q+'d'+lados+'...';
   const concluir=()=>{
    if(palco._mesaAnimacao!==a)return;
-   a.concluir(v);acessibilidadeSomDado(true);$('total').textContent=v.reduce((x,y)=>x+y,0);
+   a.concluir(v);$('total').textContent=v.reduce((x,y)=>x+y,0);
    $('detalhe').textContent=q+'d'+lados+': '+v.join(' + ');
   };
   if(acessibilidadeMovimentoReduzido())concluir();
@@ -1818,71 +1818,33 @@ function acessibilidadeBotaoLer(alvo,conteudo){
 }
 // Navegadores móveis só liberam Web Audio após um gesto do usuário.
 // Mantemos o mesmo AudioContext para a rolagem e seu resultado final.
-async function acessibilidadePrepararAudio(){
- const C=window.AudioContext||window.webkitAudioContext;
- if(!C)return {ok:false,erro:'Este navegador não oferece suporte ao áudio dos dados.'};
+// Reproduz o áudio de dados enviado pelo usuário. O arquivo compactado é
+// carregado no navegador com a página; não depende de serviços externos.
+function acessibilidadeSomDado(final=false,forcar=false){
+ if(final||(!mesaA11y.som&&!forcar))return Promise.resolve(false);
  try{
-  let ctx=mesaA11y.audio;
-  if(!ctx||ctx.state==='closed'){ctx=new C();mesaA11y.audio=ctx;}
-  if(ctx.state!=='running')await ctx.resume();
-  if(ctx.state!=='running')return {ok:false,erro:'O navegador bloqueou o som. Toque em Testar som novamente.'};
-  return {ok:true,ctx};
- }catch{
-  return {ok:false,erro:'Não foi possível ativar o som. Confira as permissões e o volume de mídia.'};
- }
-}
-function acessibilidadeTocarDado(ctx,final=false){
- // Som de dado de mesa feito com impactos curtos de ruído filtrado,
- // atrito e repiques que desaceleram. Sem os bipes dos osciladores antigos.
- const taxa=ctx.sampleRate;
- const duracao=final?.50:.88;
- const buffer=ctx.createBuffer(1,Math.ceil(taxa*duracao),taxa);
- const dados=buffer.getChannelData(0);
- // Distribuição irregular de pequenas batidas, como dados de resina na madeira.
- const eventos=final
-  ? [[.015,.58],[.10,.38],[.21,.25],[.34,.14]]
-  : [[.015,.76],[.067,.49],[.138,.68],[.225,.40],[.345,.51],[.49,.26],[.65,.16],[.78,.09]];
- // Ruído aleatório com decaimento rápido, mais uma ressonância muito baixa.
- for(const [tempo,intensidade] of eventos){
-  const inicio=Math.floor(tempo*taxa);
-  const comprimento=Math.floor((.038+intensidade*.025)*taxa);
-  let anterior=0;
-  for(let j=0;j<comprimento&&inicio+j<dados.length;j++){
-   const t=j/taxa;
-   const ruido=Math.random()*2-1;
-   // Diferencia o ruído em alta frequência para soar como um clique físico.
-   const agudo=ruido-anterior*.72;anterior=ruido;
-   const envelope=Math.exp(-t*(92-25*intensidade));
-   const madeira=Math.sin(2*Math.PI*(165+65*intensidade)*t)*Math.exp(-t*68);
-   dados[inicio+j]+=intensidade*envelope*(agudo*.62+madeira*.27);
+  const clip=window.MESA_DICE_AUDIO;
+  if(typeof clip!=='string'||!clip.startsWith('data:audio/mpeg;base64,')){
+   if(forcar)$('mesa-acessibilidade-status').textContent='O arquivo de áudio não carregou. Atualize o Mesa e tente novamente.';
+   return Promise.resolve(false);
   }
- }
- // Atrito baixo entre impactos, como o dado escorregando na mesa.
- for(let i=0;i<dados.length;i++){
-  const t=i/taxa;
-  const escorregar=Math.max(0,1-t/duracao);
-  dados[i]+=(Math.random()*2-1)*.012*escorregar*escorregar;
-  dados[i]=Math.max(-1,Math.min(1,dados[i]));
- }
- const fonte=ctx.createBufferSource(),filtro=ctx.createBiquadFilter(),volume=ctx.createGain();
- fonte.buffer=buffer;
- filtro.type='lowpass';filtro.frequency.value=2400;filtro.Q.value=.6;
- volume.gain.value=.70;
- fonte.connect(filtro);filtro.connect(volume);volume.connect(ctx.destination);
- fonte.start();
-}
-
-async function acessibilidadeSomDado(final=false,forcar=false){
- if(!mesaA11y.som&&!forcar)return false;
- const audio=await acessibilidadePrepararAudio();
- if(!audio.ok){
-  if(forcar)$('mesa-acessibilidade-status').textContent=audio.erro;
-  return false;
- }
- try{acessibilidadeTocarDado(audio.ctx,final);return true;}
- catch{
-  if(forcar)$('mesa-acessibilidade-status').textContent='Falha ao reproduzir o som de teste.';
-  return false;
+  if(mesaA11y.audio&&typeof mesaA11y.audio.pause==='function'){
+   mesaA11y.audio.pause();
+   mesaA11y.audio.currentTime=0;
+  }
+  const audio=new Audio(clip);
+  audio.preload='auto';
+  audio.volume=.95;
+  mesaA11y.audio=audio;
+  // A reprodução é iniciada no clique do jogador para respeitar o bloqueio
+  // de autoplay dos navegadores, especialmente no Android.
+  return audio.play().then(()=>true).catch(()=>{
+   if(forcar)$('mesa-acessibilidade-status').textContent='O navegador bloqueou o som. Toque em Testar som e verifique o volume de mídia.';
+   return false;
+  });
+ }catch{
+  if(forcar)$('mesa-acessibilidade-status').textContent='Não foi possível reproduzir o áudio enviado.';
+  return Promise.resolve(false);
  }
 }
 
