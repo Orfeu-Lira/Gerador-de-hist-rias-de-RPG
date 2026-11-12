@@ -808,3 +808,33 @@ main select,main textarea{max-width:100%;min-width:0}
 @media(prefers-reduced-motion:reduce){
  .mesa-dado-objeto.girando,.mesa-dado-objeto.girando .mesa-dado-svg,.mesa-dado-objeto.concluido{animation:none!important}
 }
+
+/* Acessibilidade configurável: não depende de login e não bloqueia o conteúdo. */
+.mesa-acessibilidade{position:fixed;right:16px;bottom:16px;z-index:950;max-width:calc(100vw - 24px)}
+.mesa-acessibilidade-atalho{display:flex;align-items:center;gap:7px;min-height:48px;padding:9px 15px;border:2px solid #e8c783;border-radius:999px;background:#173e36;color:#fff2d9;font-weight:800;box-shadow:0 5px 20px #0008;cursor:pointer}
+.mesa-acessibilidade-atalho:focus-visible,.mesa-acessibilidade-painel :is(button,input,select):focus-visible,.mesa-ler-trecho:focus-visible{outline:3px solid #f3b94f;outline-offset:3px}
+.mesa-acessibilidade-painel{position:absolute;right:0;bottom:58px;width:min(370px,calc(100vw - 24px));max-height:min(78vh,660px);overflow-y:auto;background:#fffaec;color:#332819;border:2px solid #c8a56e;border-radius:15px;box-shadow:0 18px 55px #0009;padding:18px;display:grid;gap:12px}
+.mesa-acessibilidade-painel[hidden]{display:none!important}
+.mesa-acessibilidade-cabecalho{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.mesa-acessibilidade-cabecalho h2{margin:0;color:#433322;font-size:1.2rem}
+.mesa-acessibilidade-cabecalho button{border-radius:8px;font-size:1.35rem;font-weight:800;min-height:40px;min-width:40px}
+.mesa-acessibilidade-painel p{margin:0;color:#4b3c29;line-height:1.6;font-size:.88rem}
+.mesa-acessibilidade-painel button,.mesa-acessibilidade-painel select{border:1px solid #a78c60;background:#fff;color:#2e291f;border-radius:8px;padding:8px 10px;font:inherit;min-height:44px}
+.mesa-acessibilidade-acoes{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.mesa-acessibilidade-acoes button{font-size:.78rem}
+.mesa-acessibilidade-painel>label:not(.mesa-acessibilidade-check){font-weight:700;margin-bottom:-9px}
+.mesa-acessibilidade-painel>select{width:100%;min-width:0}
+.mesa-acessibilidade-check{display:flex;align-items:center;gap:10px;min-height:38px;line-height:1.5;cursor:pointer}
+.mesa-acessibilidade-check input{width:21px;height:21px;flex:0 0 21px;accent-color:#2f6958}
+.mesa-ler-trecho{display:inline-flex;align-items:center;min-height:40px;border:1px solid #bfa677;border-radius:8px;background:#fff4de;color:#4e3b21;padding:7px 11px;font-weight:700;font-size:.84rem;margin:10px 0}
+.solo-mensagem.mestre .mesa-ler-trecho{margin-bottom:0}
+body.mesa-fonte-grande{font-size:19px;line-height:1.76}
+body.mesa-fonte-grande :is(p,li,label,button,input,textarea,select,.suave){font-size:max(1em,17px);line-height:1.7}
+body.mesa-fonte-grande :is(h1,h2,h3){letter-spacing:normal}
+body.mesa-alto-contraste{background:#080808;color:#fff}
+body.mesa-alto-contraste :is(.folha,.solo-mensagem.mestre,.npc-ficha,.jornada-player,.mesa-acessibilidade-painel,.mesa-exportar-dados){background:#fff;color:#101010;border:2px solid #222}
+body.mesa-alto-contraste :is(.folha,.solo-mensagem.mestre,.npc-ficha,.jornada-player,.mesa-acessibilidade-painel,.mesa-exportar-dados) :is(p,span,h1,h2,h3,label,li){color:#141414}
+body.mesa-alto-contraste :is(button,a):focus-visible{outline:4px solid #f5c43b;outline-offset:4px}
+body.mesa-alto-contraste .solo-mensagem.jogador{background:#073e2a;color:#fff;border:2px solid #fff}
+html.mesa-movimento-reduzido *,html.mesa-movimento-reduzido *::before,html.mesa-movimento-reduzido *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+@media(max-width:600px){.mesa-acessibilidade{right:9px;bottom:9px}.mesa-acessibilidade-painel{bottom:54px}.mesa-acessibilidade-atalho{font-size:.84rem;min-height:44px;padding:7px 11px}}
