@@ -742,3 +742,21 @@ main select,main textarea{max-width:100%;min-width:0}
 .solo-teste .guia-abrir:disabled{opacity:.6}
 .solo-teste-status{font-weight:700}
 @media(max-width:570px){.solo-teste{padding:12px}.solo-teste .guia-abrir{width:100%}}
+
+/* Documentos legais e transparência no cadastro. */
+.mesa-legal{max-width:1000px;margin:0 auto}
+.mesa-legal-conteudo{line-height:1.8}
+.mesa-legal-conteudo h2{font:700 clamp(1.03rem,2vw,1.35rem)/1.45 Cinzel,Georgia,serif;color:#604329;margin:26px 0 9px}
+.mesa-legal-conteudo p{color:#4e4334}
+.mesa-legal-conteudo a,.mesa-aceite-termos a{color:#8a4d30;text-decoration:underline;text-underline-offset:3px}
+.mesa-legal-data{font-size:.8rem;color:#79684d!important}
+.mesa-legal-aviso{background:#fff0cf;border-left:4px solid #b88b4b;padding:12px 15px;border-radius:7px}
+.mesa-legal-links{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:11px 24px;margin:14px 0}
+.mesa-legal-links a{color:#e6ca98;text-decoration:underline;text-underline-offset:4px;font-size:.82rem}
+.mesa-aceite-termos{display:flex;align-items:flex-start;gap:11px;margin:20px 0 8px;font-size:.82rem;line-height:1.65;color:#513e2f}
+.mesa-aceite-termos input{flex:none;width:19px;height:19px;min-height:19px;margin-top:3px;accent-color:#225744}
+.mesa-cookies-aviso{position:fixed;z-index:130;left:clamp(10px,2vw,28px);bottom:clamp(10px,2vw,28px);display:flex;align-items:center;gap:15px;width:min(570px,calc(100vw - 20px));padding:16px 18px;background:#f8edda;border:1px solid #a78954;color:#473727;border-radius:12px;box-shadow:0 16px 44px #071916a8}
+.mesa-cookies-aviso p{margin:5px 0 0;font-size:.8rem;line-height:1.55;color:#594b38}
+.mesa-cookies-aviso a{color:#8b4d2e;text-decoration:underline}
+.mesa-cookies-aviso button{flex:none}
+@media(max-width:650px){.mesa-cookies-aviso{flex-direction:column;align-items:stretch;bottom:10px}.mesa-cookies-aviso button{width:100%}}
