@@ -253,6 +253,7 @@ function desenharAventura(a, alvo, aventuraId=null, genero='', tom='') {
   const f = el('article', '', 'folha aventura');
   f.appendChild(el('h2', a.titulo || 'Aventura'));
   f.appendChild(el('p', a.gancho));
+  acessibilidadeBotaoLer(f,()=>f.innerText.replace(/🔊 Ouvir texto/g,''));
   if (a.locais && a.locais.length) { f.appendChild(el('h3', 'Locais')); const ul = el('ul'); a.locais.forEach((l) => ul.appendChild(el('li', l))); f.appendChild(ul); }
   if (a.npcs && a.npcs.length) { f.appendChild(el('h3', 'NPCs')); const ul = el('ul'); a.npcs.forEach((n) => ul.appendChild(el('li', n.nome + ': ' + n.descricao))); f.appendChild(ul); }
   if (a.vilao) { f.appendChild(el('h3', 'Vilão')); f.appendChild(el('p', a.vilao)); }
@@ -341,6 +342,7 @@ function desenharNPC(npc,alvo){
   bloco.appendChild(el('h3',titulo));bloco.appendChild(el('p',npc[chave]));
   art.appendChild(bloco);
  }
+ acessibilidadeBotaoLer(art,()=>art.innerText.replace(/🔊 Ouvir texto/g,''));
  const botao=el('button','⧉ Copiar NPC','guia-abrir');botao.type='button';
  botao.onclick=async()=>{
   const texto=[npc.nome,...campos.map(([t,k])=>npc[k]?t+': '+npc[k]:'').filter(Boolean)].join('\n\n');
@@ -462,7 +464,9 @@ $('solo-aventura').onchange=()=>{
 function soloMensagem(papel,texto,tipo='acao',teste=null,numero=null){
  const art=el('article','','solo-mensagem '+(papel==='mestre'?'mestre':'jogador'));
  art.appendChild(el('strong',papel==='mestre'?'✧ Mestre IA':tipo==='ajuste'?'✎ Modificação solicitada':'♙ Você'));
- const p=el('p',texto);art.appendChild(p);$('solo-mensagens').appendChild(art);
+ const p=el('p',texto);art.appendChild(p);
+ if(papel==='mestre')acessibilidadeBotaoLer(art,()=>p.textContent);
+ $('solo-mensagens').appendChild(art);
  if(papel==='mestre'&&teste&&Number.isInteger(Number(numero)))soloAdicionarTeste(art,teste,Number(numero));
  return art;
 }
@@ -480,11 +484,12 @@ function soloAdicionarTeste(art,teste,numero){
   if(soloOcupado||!soloCampanhaId)return;
   soloOcupado=true;botao.disabled=true;$('solo-enviar').disabled=true;$('solo-voltar').disabled=true;
   const animacao=iniciarAnimacaoDado(palco,Number(teste.dado),Number(teste.quantidade));
+  acessibilidadeSomDado();
   const texto=el('p','Rolando e consultando o Mestre IA...','solo-teste-status');caixa.appendChild(texto);
   try{
    const r=await api('/api/solo/campanhas/'+soloCampanhaId+'/turnos','POST',{tipo:'rolagem',numero});
    const v=r.rolagem;
-   animacao.concluir(v.valores);
+   animacao.concluir(v.valores);acessibilidadeSomDado(true);
    const resultado='🎲 '+v.nome+': '+v.valores.join(' + ')+' ('+v.quantidade+'d'+v.dado+') '+(v.modificador>=0?'+ ':'- ')+Math.abs(v.modificador)+' = '+v.total+(v.passou===null?'':v.passou?' · Sucesso!':' · Falha');
    soloMensagem('jogador',resultado,'acao');
    soloMensagem('mestre',r.narracao,'acao',r.teste,r.numero);
@@ -570,7 +575,7 @@ $('solo-acao-form').onsubmit=async ev=>{
 function iniciarAnimacaoDado(alvo,lados,quantidade=1){
  const anterior=alvo._mesaAnimacao;
  if(anterior)anterior.cancelar();
- const reduz=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+ const reduz=acessibilidadeMovimentoReduzido();
  const formas={
   4:['65,7 115,109 15,109','65,7 65,109 15,109 65,7 115,109'],
   6:['65,10 117,38 117,91 65,119 13,91 13,38','65,10 65,64 117,38 65,64 65,119 65,64 13,38'],
@@ -631,13 +636,14 @@ $('abrir-guia-dados').onclick = () => {
   const q=Math.min(20,Math.max(1,parseInt($('qtd').value,10)||1));
   const v=Array.from({length:q},()=>1+Math.floor(Math.random()*lados));
   const palco=$('dados-animacao'),a=iniciarAnimacaoDado(palco,lados,q);
+  acessibilidadeSomDado();
   $('total').textContent='🎲';$('detalhe').textContent='Rolando '+q+'d'+lados+'...';
   const concluir=()=>{
    if(palco._mesaAnimacao!==a)return;
-   a.concluir(v);$('total').textContent=v.reduce((x,y)=>x+y,0);
+   a.concluir(v);acessibilidadeSomDado(true);$('total').textContent=v.reduce((x,y)=>x+y,0);
    $('detalhe').textContent=q+'d'+lados+': '+v.join(' + ');
   };
-  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches)concluir();
+  if(acessibilidadeMovimentoReduzido())concluir();
   else setTimeout(concluir,950);
  };
  $('dados').appendChild(b);
@@ -1759,6 +1765,103 @@ $('mesa-exportar-btn').onclick=async()=>{
  }catch(e){estado.textContent=e.message||'Erro ao preparar arquivo.';}
  finally{btn.disabled=false;}
 };
+
+
+/* Acessibilidade opcional, por conta do navegador e sem microfone. */
+const mesaA11y={fonte:false,contraste:false,movimento:false,som:false,velocidade:1,token:0,audio:null};
+function acessibilidadeAplicar(){
+ document.body.classList.toggle('mesa-fonte-grande',mesaA11y.fonte);
+ document.body.classList.toggle('mesa-alto-contraste',mesaA11y.contraste);
+ document.documentElement.classList.toggle('mesa-movimento-reduzido',mesaA11y.movimento);
+ for(const [id,chave] of [['mesa-fonte-grande','fonte'],['mesa-alto-contraste','contraste'],['mesa-reduzir-movimento','movimento'],['mesa-som-dados','som']])$(id).checked=mesaA11y[chave];
+ $('mesa-velocidade-voz').value=String(mesaA11y.velocidade);
+}
+function acessibilidadeSalvar(){
+ acessibilidadeAplicar();
+ try{localStorage.setItem('mesa-a11y-v1',JSON.stringify({fonte:mesaA11y.fonte,contraste:mesaA11y.contraste,movimento:mesaA11y.movimento,som:mesaA11y.som,velocidade:mesaA11y.velocidade}));}catch{}
+ $('mesa-acessibilidade-status').textContent='Preferências salvas neste dispositivo.';
+}
+function acessibilidadeMovimentoReduzido(){
+ return mesaA11y.movimento||window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+function acessibilidadeParar(){
+ mesaA11y.token++;
+ if('speechSynthesis' in window)window.speechSynthesis.cancel();
+}
+function acessibilidadeLer(valor){
+ const status=$('mesa-acessibilidade-status');
+ if(!('speechSynthesis' in window)||!('SpeechSynthesisUtterance' in window)){
+  status.textContent='Leitura por voz indisponível neste navegador. Use o leitor de tela do dispositivo.';return;
+ }
+ const texto=String(valor||'').replace(/\s+/g,' ').trim().slice(0,20000);
+ if(!texto){status.textContent='Não há texto disponível.';return;}
+ acessibilidadeParar();
+ const token=mesaA11y.token;
+ const partes=texto.match(/.{1,180}(?:[.!?;](?=\s|$)|\s|$)/g)||[texto];
+ let indice=0;
+ const proximo=()=>{
+  if(token!==mesaA11y.token)return;
+  if(indice>=partes.length){status.textContent='Leitura concluída.';return;}
+  const fala=new SpeechSynthesisUtterance(partes[indice++].trim());
+  fala.lang='pt-BR';fala.rate=mesaA11y.velocidade;
+  fala.onend=proximo;
+  fala.onerror=()=>{if(token===mesaA11y.token)status.textContent='A leitura foi interrompida.';};
+  try{speechSynthesis.speak(fala);}catch{status.textContent='Não foi possível ler este texto.';}
+ };
+ status.textContent='Lendo em voz alta. Você pode parar a leitura a qualquer momento.';proximo();
+}
+function acessibilidadeBotaoLer(alvo,conteudo){
+ const b=el('button','🔊 Ouvir texto','mesa-ler-trecho');b.type='button';
+ b.setAttribute('aria-label','Ler este trecho em voz alta');
+ b.onclick=()=>acessibilidadeLer(typeof conteudo==='function'?conteudo():conteudo);
+ alvo.appendChild(b);
+}
+function acessibilidadeSomDado(final=false){
+ if(!mesaA11y.som)return;
+ try{
+  const AudioC=window.AudioContext||window.webkitAudioContext;if(!AudioC)return;
+  if(!mesaA11y.audio)mesaA11y.audio=new AudioC();
+  const ctx=mesaA11y.audio;
+  if(ctx.state==='suspended')ctx.resume().catch(()=>{});
+  const inicio=ctx.currentTime;
+  for(let i=0;i<(final?2:4);i++){
+   const t=inicio+i*(final?.085:.055),osc=ctx.createOscillator(),g=ctx.createGain();
+   osc.type='triangle';osc.frequency.setValueAtTime((final?250:390)-i*40,t);
+   g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.042,t+.006);g.gain.exponentialRampToValueAtTime(.0001,t+.075);
+   osc.connect(g);g.connect(ctx.destination);osc.start(t);osc.stop(t+.08);
+  }
+ }catch{}
+}
+try{
+ const dados=JSON.parse(localStorage.getItem('mesa-a11y-v1')||'{}');
+ for(const k of ['fonte','contraste','movimento','som'])mesaA11y[k]=dados[k]===true;
+ if([.75,1,1.25].includes(Number(dados.velocidade)))mesaA11y.velocidade=Number(dados.velocidade);
+}catch{}
+acessibilidadeAplicar();
+$('mesa-acessibilidade-abrir').onclick=()=>{
+ const p=$('mesa-acessibilidade-painel'),aberto=p.hidden;
+ p.hidden=!aberto;$('mesa-acessibilidade-abrir').setAttribute('aria-expanded',String(aberto));
+ if(aberto)$('mesa-acessibilidade-fechar').focus();
+};
+$('mesa-acessibilidade-fechar').onclick=()=>{
+ $('mesa-acessibilidade-painel').hidden=true;$('mesa-acessibilidade-abrir').setAttribute('aria-expanded','false');
+ $('mesa-acessibilidade-abrir').focus();
+};
+for(const [id,chave] of [['mesa-fonte-grande','fonte'],['mesa-alto-contraste','contraste'],['mesa-reduzir-movimento','movimento'],['mesa-som-dados','som']]){
+ $(id).onchange=()=>{mesaA11y[chave]=$(id).checked;acessibilidadeSalvar();};
+}
+$('mesa-velocidade-voz').onchange=()=>{mesaA11y.velocidade=Number($('mesa-velocidade-voz').value);acessibilidadeSalvar();};
+$('mesa-parar-leitura').onclick=()=>{acessibilidadeParar();$('mesa-acessibilidade-status').textContent='Leitura parada.';};
+$('mesa-ler-pagina').onclick=()=>{
+ const secao=[...document.querySelectorAll('section[id^="v-"]')].find(v=>!v.hidden);
+ if(!secao)return;
+ const texto=secao.cloneNode(true);
+ texto.querySelectorAll('button,form,input,textarea,select,[hidden],svg,nav').forEach(e=>e.remove());
+ acessibilidadeLer(texto.textContent);
+};
+document.addEventListener('keydown',e=>{
+ if(e.key==='Escape'&&!$('mesa-acessibilidade-painel').hidden)$('mesa-acessibilidade-fechar').click();
+});
 
 (function informarCookies(){
  const caixa=$('mesa-cookies-aviso'),btn=$('mesa-cookies-entendi');
