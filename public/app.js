@@ -1816,28 +1816,64 @@ function acessibilidadeBotaoLer(alvo,conteudo){
  b.onclick=()=>acessibilidadeLer(typeof conteudo==='function'?conteudo():conteudo);
  alvo.appendChild(b);
 }
-function acessibilidadeSomDado(final=false){
- if(!mesaA11y.som)return;
+// Navegadores móveis só liberam Web Audio após um gesto do usuário.
+// Mantemos o mesmo AudioContext para a rolagem e seu resultado final.
+async function acessibilidadePrepararAudio(){
+ const C=window.AudioContext||window.webkitAudioContext;
+ if(!C)return {ok:false,erro:'Este navegador não oferece suporte ao áudio dos dados.'};
  try{
-  const AudioC=window.AudioContext||window.webkitAudioContext;if(!AudioC)return;
-  if(!mesaA11y.audio)mesaA11y.audio=new AudioC();
-  const ctx=mesaA11y.audio;
-  if(ctx.state==='suspended')ctx.resume().catch(()=>{});
-  const inicio=ctx.currentTime;
-  for(let i=0;i<(final?2:4);i++){
-   const t=inicio+i*(final?.085:.055),osc=ctx.createOscillator(),g=ctx.createGain();
-   osc.type='triangle';osc.frequency.setValueAtTime((final?250:390)-i*40,t);
-   g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.042,t+.006);g.gain.exponentialRampToValueAtTime(.0001,t+.075);
-   osc.connect(g);g.connect(ctx.destination);osc.start(t);osc.stop(t+.08);
-  }
- }catch{}
+  let ctx=mesaA11y.audio;
+  if(!ctx||ctx.state==='closed'){ctx=new C();mesaA11y.audio=ctx;}
+  if(ctx.state!=='running')await ctx.resume();
+  if(ctx.state!=='running')return {ok:false,erro:'O navegador bloqueou o som. Toque em Testar som novamente.'};
+  return {ok:true,ctx};
+ }catch{
+  return {ok:false,erro:'Não foi possível ativar o som. Confira as permissões e o volume de mídia.'};
+ }
 }
+function acessibilidadeTocarDado(ctx,final=false){
+ // Cliques curtos com tom grave e envelope suave para lembrar dados batendo na mesa.
+ const base=ctx.currentTime+.012;
+ const batidas=final?3:5;
+ for(let i=0;i<batidas;i++){
+  const t=base+i*(final?.085:.067);
+  const osc=ctx.createOscillator(),gain=ctx.createGain();
+  osc.type=i%2?'triangle':'square';
+  osc.frequency.setValueAtTime(final?175+i*36:340-i*32,t);
+  osc.frequency.exponentialRampToValueAtTime(final?110:150,t+.065);
+  gain.gain.setValueAtTime(.0001,t);
+  gain.gain.exponentialRampToValueAtTime(final?.13:.11,t+.008);
+  gain.gain.exponentialRampToValueAtTime(.0001,t+.085);
+  osc.connect(gain);gain.connect(ctx.destination);
+  osc.start(t);osc.stop(t+.09);
+ }
+}
+async function acessibilidadeSomDado(final=false,forcar=false){
+ if(!mesaA11y.som&&!forcar)return false;
+ const audio=await acessibilidadePrepararAudio();
+ if(!audio.ok){
+  if(forcar)$('mesa-acessibilidade-status').textContent=audio.erro;
+  return false;
+ }
+ try{acessibilidadeTocarDado(audio.ctx,final);return true;}
+ catch{
+  if(forcar)$('mesa-acessibilidade-status').textContent='Falha ao reproduzir o som de teste.';
+  return false;
+ }
+}
+
 try{
  const dados=JSON.parse(localStorage.getItem('mesa-a11y-v1')||'{}');
  for(const k of ['fonte','contraste','movimento','som'])mesaA11y[k]=dados[k]===true;
  if([.75,1,1.25].includes(Number(dados.velocidade)))mesaA11y.velocidade=Number(dados.velocidade);
 }catch{}
 acessibilidadeAplicar();
+$('mesa-testar-som-dados').onclick=async()=>{
+ const estado=$('mesa-acessibilidade-status');
+ estado.textContent='Testando o som dos dados...';
+ const ok=await acessibilidadeSomDado(false,true);
+ if(ok)estado.textContent='Som de teste reproduzido. Se não ouviu, aumente o volume de mídia do dispositivo.';
+};
 $('mesa-acessibilidade-abrir').onclick=()=>{
  const p=$('mesa-acessibilidade-painel'),aberto=p.hidden;
  p.hidden=!aberto;$('mesa-acessibilidade-abrir').setAttribute('aria-expanded',String(aberto));
@@ -1848,7 +1884,7 @@ $('mesa-acessibilidade-fechar').onclick=()=>{
  $('mesa-acessibilidade-abrir').focus();
 };
 for(const [id,chave] of [['mesa-fonte-grande','fonte'],['mesa-alto-contraste','contraste'],['mesa-reduzir-movimento','movimento'],['mesa-som-dados','som']]){
- $(id).onchange=()=>{mesaA11y[chave]=$(id).checked;acessibilidadeSalvar();};
+ $(id).onchange=()=>{mesaA11y[chave]=$(id).checked;acessibilidadeSalvar();if(chave==='som'&&mesaA11y.som){acessibilidadeSomDado(false,true).then(ok=>{$('mesa-acessibilidade-status').textContent=ok?'Som dos dados ativado.':'Som ativado, mas o navegador bloqueou a reprodução. Use Testar som.';});}};
 }
 $('mesa-velocidade-voz').onchange=()=>{mesaA11y.velocidade=Number($('mesa-velocidade-voz').value);acessibilidadeSalvar();};
 $('mesa-parar-leitura').onclick=()=>{acessibilidadeParar();$('mesa-acessibilidade-status').textContent='Leitura parada.';};
