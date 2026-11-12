@@ -114,7 +114,34 @@ app.get('/api/db-health',asyncHandler(async(req,res)=>{
   await query('SELECT 1'); res.json({ok:true,database:'connected'});
 }));
 
+// Limitação persistente no PostgreSQL: funciona entre instâncias serverless.
+// Identificadores de IP e e-mail são HMAC, evitando armazená-los em texto puro.
+const exigirLimiteAuth=async(req,res,classe,email='')=>{
+ const ip=String(req.ip||'indefinido').slice(0,120);
+ const id=classe+':'+crypto.createHmac('sha256',process.env.SESSION_SECRET)
+  .update(email?email.trim().toLowerCase():ip).digest('hex');
+ const janelas={cadastro:[5,1800],loginIp:[20,900],loginConta:[8,900],recuperacao:[5,900]};
+ const [max,segundos]=janelas[classe];
+ const r=await query(`INSERT INTO public.mesa_rate_limits(chave,total,expira_em)
+ VALUES($1,1,now()+($2::int * interval '1 second'))
+ ON CONFLICT(chave) DO UPDATE SET total=CASE
+ WHEN public.mesa_rate_limits.expira_em <= now() THEN 1
+ ELSE public.mesa_rate_limits.total+1 END,
+ expira_em=CASE WHEN public.mesa_rate_limits.expira_em <= now()
+ THEN now()+($2::int * interval '1 second')
+ ELSE public.mesa_rate_limits.expira_em END
+ RETURNING total,extract(epoch FROM (expira_em-now()))::int AS restante`,[id,segundos]);
+ if(r.rows[0].total>max){
+  res.set('Retry-After',String(Math.max(1,r.rows[0].restante||segundos)));
+  res.status(429).json({erro:'Muitas tentativas. Aguarde alguns minutos e tente novamente.'});
+  return false;
+ }
+ return true;
+};
+// Respostas sensíveis não devem ser armazenadas por caches compartilhados.
+app.use('/api',(req,res,next)=>{res.set('Cache-Control','no-store');next();});
 app.post('/api/cadastro', asyncHandler(async(req,res) => {
+  if(!await exigirLimiteAuth(req,res,'cadastro'))return;
   const {email,senha,tokenBootstrap,aceiteTermos} = req.body || {};
   if(aceiteTermos!==true)return res.status(400).json({erro:'Leia e aceite os Termos de Uso para criar sua conta.'});
   if (!emailValido(email) || !senhaValida(senha)) return res.status(400).json({erro:'Use um e-mail válido e senha de 8 a 72 caracteres.'});
@@ -140,6 +167,8 @@ app.post('/api/cadastro', asyncHandler(async(req,res) => {
   res.json({ok:true});
 }));
 app.post('/api/login',asyncHandler(async(req,res) => {
+  if(!await exigirLimiteAuth(req,res,'loginIp'))return;
+  if(typeof req.body?.email==='string' && !await exigirLimiteAuth(req,res,'loginConta',req.body.email))return;
   const {email,senha} = req.body || {};
   const r = typeof email === 'string' && email.length <= 254
     ? await query('SELECT id,senha_hash,bloqueado_ate FROM public.usuarios WHERE email=$1',[email.trim().toLowerCase()])
