@@ -1832,22 +1832,46 @@ async function acessibilidadePrepararAudio(){
  }
 }
 function acessibilidadeTocarDado(ctx,final=false){
- // Cliques curtos com tom grave e envelope suave para lembrar dados batendo na mesa.
- const base=ctx.currentTime+.012;
- const batidas=final?3:5;
- for(let i=0;i<batidas;i++){
-  const t=base+i*(final?.085:.067);
-  const osc=ctx.createOscillator(),gain=ctx.createGain();
-  osc.type=i%2?'triangle':'square';
-  osc.frequency.setValueAtTime(final?175+i*36:340-i*32,t);
-  osc.frequency.exponentialRampToValueAtTime(final?110:150,t+.065);
-  gain.gain.setValueAtTime(.0001,t);
-  gain.gain.exponentialRampToValueAtTime(final?.13:.11,t+.008);
-  gain.gain.exponentialRampToValueAtTime(.0001,t+.085);
-  osc.connect(gain);gain.connect(ctx.destination);
-  osc.start(t);osc.stop(t+.09);
+ // Som de dado de mesa feito com impactos curtos de ruído filtrado,
+ // atrito e repiques que desaceleram. Sem os bipes dos osciladores antigos.
+ const taxa=ctx.sampleRate;
+ const duracao=final?.50:.88;
+ const buffer=ctx.createBuffer(1,Math.ceil(taxa*duracao),taxa);
+ const dados=buffer.getChannelData(0);
+ // Distribuição irregular de pequenas batidas, como dados de resina na madeira.
+ const eventos=final
+  ? [[.015,.58],[.10,.38],[.21,.25],[.34,.14]]
+  : [[.015,.76],[.067,.49],[.138,.68],[.225,.40],[.345,.51],[.49,.26],[.65,.16],[.78,.09]];
+ // Ruído aleatório com decaimento rápido, mais uma ressonância muito baixa.
+ for(const [tempo,intensidade] of eventos){
+  const inicio=Math.floor(tempo*taxa);
+  const comprimento=Math.floor((.038+intensidade*.025)*taxa);
+  let anterior=0;
+  for(let j=0;j<comprimento&&inicio+j<dados.length;j++){
+   const t=j/taxa;
+   const ruido=Math.random()*2-1;
+   // Diferencia o ruído em alta frequência para soar como um clique físico.
+   const agudo=ruido-anterior*.72;anterior=ruido;
+   const envelope=Math.exp(-t*(92-25*intensidade));
+   const madeira=Math.sin(2*Math.PI*(165+65*intensidade)*t)*Math.exp(-t*68);
+   dados[inicio+j]+=intensidade*envelope*(agudo*.62+madeira*.27);
+  }
  }
+ // Atrito baixo entre impactos, como o dado escorregando na mesa.
+ for(let i=0;i<dados.length;i++){
+  const t=i/taxa;
+  const escorregar=Math.max(0,1-t/duracao);
+  dados[i]+=(Math.random()*2-1)*.012*escorregar*escorregar;
+  dados[i]=Math.max(-1,Math.min(1,dados[i]));
+ }
+ const fonte=ctx.createBufferSource(),filtro=ctx.createBiquadFilter(),volume=ctx.createGain();
+ fonte.buffer=buffer;
+ filtro.type='lowpass';filtro.frequency.value=2400;filtro.Q.value=.6;
+ volume.gain.value=.70;
+ fonte.connect(filtro);filtro.connect(volume);volume.connect(ctx.destination);
+ fonte.start();
 }
+
 async function acessibilidadeSomDado(final=false,forcar=false){
  if(!mesaA11y.som&&!forcar)return false;
  const audio=await acessibilidadePrepararAudio();
