@@ -250,6 +250,29 @@ app.get('/api/eu',asyncHandler(async(req,res) => {
   const u = await atual(req);
   res.json({logado:!!u,email:u?.email||null,papel:u?.papel||null,restantes:await restantes(req,u)});
 }));
+// Exportação informativa dos dados de uso pertencentes ao titular autenticado.
+// Não entrega senhas, hashes, cookies, tokens, auditoria ou informações de outras contas.
+// Cada coleção tem limite de 1000 itens; dados adicionais podem ser solicitados pelo suporte.
+app.get('/api/conta/meus-dados',asyncHandler(async(req,res)=>{
+ const u=await atual(req);
+ if(!u)return res.status(401).json({erro:'Entre na sua conta para exportar seus dados.'});
+ const [perfil,aventuras,personagens,npcs,campanhas,mensagens,suporte]=await Promise.all([
+  query('SELECT email,papel,criado_em,ultimo_login_em,termos_aceitos_em,termos_versao FROM public.usuarios WHERE id=$1',[u.id]),
+  query('SELECT id,genero,tom,jogadores,conteudo,criado_em FROM public.aventuras WHERE usuario_id=$1 ORDER BY id DESC LIMIT 1000',[u.id]),
+  query('SELECT id,nome,dados,criado_em,atualizado_em FROM public.personagens_dnd WHERE usuario_id=$1 ORDER BY id DESC LIMIT 1000',[u.id]),
+  query('SELECT id,aventura_id,conteudo,criado_em FROM public.mesa_npcs WHERE usuario_id=$1 ORDER BY id DESC LIMIT 1000',[u.id]),
+  query('SELECT id,aventura_id,titulo,genero,tom,premissa,resumo,turno_atual,criado_em,atualizado_em FROM public.mesa_solo_campanhas WHERE usuario_id=$1 ORDER BY id DESC LIMIT 1000',[u.id]),
+  query('SELECT m.id,m.campanha_id,m.numero,m.papel,m.tipo,m.texto,m.teste,m.criado_em FROM public.mesa_solo_mensagens m JOIN public.mesa_solo_campanhas c ON c.id=m.campanha_id WHERE c.usuario_id=$1 ORDER BY m.id DESC LIMIT 1000',[u.id]),
+  query('SELECT id,assunto,mensagem,resposta,status,criado_em,atualizado_em FROM public.mesa_chamados WHERE usuario_id=$1 ORDER BY id DESC LIMIT 1000',[u.id])
+ ]);
+ res.set({'Cache-Control':'private, no-store','Content-Disposition':'attachment; filename="mesa-meus-dados.json"','X-Content-Type-Options':'nosniff'});
+ res.type('application/json').send(JSON.stringify({
+  exportadoEm:new Date().toISOString(),tipo:'exportacao_autosservico_limitada',
+  observacao:'Até 1000 registros por coleção. Fotos originais, sessões, logs técnicos e outros registros não integram este arquivo. Solicite acesso adicional pelo Suporte (LGPD).',
+  conta:perfil.rows[0],aventuras:aventuras.rows,personagens:personagens.rows,npcs:npcs.rows,
+  campanhasSolo:campanhas.rows,mensagensSolo:mensagens.rows,chamadosSuporte:suporte.rows
+ }));
+}));
 // Manutenção é imposta no servidor; não basta desabilitar botões no navegador.
 const modoManutencao=asyncHandler(async(req,res,next)=>{
  const r=await query("SELECT valor FROM public.mesa_config WHERE chave='modo_manutencao'");
