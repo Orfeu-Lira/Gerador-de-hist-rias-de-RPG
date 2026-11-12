@@ -77,7 +77,7 @@ app.use(session({
   cookie: { httpOnly: true, secure: PRODUCAO, sameSite: PRODUCAO ? 'none' : 'lax', maxAge: 604800000 }
 }));
 
-const GENEROS = ['Fantasia sombria','Fantasia épica','Ficção científica','Terror','Investigação','Piratas e mares'];
+const GENEROS = ['Fantasia sombria','Fantasia épica','D&D clássico','Ficção científica','Terror','Investigação','Piratas e mares'];
 const TONS = ['Misterioso','Aventureiro','Sombrio','Leve e bem-humorado','Tenso'];
 const HASH_FALSO = bcrypt.hashSync('senha-falsa-para-proteger-tempo-de-resposta', 12);
 const emailValido = s => typeof s === 'string' && s.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
@@ -385,10 +385,13 @@ app.post('/api/musicas',musicaLimite,asyncHandler(async(req,res)=>{
 // Geração compartilhada com a cota existente (1 visitante, 5 usuário, admin livre).
 app.post('/api/npcs/gerar',asyncHandler(async(req,res)=>{
  const {genero,tom}=req.body||{},descricao=req.body?.descricao;
+ const resumo=req.body?.resumo??'',tematica=req.body?.tematica??'',situacao=req.body?.situacao??'';
  const aventuraId=req.body?.aventuraId;
  if(!GENEROS.includes(genero)||!TONS.includes(tom)||typeof descricao!=='string'||descricao.length>1500||
+    typeof resumo!=='string'||resumo.length>1800||typeof tematica!=='string'||tematica.length>120||
+    typeof situacao!=='string'||situacao.length>350||
     (aventuraId!==null&&aventuraId!==undefined&&(!Number.isSafeInteger(Number(aventuraId))||Number(aventuraId)<1)))
-   return res.status(400).json({erro:'Informe um cenário, tom e descrição válidos.'});
+   return res.status(400).json({erro:'Informe um gênero, tom, resumo, temática e situação válidos.'});
  const u=await atual(req);
  let contexto='',id=null;
  if(aventuraId!==null&&aventuraId!==undefined){
@@ -401,7 +404,8 @@ app.post('/api/npcs/gerar',asyncHandler(async(req,res)=>{
    contexto=JSON.stringify({genero:r.rows[0].genero,tom:r.rows[0].tom,titulo:a.titulo,gancho:a.gancho,
      locais:a.locais,npcs:a.npcs,vilao:a.vilao}).slice(0,4500);
  }
- if(!descricao.trim()&&!id)return res.status(400).json({erro:'Descreva o NPC ou selecione uma aventura salva.'});
+ if(!descricao.trim()&&!resumo.trim()&&!tematica.trim()&&!situacao.trim()&&!id)
+   return res.status(400).json({erro:'Descreva o NPC ou informe o contexto da cena, ou selecione uma aventura salva.'});
  const key=quotaKey(req,u),limit=u?5:1,bypass=u?.papel==='admin';
  if(!bypass){
    const claimed=await query(
@@ -410,7 +414,7 @@ app.post('/api/npcs/gerar',asyncHandler(async(req,res)=>{
    if(!claimed.rowCount)return res.status(403).json({erro:u?'Você usou todas as gerações de hoje.':'O teste grátis acabou. Crie uma conta para continuar.',codigo:u?'limite_diario':'limite_visitante'});
  }
  try{
-   const npc=await gerarNpc({genero,tom,descricao:descricao.trim(),contexto});
+   const npc=await gerarNpc({genero,tom,descricao:descricao.trim(),contexto,resumo:resumo.trim(),tematica:tematica.trim(),situacao:situacao.trim()});
    if(u)await query('INSERT INTO public.mesa_npcs(usuario_id,aventura_id,conteudo) VALUES($1,$2,$3::jsonb)',[u.id,id,JSON.stringify(npc)]);
    res.json({npc,restantes:await restantes(req,u)});
  }catch(e){
