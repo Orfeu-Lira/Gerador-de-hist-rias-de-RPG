@@ -473,20 +473,24 @@ function soloAdicionarTeste(art,teste,numero){
  const formula=Number(teste.quantidade)+'d'+Number(teste.dado)+(Number(teste.modificador)?(teste.modificador>0?'+':'')+teste.modificador:'');
  caixa.appendChild(el('p','Role '+formula+(Number.isInteger(teste.dificuldade)?' · Dificuldade '+teste.dificuldade:''),'solo-teste-formula'));
  caixa.appendChild(el('p',teste.explicacao||'O dado indica o resultado de uma ação incerta.','solo-teste-explicacao'));
- const botao=el('button','🎲 Rolar '+formula,'guia-abrir');botao.type='button';
+ const palco=el('div','','solo-dado-animacao');
+ caixa.appendChild(palco);
+  const botao=el('button','🎲 Rolar '+formula,'guia-abrir');botao.type='button';
  botao.onclick=async()=>{
   if(soloOcupado||!soloCampanhaId)return;
   soloOcupado=true;botao.disabled=true;$('solo-enviar').disabled=true;$('solo-voltar').disabled=true;
+  const animacao=iniciarAnimacaoDado(palco,Number(teste.dado),Number(teste.quantidade));
   const texto=el('p','Rolando e consultando o Mestre IA...','solo-teste-status');caixa.appendChild(texto);
   try{
    const r=await api('/api/solo/campanhas/'+soloCampanhaId+'/turnos','POST',{tipo:'rolagem',numero});
    const v=r.rolagem;
+   animacao.concluir(v.valores);
    const resultado='🎲 '+v.nome+': '+v.valores.join(' + ')+' ('+v.quantidade+'d'+v.dado+') '+(v.modificador>=0?'+ ':'- ')+Math.abs(v.modificador)+' = '+v.total+(v.passou===null?'':v.passou?' · Sucesso!':' · Falha');
    soloMensagem('jogador',resultado,'acao');
    soloMensagem('mestre',r.narracao,'acao',r.teste,r.numero);
    botao.remove();texto.textContent='Resultado registrado nesta campanha.';
    soloEstado('');
-  }catch(e){texto.textContent=e.message;botao.disabled=false;soloEstado('Não foi possível concluir a rolagem: '+e.message,true);}
+  }catch(e){animacao.cancelar();palco.replaceChildren();texto.textContent=e.message;botao.disabled=false;soloEstado('Não foi possível concluir a rolagem: '+e.message,true);}
   finally{soloOcupado=false;$('solo-enviar').disabled=false;$('solo-voltar').disabled=false;soloFimLista();}
  };
  caixa.appendChild(botao);art.appendChild(caixa);
@@ -561,6 +565,59 @@ $('solo-acao-form').onsubmit=async ev=>{
  }finally{soloOcupado=false;$('solo-enviar').disabled=false;$('solo-voltar').disabled=false;soloFimLista();}
 };
 
+// Animação compartilhada pelas ferramentas, sem compartilhar estado ou resultados.
+// O número exibido ao final vem da rolagem já calculada (no Solo, pelo servidor).
+function iniciarAnimacaoDado(alvo,lados,quantidade=1){
+ const anterior=alvo._mesaAnimacao;
+ if(anterior)anterior.cancelar();
+ const reduz=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+ const formas={
+  4:['65,7 115,109 15,109','65,7 65,109 15,109 65,7 115,109'],
+  6:['65,10 117,38 117,91 65,119 13,91 13,38','65,10 65,64 117,38 65,64 65,119 65,64 13,38'],
+  8:['65,6 117,62 65,119 13,62','65,6 65,119 13,62 117,62'],
+  10:['65,6 113,44 104,91 65,120 26,91 17,44','65,6 65,120 17,44 65,6 113,44'],
+  12:['65,6 96,15 118,41 118,82 91,112 65,121 39,112 12,82 12,41 34,15','65,6 65,121 12,41 118,82 12,82 118,41'],
+  20:['65,5 103,17 122,63 104,104 65,121 26,104 8,63 27,17','65,5 65,121 8,63 122,63 27,17 104,104 103,17 26,104'],
+  100:['65,4 101,15 125,49 119,87 90,116 43,116 12,86 5,49 29,15','65,4 65,116 5,49 125,49 29,15 90,116']
+ };
+ const shape=formas[lados]||formas[20];
+ const container=el('div','','mesa-dado-palco');
+ const svgNS='http://www.w3.org/2000/svg';
+ const svg=document.createElementNS(svgNS,'svg');svg.setAttribute('viewBox','0 0 130 130');
+ svg.setAttribute('aria-hidden','true');svg.classList.add('mesa-dado-svg','mesa-dado-d'+lados);
+ const face=document.createElementNS(svgNS,'polygon');face.setAttribute('points',shape[0]);face.setAttribute('class','mesa-dado-face');
+ const riscos=document.createElementNS(svgNS,'polyline');riscos.setAttribute('points',shape[1]);riscos.setAttribute('class','mesa-dado-facetas');
+ const numero=document.createElementNS(svgNS,'text');numero.setAttribute('x','65');numero.setAttribute('y','74');numero.setAttribute('class','mesa-dado-numero');numero.setAttribute('text-anchor','middle');
+ numero.textContent='?';svg.append(face,riscos,numero);
+ const legenda=el('span',quantidade+'d'+lados+' · Rolando...','mesa-dado-legenda');
+ const dado=el('div','','mesa-dado-objeto');dado.appendChild(svg);
+ container.append(dado,legenda);
+ alvo.replaceChildren(container);
+ let token=0,interval=null,timeout=null;
+ const gerarNumero=()=>1+Math.floor(Math.random()*lados);
+ if(!reduz){
+  dado.classList.add('girando');
+  interval=setInterval(()=>{numero.textContent=String(gerarNumero());},75);
+ }else numero.textContent='…';
+ const limpar=()=>{if(interval!==null){clearInterval(interval);interval=null;}if(timeout!==null){clearTimeout(timeout);timeout=null;}};
+ const api={
+  concluir(valores){
+   if(alvo._mesaAnimacao!==api)return;
+   limpar();dado.classList.remove('girando');dado.classList.add('concluido');
+   const lista=Array.isArray(valores)?valores:[valores];
+   const primeira=Number(lista[0]);numero.textContent=Number.isFinite(primeira)?String(primeira):'?';
+   legenda.textContent=quantidade+'d'+lados+' · '+(lista.length>1?lista.join(' + '):'Resultado: '+primeira);
+   container.setAttribute('aria-label',legenda.textContent);
+  },
+  cancelar(){
+   limpar();if(alvo._mesaAnimacao===api)delete alvo._mesaAnimacao;
+   dado.classList.remove('girando');
+  }
+ };
+ alvo._mesaAnimacao=api;
+ return api;
+}
+
 // ---- Dados e tutorial para iniciantes ----
 $('abrir-guia-dados').onclick = () => {
   const painel = $('guia-dados');
@@ -569,15 +626,21 @@ $('abrir-guia-dados').onclick = () => {
   $('abrir-guia-dados').textContent = painel.hidden ? 'Ver tutorial dos dados ↓' : 'Fechar tutorial ↑';
 };
 [4, 6, 8, 10, 12, 20, 100].forEach((lados) => {
-  const b = el('button', 'd' + lados, 'dado');
-  b.type = 'button';
-  b.onclick = () => {
-    const q = Math.min(20, Math.max(1, parseInt($('qtd').value, 10) || 1));
-    const v = Array.from({ length: q }, () => 1 + Math.floor(Math.random() * lados));
-    $('total').textContent = v.reduce((a, c) => a + c, 0);
-    $('detalhe').textContent = q + 'd' + lados + ': ' + v.join(' + ');
+ const b=el('button','d'+lados,'dado');b.type='button';
+ b.onclick=()=>{
+  const q=Math.min(20,Math.max(1,parseInt($('qtd').value,10)||1));
+  const v=Array.from({length:q},()=>1+Math.floor(Math.random()*lados));
+  const palco=$('dados-animacao'),a=iniciarAnimacaoDado(palco,lados,q);
+  $('total').textContent='🎲';$('detalhe').textContent='Rolando '+q+'d'+lados+'...';
+  const concluir=()=>{
+   if(palco._mesaAnimacao!==a)return;
+   a.concluir(v);$('total').textContent=v.reduce((x,y)=>x+y,0);
+   $('detalhe').textContent=q+'d'+lados+': '+v.join(' + ');
   };
-  $('dados').appendChild(b);
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches)concluir();
+  else setTimeout(concluir,950);
+ };
+ $('dados').appendChild(b);
 });
 
 // ---- Histórico ----
