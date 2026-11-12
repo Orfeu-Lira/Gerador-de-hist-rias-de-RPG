@@ -131,6 +131,9 @@ const exigirLimiteAuth=async(req,res,classe,email='')=>{
  THEN now()+($2::int * interval '1 second')
  ELSE public.mesa_rate_limits.expira_em END
  RETURNING total,extract(epoch FROM (expira_em-now()))::int AS restante`,[id,segundos]);
+ if(crypto.randomInt(0,100)===0){
+  await query("DELETE FROM public.mesa_rate_limits WHERE expira_em < now() - interval '1 day'").catch(()=>{});
+ }
  if(r.rows[0].total>max){
   res.set('Retry-After',String(Math.max(1,r.rows[0].restante||segundos)));
   res.status(429).json({erro:'Muitas tentativas. Aguarde alguns minutos e tente novamente.'});
@@ -709,7 +712,12 @@ app.post('/api/personagens/:id/avatar',asyncHandler(async(req,res)=>{
   if(typeof base64!=='string'||base64.length<80||base64.length>525000||!/^[a-zA-Z0-9+/]+={0,2}$/.test(base64))
     return res.status(400).json({erro:'Imagem inválida ou grande demais.'});
   const imagem=Buffer.from(base64,'base64');
-  if(imagem.length>393216||imagem.length<64||imagem.toString('ascii',0,4)!=='RIFF'||imagem.toString('ascii',8,12)!=='WEBP')
+  // Verifica também o tamanho RIFF e o primeiro bloco WEBP. Apenas checar
+  // os quatro primeiros bytes aceitaria arquivos arbitrários com cabeçalho forjado.
+  const tipoWebp=imagem.length>=16?imagem.toString('ascii',12,16):'';
+  if(imagem.length>393216||imagem.length<64||imagem.toString('ascii',0,4)!=='RIFF'||
+     imagem.toString('ascii',8,12)!=='WEBP'||!['VP8 ','VP8L','VP8X'].includes(tipoWebp)||
+     imagem.readUInt32LE(4)!==imagem.length-8)
     return res.status(400).json({erro:'Use uma imagem WebP válida de até 384 KB.'});
   const path=acesso.u.id+'/'+acesso.id+'/avatar.webp';
   const url=avatarBase()+path;
