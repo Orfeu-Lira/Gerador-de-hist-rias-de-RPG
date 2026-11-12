@@ -760,3 +760,13 @@ main select,main textarea{max-width:100%;min-width:0}
 .mesa-cookies-aviso a{color:#8b4d2e;text-decoration:underline}
 .mesa-cookies-aviso button{flex:none}
 @media(max-width:650px){.mesa-cookies-aviso{flex-direction:column;align-items:stretch;bottom:10px}.mesa-cookies-aviso button{width:100%}}
+
+/* Acessibilidade: salto por teclado e foco visível antes do menu lateral. */
+.mesa-pular{position:fixed;z-index:9999;top:8px;left:12px;transform:translateY(-160%);padding:12px 18px;border-radius:9px;background:#f4e4ba;color:#233d33;font-weight:800;box-shadow:0 6px 22px #0008}
+.mesa-pular:focus{transform:translateY(0);outline:3px solid #fff;outline-offset:2px}
+#mesa-conteudo:focus{outline:none}
+.mesa-exportar-dados{margin:20px 0;padding:17px;background:#fff8e7;border:1px solid #d8bb88;border-radius:11px;color:#453726}
+.mesa-exportar-dados h3{margin:0 0 8px;color:#463525}
+.mesa-exportar-dados p{line-height:1.65;overflow-wrap:break-word}
+.mesa-exportar-dados button{min-height:44px}
+@media (prefers-reduced-motion: reduce){.mesa-pular{transition:none!important}}
