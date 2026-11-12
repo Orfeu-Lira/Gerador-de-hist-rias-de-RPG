@@ -778,3 +778,33 @@ main select,main textarea{max-width:100%;min-width:0}
 .npc-contexto-cena :is(input,textarea){width:100%;max-width:100%;min-width:0}
 .npc-contexto-cena .suave{font-size:.86rem;color:#65543c}
 @media(max-width:680px){.npc-contexto-cena{padding:13px}.npc-contexto-cena .grade{grid-template-columns:minmax(0,1fr)}}
+
+/* Dados animados: uma forma distinta para cada número de faces, interação consistente
+   no Oráculo e nos pedidos do Mestre IA. O resultado matemático nunca depende da animação. */
+.dados-animacao-area{display:flex;justify-content:center;align-items:center;min-height:0;margin:8px 0}
+.dados-animacao-area:has(.mesa-dado-palco){min-height:180px}
+.mesa-dado-palco{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:min(100%,260px);min-height:153px;isolation:isolate}
+.mesa-dado-objeto{position:relative;width:132px;height:132px;display:grid;place-items:center;filter:drop-shadow(0 13px 11px #21170b66)}
+.mesa-dado-svg{display:block;width:126px;height:126px;overflow:visible;transform-origin:50% 50%}
+.mesa-dado-face{fill:#ac4e35;stroke:#efc981;stroke-width:3;stroke-linejoin:round}
+.mesa-dado-facetas{fill:none;stroke:#f7d9a5;stroke-width:2.6;stroke-linejoin:round;opacity:.82}
+.mesa-dado-numero{fill:#fff8e9;stroke:#492817;stroke-width:1.4;paint-order:stroke;font:900 30px Georgia,serif;dominant-baseline:middle}
+.mesa-dado-d4 .mesa-dado-face{fill:#b35e42}
+.mesa-dado-d6 .mesa-dado-face{fill:#975438}
+.mesa-dado-d8 .mesa-dado-face{fill:#32766b}
+.mesa-dado-d10 .mesa-dado-face{fill:#73568e}
+.mesa-dado-d12 .mesa-dado-face{fill:#506fa0}
+.mesa-dado-d20 .mesa-dado-face{fill:#a44a36}
+.mesa-dado-d100 .mesa-dado-face{fill:#766037}
+.mesa-dado-legenda{font-weight:700;color:#f8e9cb;font-size:.88rem;text-align:center;overflow-wrap:anywhere}
+.solo-dado-animacao .mesa-dado-legenda{color:#59402e}
+.solo-dado-animacao .mesa-dado-palco{margin:0 auto;min-height:145px}
+.mesa-dado-objeto.girando{animation:mesa-rolagem-salto .7s ease-in-out infinite alternate}
+.mesa-dado-objeto.girando .mesa-dado-svg{animation:mesa-rolagem-rotacao .42s linear infinite}
+.mesa-dado-objeto.concluido{animation:mesa-rolagem-concluir .4s cubic-bezier(.2,1.6,.45,1) both}
+@keyframes mesa-rolagem-salto{0%{transform:translateY(12px) scale(.92)}55%{transform:translateY(-20px) scale(1.04)}100%{transform:translateY(8px) scale(.96)}}
+@keyframes mesa-rolagem-rotacao{0%{transform:rotate(-15deg) scale(.92)}50%{transform:rotate(180deg) scale(1.06)}100%{transform:rotate(345deg) scale(.92)}}
+@keyframes mesa-rolagem-concluir{0%{transform:scale(.74) rotate(-20deg)}65%{transform:scale(1.13) rotate(6deg)}100%{transform:scale(1) rotate(0)}}
+@media(prefers-reduced-motion:reduce){
+ .mesa-dado-objeto.girando,.mesa-dado-objeto.girando .mesa-dado-svg,.mesa-dado-objeto.concluido{animation:none!important}
+}
