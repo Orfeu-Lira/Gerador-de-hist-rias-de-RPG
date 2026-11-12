@@ -199,6 +199,7 @@ const urlRecuperacao = () => {
   return destino;
 };
 app.post('/api/senha/solicitar', limiteRecuperacao, asyncHandler(async (req,res) => {
+  if(!await exigirLimiteAuth(req,res,'recuperacao'))return;
   if (!resetConfigurado()) return res.status(503).json({erro:'A recuperação por e-mail está sendo configurada. Tente novamente mais tarde.'});
   const email = req.body?.email;
   if (!emailValido(email)) return res.status(400).json({erro:'Informe um e-mail válido.'});
@@ -243,6 +244,7 @@ app.post('/api/senha/solicitar', limiteRecuperacao, asyncHandler(async (req,res)
   res.json({mensagem});
 }));
 app.post('/api/senha/redefinir', limiteRecuperacao, asyncHandler(async(req,res) => {
+  if(!await exigirLimiteAuth(req,res,'recuperacao'))return;
   const {token,senha} = req.body || {};
   if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token) || !senhaValida(senha)) {
     return res.status(400).json({erro:'Link inválido ou senha fora do limite de 8 a 72 caracteres.'});
