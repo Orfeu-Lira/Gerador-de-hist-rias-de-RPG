@@ -458,6 +458,25 @@
       <p class="mesa-legal-aviso">Termos iniciais sujeitos a revisão conforme a operação real do projeto e a legislação aplicável.</p>
     </article>
   </section>
+  <!-- Preferências locais de acessibilidade. Nenhuma gravação ou envio de voz ao servidor. -->
+  <div class="mesa-acessibilidade" id="mesa-acessibilidade">
+    <button id="mesa-acessibilidade-abrir" class="mesa-acessibilidade-atalho" type="button" aria-controls="mesa-acessibilidade-painel" aria-expanded="false" aria-label="Abrir opções de acessibilidade">♿ <span>Acessibilidade</span></button>
+    <section id="mesa-acessibilidade-painel" class="mesa-acessibilidade-painel" aria-labelledby="mesa-acessibilidade-titulo" hidden>
+      <div class="mesa-acessibilidade-cabecalho"><h2 id="mesa-acessibilidade-titulo">Acessibilidade</h2><button type="button" id="mesa-acessibilidade-fechar" aria-label="Fechar opções de acessibilidade">×</button></div>
+      <p>O Mesa funciona por texto, sem exigir microfone ou fala. Os controles de leitura em voz alta utilizam as vozes disponíveis no seu navegador.</p>
+      <div class="mesa-acessibilidade-acoes">
+        <button type="button" id="mesa-ler-pagina">🔊 Ler conteúdo da página</button>
+        <button type="button" id="mesa-parar-leitura">■ Parar leitura</button>
+      </div>
+      <label for="mesa-velocidade-voz">Velocidade da leitura</label>
+      <select id="mesa-velocidade-voz"><option value="0.75">Mais devagar (0,75×)</option><option value="1" selected>Normal (1×)</option><option value="1.25">Mais rápido (1,25×)</option></select>
+      <label class="mesa-acessibilidade-check"><input type="checkbox" id="mesa-fonte-grande"> Aumentar tamanho dos textos</label>
+      <label class="mesa-acessibilidade-check"><input type="checkbox" id="mesa-alto-contraste"> Alto contraste</label>
+      <label class="mesa-acessibilidade-check"><input type="checkbox" id="mesa-reduzir-movimento"> Reduzir animações</label>
+      <label class="mesa-acessibilidade-check"><input type="checkbox" id="mesa-som-dados"> Efeito sonoro ao rolar dados (opcional)</label>
+      <p id="mesa-acessibilidade-status" class="suave" role="status" aria-live="polite">As opções são salvas neste dispositivo.</p>
+    </section>
+  </div>
   <aside id="mesa-cookies-aviso" class="mesa-cookies-aviso" aria-label="Informações sobre cookies" hidden>
     <div><strong>Privacidade e funcionamento</strong><p>Usamos cookie de sessão para login e armazenamento local para preferências do aplicativo. Não configuramos cookies próprios de publicidade. <a href="/?tela=privacidade">Como tratamos dados</a></p></div>
     <button type="button" id="mesa-cookies-entendi" class="guia-abrir">Entendi</button>
