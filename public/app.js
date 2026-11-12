@@ -31,7 +31,7 @@ async function api(url, metodo = 'GET', corpo) {
 function aviso(texto, bom) { const a = $('aviso'); a.textContent = texto || ''; a.className = bom ? 'bom' : ''; }
 
 // ---- Navegação entre telas ----
-const TELAS = ['gerador','solo','dados','historico','personagens','assistente','tutorial','novidades','suporte','instalar','conta','admin'];
+const TELAS = ['gerador','solo','dados','historico','personagens','assistente','tutorial','novidades','suporte','instalar','conta','admin','privacidade','termos'];
 const estadoNavegacao={
   ler(chave){try{return sessionStorage.getItem('mesa:'+chave);}catch{return null;}},
   gravar(chave,valor){try{if(valor===null)sessionStorage.removeItem('mesa:'+chave);else sessionStorage.setItem('mesa:'+chave,String(valor));}catch{}}
@@ -1439,7 +1439,7 @@ async function entrar(url, email, senha, tokenBootstrap, manterConectado = false
   finally { if (tokenBootstrap) $('c-token-bootstrap').value = ''; }
 }
 $('f-login').onsubmit = (ev) => { ev.preventDefault(); entrar('/api/login', $('l-email').value, $('l-senha').value, undefined, $('l-manter').checked); };
-$('f-cadastro').onsubmit = (ev) => { ev.preventDefault(); entrar('/api/cadastro', $('c-email').value, $('c-senha').value, $('c-token-bootstrap').value); };
+$('f-cadastro').onsubmit = (ev) => { ev.preventDefault(); if(!$('c-aceite-termos').checked){aviso('Leia e aceite os Termos de Uso para criar sua conta.');return;} entrar('/api/cadastro', $('c-email').value, $('c-senha').value, $('c-token-bootstrap').value); };
 
 // ---- Painel do dono ----
 // Central do Mestre. Texto remoto sempre tratado como texto, nunca como HTML.
@@ -1670,6 +1670,16 @@ if('serviceWorker' in navigator&&window.isSecureContext){
   navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(()=>{/* Instalação é opcional; website continua acessível. */});
  });
 }
+
+
+/* Aviso informativo, não consentimento fictício: somente cookie de sessão
+   e armazenamento técnico já usados pelo serviço. Não instala rastreadores. */
+(function informarCookies(){
+ const caixa=$('mesa-cookies-aviso'),btn=$('mesa-cookies-entendi');
+ let lido=false;try{lido=localStorage.getItem('mesa-aviso-privacidade-v1')==='1';}catch{}
+ caixa.hidden=lido;
+ btn.onclick=()=>{caixa.hidden=true;try{localStorage.setItem('mesa-aviso-privacidade-v1','1');}catch{}};
+})();
 
 noticiasMesa();
 atualizarEu().then(() => {
