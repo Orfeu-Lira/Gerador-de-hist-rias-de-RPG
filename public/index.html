@@ -344,6 +344,7 @@
       <input id="c-senha" type="password" autocomplete="new-password" minlength="8" maxlength="72" required>
       <p class="suave" id="dica-senha">Dica: use de 8 a 72 caracteres e prefira uma frase longa, única e difícil de adivinhar. Não reutilize senhas.</p>
       <details class="admin-explicacao"><summary>O que é o token de administrador?</summary><p>É um código secreto definido pelo responsável pelo Mesa na configuração do servidor. Serve apenas para criar a primeira conta de administrador. <strong>Se você é jogador, deixe esse campo vazio.</strong> Não é uma senha comum e nunca deve ser compartilhado.</p><label for="c-token-bootstrap">Token inicial de administrador (somente responsável)</label><input id="c-token-bootstrap" type="password" autocomplete="off"></details>
+      <label class="mesa-aceite-termos" for="c-aceite-termos"><input id="c-aceite-termos" type="checkbox" required><span>Li e concordo com os <a href="/?tela=termos" target="_blank" rel="noopener noreferrer">Termos de Uso</a> e tomei conhecimento da <a href="/?tela=privacidade" target="_blank" rel="noopener noreferrer">Política de Privacidade</a>.</span></label>
       <p class="acoes"><button class="principal" type="submit">Criar conta</button></p>
       <p class="suave">Já tem conta? <button type="button" class="link" id="ir-login">Entrar</button></p>
     </form>
@@ -387,8 +388,64 @@
       <h2>Minhas mensagens</h2><div id="suporte-meus-chamados"></div>
     </div>
   </section>
+
+  <section id="v-privacidade" class="mesa-legal" hidden aria-labelledby="privacidade-titulo">
+    <div class="pagina-intro"><span class="sobretitulo">TRANSPARÊNCIA DO MESA</span><h1 id="privacidade-titulo">Política de Privacidade</h1><p>Como o Mesa utiliza informações ao oferecer histórias e ferramentas de RPG.</p></div>
+    <article class="folha mesa-legal-conteudo">
+      <p class="mesa-legal-data">Versão informativa inicial · 12 de novembro de 2026</p>
+      <p>O Mesa é um projeto independente de criação e narração de RPG. Esta política descreve as operações conhecidas da plataforma. Ela deve ser atualizada caso os recursos, fornecedores ou finalidades de tratamento mudem.</p>
+      <h2>1. Quais dados são utilizados</h2>
+      <p>Ao cadastrar uma conta: e-mail e uma representação protegida da senha (hash). Ao usar o serviço: aventuras, ideias enviadas, NPCs, fichas, imagens de personagens fornecidas voluntariamente, histórico de campanhas solo, rolagens e mensagens de suporte. Dados técnicos necessários ao funcionamento e à segurança também podem ser processados, como endereços IP associados a controles de uso, registros de acesso e identificadores de sessão.</p>
+      <h2>2. Para que são utilizados</h2>
+      <p>Autenticação e manutenção da conta, geração de conteúdo solicitado, salvamento e recuperação de campanhas, controle de limites, prevenção de abusos, atendimento de suporte e funcionamento técnico do aplicativo. O projeto não solicita dados sensíveis para criar histórias; evite incluir informações pessoais de terceiros nos textos enviados à IA.</p>
+      <h2>3. Inteligência artificial e fornecedores</h2>
+      <p>Quando você solicita uma geração ou narração, o conteúdo necessário para responder pode ser enviado à API de inteligência artificial Google Gemini. O banco de dados e os recursos técnicos do Mesa utilizam serviços de infraestrutura, incluindo Supabase e hospedagem na Vercel. Cada fornecedor pode tratar dados técnicos conforme suas próprias condições e políticas. Não inclua informações sigilosas no texto de suas aventuras.</p>
+      <h2>4. Cookies, preferências e recursos externos</h2>
+      <p>O Mesa usa um cookie de sessão necessário para autenticação e continuidade do login, inclusive quando você opta por permanecer conectado. Preferências locais, como a tela e a etapa do tutorial, podem ser mantidas no armazenamento do navegador. O aplicativo também utiliza cache técnico para recursos públicos do PWA. Não foi configurado um sistema próprio de publicidade comportamental ou de métricas de rastreamento neste aplicativo. Fontes, links externos e mídias selecionadas podem fazer conexões com serviços terceiros.</p>
+      <h2>5. Compartilhamento e proteção</h2>
+      <p>Dados da conta e campanhas são acessados por meio do servidor, com verificações de autorização. A comunicação pública utiliza HTTPS em produção. Nenhuma medida de segurança elimina todos os riscos; não compartilhe senhas nem inclua dados desnecessários em conteúdos de RPG.</p>
+      <h2>6. Prazo de conservação</h2>
+      <p>As informações são armazenadas enquanto necessárias ao funcionamento da conta e às finalidades descritas. Aventuras e personagens podem ter opções de exclusão no aplicativo. Algumas informações técnicas e registros de segurança podem exigir tratamento separado. Os prazos específicos de retenção e descarte ainda precisam ser formalizados pelo responsável pelo projeto.</p>
+      <h2>7. Seus direitos pela LGPD</h2>
+      <p>Você pode solicitar informações sobre o tratamento de seus dados, acesso, correção, eliminação quando cabível e demais direitos previstos na Lei Geral de Proteção de Dados. Usuários autenticados podem usar a área <strong>Suporte</strong> para apresentar uma solicitação relacionada à privacidade. Um canal público específico de privacidade ainda precisa ser definido pelo responsável pelo projeto.</p>
+      <h2>8. Crianças e adolescentes</h2>
+      <p>O Mesa não deve ser utilizado para compartilhar dados pessoais de menores sem uma base legal apropriada. Não envie dados identificáveis de outras pessoas ou de menores no campo de histórias.</p>
+      <h2>9. Atualizações</h2>
+      <p>Este texto poderá ser revisto quando o Mesa receber novos recursos ou quando forem concluídas as definições administrativas e jurídicas. Consulte esta página periodicamente.</p>
+      <p class="mesa-legal-aviso">Documento informativo inicial: não representa parecer jurídico nem certificação de conformidade integral com a LGPD.</p>
+      <p><a href="/?tela=termos">Ler também os Termos de Uso</a></p>
+    </article>
+  </section>
+  <section id="v-termos" class="mesa-legal" hidden aria-labelledby="termos-titulo">
+    <div class="pagina-intro"><span class="sobretitulo">CONDIÇÕES DE UTILIZAÇÃO</span><h1 id="termos-titulo">Termos de Uso</h1><p>Informações essenciais para usar o Mesa com responsabilidade.</p></div>
+    <article class="folha mesa-legal-conteudo">
+      <p class="mesa-legal-data">Versão informativa inicial · 12 de novembro de 2026</p>
+      <h2>1. Sobre o serviço</h2>
+      <p>O Mesa oferece gratuitamente, nesta etapa do projeto, ferramentas para geração de histórias, NPCs, fichas e narração de campanhas de RPG. Recursos, cotas de uso e disponibilidade podem ser alterados à medida que a plataforma evolui.</p>
+      <h2>2. Conta e segurança</h2>
+      <p>Você deve usar um e-mail válido, manter sua senha em sigilo e não acessar contas ou informações de terceiros sem autorização. O acesso às campanhas privadas está vinculado à conta em que foram criadas.</p>
+      <h2>3. Conteúdo criado pelo usuário e por IA</h2>
+      <p>Você é responsável pelo material que envia e deve respeitar direitos autorais, privacidade e as leis aplicáveis. A IA pode cometer erros, inventar informações ou produzir conteúdo inadequado; revise e adapte os resultados antes de compartilhá-los. O Mesa não garante originalidade absoluta, adequação a regras oficiais de RPG nem ausência de semelhanças com obras existentes.</p>
+      <h2>4. Uso adequado</h2>
+      <p>Não utilize a plataforma para violar direitos de terceiros, extrair conteúdo privado de outras contas, automatizar abusos ou tentar comprometer a segurança do serviço. Contas podem ser limitadas ou suspensas diante de usos abusivos.</p>
+      <h2>5. Disponibilidade e limites</h2>
+      <p>O projeto está em desenvolvimento. Pode haver manutenção, interrupções, limites de geração, erros de IA e alterações nas funcionalidades. Faça cópias de conteúdos importantes. As narrações não substituem a avaliação e as decisões humanas em sua mesa.</p>
+      <h2>6. Cobranças e reembolsos</h2>
+      <p>O Mesa não oferece planos pagos ou compras pelo próprio aplicativo nesta versão. Portanto, não há pagamento ou reembolso a processar neste momento. Se produtos ou assinaturas forem criados no futuro, serão publicados termos comerciais específicos antes de qualquer cobrança.</p>
+      <h2>7. Marcas, imagens e músicas</h2>
+      <p>Os materiais originais do site, os arquivos de usuários e os conteúdos de terceiros podem ter titulares e licenças diferentes. As músicas reproduzidas por links externos mantêm seus próprios créditos e condições. Não presuma que uma imagem ou geração de IA esteja automaticamente liberada para qualquer finalidade.</p>
+      <h2>8. Privacidade e contato</h2>
+      <p>Consulte nossa <a href="/?tela=privacidade">Política de Privacidade</a>. Usuários autenticados podem entrar em contato pela seção de Suporte. Os dados completos de identificação do responsável pelo projeto e um canal público de contato precisam ser confirmados antes de constarem como dados oficiais.</p>
+      <p class="mesa-legal-aviso">Termos iniciais sujeitos a revisão conforme a operação real do projeto e a legislação aplicável.</p>
+    </article>
+  </section>
+  <aside id="mesa-cookies-aviso" class="mesa-cookies-aviso" aria-label="Informações sobre cookies" hidden>
+    <div><strong>Privacidade e funcionamento</strong><p>Usamos cookie de sessão para login e armazenamento local para preferências do aplicativo. Não configuramos cookies próprios de publicidade. <a href="/?tela=privacidade">Como tratamos dados</a></p></div>
+    <button type="button" id="mesa-cookies-entendi" class="guia-abrir">Entendi</button>
+  </aside>
   <footer class="mesa-sobre-vibe" aria-label="Sobre a criação do Mesa">
     <p><strong>✧ Feito com imaginação e vibe coding.</strong> O Mesa é um projeto independente desenvolvido com apoio de inteligência artificial, combinando ideias, direção criativa, testes e evolução contínua para transformar a paixão por RPG em uma experiência digital.</p>
+    <nav class="mesa-legal-links" aria-label="Informações legais"><a href="/?tela=privacidade">Privacidade e LGPD</a><a href="/?tela=termos">Termos de uso</a><a href="/?tela=suporte">Suporte</a></nav>
   </footer>
 </main>
 <script src="./config.js"></script>
