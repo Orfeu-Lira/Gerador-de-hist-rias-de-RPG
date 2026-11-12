@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="./style.css">
 </head>
 <body>
+<a class="mesa-pular" href="#mesa-conteudo">Pular para o conteúdo principal</a>
 <main>
   <header class="topo" id="menu-lateral">
     <div class="menu-cabecalho">
@@ -50,6 +51,7 @@
   <p id="aviso" role="status"></p>
 
   <!-- Gerador: qualquer visitante vê; o servidor aplica os limites -->
+  <div id="mesa-conteudo" tabindex="-1" aria-label="Conteúdo da página"></div>
   <section id="v-gerador">
     <div class="hero"><div class="hero-copia"><span class="sobretitulo">✧ O ATELIÊ DE AVENTURAS</span><h1>Grandes histórias <em>começam aqui.</em></h1><p>Transforme uma ideia em uma jornada inesquecível. Escolha o mundo, reúna seu grupo e deixe a imaginação conduzir o próximo capítulo.</p><div class="hero-tracos"><span>✦ Histórias com IA</span><span>✦ Feito para mestres</span><span>✦ Suas aventuras salvas</span></div></div><div class="hero-arte" aria-hidden="true"><span>✧</span></div></div>
     <div class="secao-intro"><span class="sobretitulo">01 / CRIAÇÃO</span><h2>Gerador de aventuras e NPCs</h2><p>Crie uma história completa ou desenvolva apenas um personagem para a sua campanha.</p></div>
@@ -407,6 +409,12 @@
       <h2>6. Prazo de conservação</h2>
       <p>As informações são armazenadas enquanto necessárias ao funcionamento da conta e às finalidades descritas. Aventuras e personagens podem ter opções de exclusão no aplicativo. Algumas informações técnicas e registros de segurança podem exigir tratamento separado. Os prazos específicos de retenção e descarte ainda precisam ser formalizados pelo responsável pelo projeto.</p>
       <h2>7. Seus direitos pela LGPD</h2>
+      <div class="mesa-exportar-dados">
+        <h3>Baixar uma cópia dos meus dados</h3>
+        <p>Com uma conta conectada, você pode baixar um arquivo JSON contendo informações da conta e até 1.000 registros de cada conjunto: aventuras, fichas, NPCs, campanhas, mensagens e suporte. O arquivo não inclui senhas nem imagens originais. Para solicitar dados adicionais, utilize o Suporte com assunto LGPD.</p>
+        <button id="mesa-exportar-btn" type="button" class="guia-abrir">Baixar meus dados (JSON)</button>
+        <p id="mesa-exportar-status" role="status" aria-live="polite" class="suave"></p>
+      </div>
       <p>Você pode solicitar informações sobre o tratamento de seus dados, acesso, correção, eliminação quando cabível e demais direitos previstos na Lei Geral de Proteção de Dados. Usuários autenticados podem usar a área <strong>Suporte</strong>, escolhendo o assunto LGPD, para apresentar uma solicitação relacionada à privacidade. Um canal público específico de privacidade ainda precisa ser definido pelo responsável pelo projeto.</p>
       <h2>8. Crianças e adolescentes</h2>
       <p>O Mesa não deve ser utilizado para compartilhar dados pessoais de menores sem uma base legal apropriada. Não envie dados identificáveis de outras pessoas ou de menores no campo de histórias.</p>
