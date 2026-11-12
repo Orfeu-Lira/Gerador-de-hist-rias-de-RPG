@@ -1674,6 +1674,26 @@ if('serviceWorker' in navigator&&window.isSecureContext){
 
 /* Aviso informativo, não consentimento fictício: somente cookie de sessão
    e armazenamento técnico já usados pelo serviço. Não instala rastreadores. */
+// LGPD: exportação individual de dados não sensíveis da conta autenticada.
+// O navegador não guarda o arquivo no cache do PWA; o usuário escolhe onde salvá-lo.
+$('mesa-exportar-btn').onclick=async()=>{
+ const btn=$('mesa-exportar-btn'),estado=$('mesa-exportar-status');
+ btn.disabled=true;estado.textContent='Preparando seu arquivo...';
+ try{
+  const r=await fetch(API_BASE_URL+'/api/conta/meus-dados',{method:'GET',credentials:'include',cache:'no-store'});
+  if(!r.ok){
+   const erro=await r.json().catch(()=>({erro:'Falha na exportação.'}));
+   throw new Error(erro.erro||'Não foi possível exportar seus dados.');
+  }
+  const blob=await r.blob(),url=URL.createObjectURL(blob),link=document.createElement('a');
+  link.href=url;link.download='mesa-meus-dados.json';
+  document.body.appendChild(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),3000);
+  estado.textContent='Arquivo preparado. Armazene-o em local seguro, pois contém dados privados.';
+ }catch(e){estado.textContent=e.message||'Erro ao preparar arquivo.';}
+ finally{btn.disabled=false;}
+};
+
 (function informarCookies(){
  const caixa=$('mesa-cookies-aviso'),btn=$('mesa-cookies-entendi');
  let lido=false;try{lido=localStorage.getItem('mesa-aviso-privacidade-v1')==='1';}catch{}
