@@ -80,7 +80,17 @@
         <div><label for="npc-genero">Gênero do mundo</label><select id="npc-genero" required></select></div>
         <div><label for="npc-tom">Tom da história</label><select id="npc-tom" required></select></div>
       </div>
-      <label for="npc-descricao">Como esse NPC deve ser? <span class="opcional">(opcional ao escolher uma aventura)</span></label>
+      <fieldset class="npc-contexto-cena">
+        <legend>Contexto do NPC na história</legend>
+        <p class="suave">Opcional se você já escolheu uma aventura. Para gerar um NPC sem aventura salva, informe ao menos uma ideia ou contexto.</p>
+        <label for="npc-resumo">Resumo da história ou contexto do mundo <span class="opcional">(opcional)</span></label>
+        <textarea id="npc-resumo" maxlength="1800" rows="4" placeholder="Ex.: O grupo está investigando o desaparecimento de moradores numa vila cercada por uma floresta antiga..."></textarea>
+        <div class="grade">
+          <div><label for="npc-tematica">Temática da cena <span class="opcional">(opcional)</span></label><input id="npc-tematica" maxlength="120" placeholder="Ex.: Intriga política, fantasia medieval, mistério"></div>
+          <div><label for="npc-situacao">Situação atual <span class="opcional">(opcional)</span></label><input id="npc-situacao" maxlength="350" placeholder="Ex.: O grupo acaba de entrar na taverna após uma batalha"></div>
+        </div>
+      </fieldset>
+      <label for="npc-descricao">Como esse NPC deve ser? <span class="opcional">(opcional se houver contexto)</span></label>
       <textarea id="npc-descricao" maxlength="1500" rows="5" placeholder="Ex.: Uma alquimista misteriosa que mora perto do castelo, esconde um pacto antigo e pode ajudar ou trair o grupo..."></textarea>
       <p class="suave">Detalhe aparência, personalidade, papel, passado e objetivos, se desejar. O Mesa vai construir apenas um NPC, não outra aventura.</p>
       <div class="acoes gerador-acoes"><span class="cota">Usa a mesma cota diária de gerações das aventuras.</span><button type="submit" id="b-gerar-npc" class="principal">♙ Gerar meu NPC ↗</button></div>
