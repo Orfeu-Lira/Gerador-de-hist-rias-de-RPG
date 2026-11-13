@@ -967,13 +967,31 @@ app.put('/api/admin/config',asyncHandler(async(req,res)=>{
 app.get('/api/admin/auditoria',asyncHandler(async(req,res)=>{
  const r=await query('SELECT a.id,a.acao,a.alvo_tipo,a.alvo_id,a.detalhes,a.criado_em,u.email administrador FROM public.mesa_auditoria a LEFT JOIN public.usuarios u ON u.id=a.admin_id ORDER BY a.id DESC LIMIT 100');res.json(r.rows);
 }));
+// Cache local e curto APENAS para material já público. Promessa compartilhada
+// agrupa acessos simultâneos à mesma instância e reduz consultas repetidas.
+// Não são armazenadas aqui sessões, perfis, fichas nem campanhas dos usuários.
+let informacoesPublicasCache={ate:0,dados:null,carregando:null};
+async function consultarInformacoesPublicas(){
+ const agora=Date.now();
+ if(informacoesPublicasCache.dados&&agora<informacoesPublicasCache.ate)return informacoesPublicasCache.dados;
+ if(informacoesPublicasCache.carregando)return informacoesPublicasCache.carregando;
+ informacoesPublicasCache.carregando=(async()=>{
+  const [avisos,conteudos,config]=await Promise.all([
+   query('SELECT id,titulo,corpo,categoria,criado_em FROM public.mesa_comunicados WHERE publicado=true ORDER BY criado_em DESC LIMIT 10'),
+   query('SELECT id,titulo,corpo,tipo FROM public.mesa_conteudos WHERE publicado=true ORDER BY atualizado_em DESC LIMIT 20'),
+   query('SELECT chave,valor FROM public.mesa_config')
+  ]);
+  const dados={avisos:avisos.rows,conteudos:conteudos.rows,config:Object.fromEntries(config.rows.map(x=>[x.chave,x.valor]))};
+  informacoesPublicasCache.dados=dados;
+  informacoesPublicasCache.ate=Date.now()+15000;
+  return dados;
+ })();
+ try{return await informacoesPublicasCache.carregando;}
+ finally{informacoesPublicasCache.carregando=null;}
+}
 app.get('/api/publico/informacoes',asyncHandler(async(req,res)=>{
- const [avisos,conteudos,config]=await Promise.all([
-  query('SELECT id,titulo,corpo,categoria,criado_em FROM public.mesa_comunicados WHERE publicado=true ORDER BY criado_em DESC LIMIT 10'),
-  query('SELECT id,titulo,corpo,tipo FROM public.mesa_conteudos WHERE publicado=true ORDER BY atualizado_em DESC LIMIT 20'),
-  query('SELECT chave,valor FROM public.mesa_config')
- ]);
- res.json({avisos:avisos.rows,conteudos:conteudos.rows,config:Object.fromEntries(config.rows.map(x=>[x.chave,x.valor]))});
+ // O cache é somente de processo; a API continua sem cache no navegador/CDN.
+ res.json(await consultarInformacoesPublicas());
 }));
 const limiteSuporte=require('express-rate-limit').rateLimit({
  windowMs:60*60*1000,limit:5,standardHeaders:'draft-7',legacyHeaders:false,
