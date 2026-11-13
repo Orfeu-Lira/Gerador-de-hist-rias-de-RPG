@@ -1914,7 +1914,7 @@ $('mesa-acessibilidade-fechar').onclick=()=>{
  $('mesa-acessibilidade-painel').hidden=true;$('mesa-acessibilidade-abrir').setAttribute('aria-expanded','false');
  $('mesa-acessibilidade-abrir').focus();
 };
-for(const [id,chave] of [['mesa-fonte-grande','fonte'],['mesa-alto-contraste','contraste'],['mesa-reduzir-movimento','movimento'],['mesa-som-dados','som']]){
+for(const [id,chave] of [['mesa-fonte-grande','fonte'],['mesa-alto-contraste','contraste'],['mesa-reduzir-movimento','movimento']]){
  $(id).onchange=()=>{mesaA11y[chave]=$(id).checked;acessibilidadeSalvar();};
 }
 $('mesa-velocidade-voz').onchange=()=>{mesaA11y.velocidade=Number($('mesa-velocidade-voz').value);acessibilidadeSalvar();};
