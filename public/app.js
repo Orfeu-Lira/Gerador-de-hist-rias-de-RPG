@@ -875,6 +875,57 @@ const sons={
  taverna:['Medieval Story','Frank Schröter','CC BY 4.0','Medieval_Story_by_Frank_Schr%C3%B6ter.ogg'],
  jornada:['Chominciamento de Gioia','Ririkuku','CC BY-SA 4.0','Chominciamento_de_Gioia1.ogg']
 };
+// A faixa global continua tocando ao navegar entre as telas, sem autoplay.
+const musicaGlobal=new Audio();musicaGlobal.loop=true;musicaGlobal.preload='none';
+const musicaUrl=v=>'https://commons.wikimedia.org/wiki/Special:Redirect/file/'+v[3];
+const musicaFonteUrl=v=>'https://commons.wikimedia.org/wiki/File:'+v[3];
+const musicaSelecionada=$('musica-faixa');
+for(const [id,faixa] of Object.entries(sons))musicaSelecionada.add(new Option(faixa[0]+' · '+faixa[1],id));
+try{const escolhida=localStorage.getItem('mesa-faixa-preferida');if(escolhida&&sons[escolhida])musicaSelecionada.value=escolhida;}catch{}
+const musicaStatus=$('musica-estado'),musicaBotao=$('musica-tocar');
+function musicaAtualizarFonte(){
+ const v=sons[musicaSelecionada.value];$('musica-fonte').href=musicaFonteUrl(v);
+ $('musica-fonte').textContent='Fonte e licença: '+v[1]+' · '+v[2]+' ↗';
+}
+function musicaParar(){
+ musicaGlobal.pause();musicaBotao.textContent='▶ Tocar música';
+ $('musica-indicador').classList.remove('tocando');
+}
+musicaGlobal.onended=musicaParar;
+function musicaAtualizarPainel(aberto){
+ $('musica-painel').hidden=!aberto;
+ $('musica-abrir').setAttribute('aria-expanded',String(aberto));
+ if(aberto)$('musica-fechar').focus();
+}
+$('musica-abrir').onclick=()=>musicaAtualizarPainel($('musica-painel').hidden);
+$('musica-fechar').onclick=()=>{musicaAtualizarPainel(false);$('musica-abrir').focus();};
+musicaSelecionada.onchange=()=>{
+ musicaParar();musicaGlobal.removeAttribute('src');musicaGlobal.load();
+ musicaAtualizarFonte();musicaStatus.textContent='Faixa selecionada. Toque em Reproduzir.';
+ try{localStorage.setItem('mesa-faixa-preferida',musicaSelecionada.value);}catch{}
+};
+$('musica-volume').oninput=()=>{
+ musicaGlobal.volume=Number($('musica-volume').value)/100;
+};
+musicaBotao.onclick=async()=>{
+ if(!musicaGlobal.paused){musicaParar();musicaStatus.textContent='Música pausada.';return;}
+ // Não permite duas músicas simultâneas entre o player global e os cards da história.
+ pararJornada();
+ const faixa=sons[musicaSelecionada.value];
+ if(!musicaGlobal.getAttribute('src'))musicaGlobal.src=musicaUrl(faixa);
+ musicaGlobal.volume=Number($('musica-volume').value)/100;
+ musicaBotao.disabled=true;musicaStatus.textContent='Carregando '+faixa[0]+'...';
+ try{
+  await musicaGlobal.play();
+  musicaBotao.textContent='❚❚ Pausar música';
+  musicaStatus.textContent='Tocando '+faixa[0]+'. A música continua ao trocar de tela.';
+  $('musica-indicador').classList.add('tocando');
+ }catch{
+  musicaParar();musicaStatus.textContent='Não foi possível tocar esta gravação. Use o link da fonte para ouvi-la.';
+ }finally{musicaBotao.disabled=false;}
+};
+musicaAtualizarFonte();
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('musica-painel').hidden){musicaAtualizarPainel(false);$('musica-abrir').focus();}});
 const audioJornada=new Audio();audioJornada.loop=true;let tocadorJornada=null;
 function pararJornada(){audioJornada.pause();audioJornada.removeAttribute('src');if(tocadorJornada){tocadorJornada.b.textContent='▶ Tocar';tocadorJornada.s.textContent='Pausado';}tocadorJornada=null;}
 function playerDaHistoria(alvo,genero='',tom='',sugestao=''){
@@ -894,14 +945,14 @@ function playerDaHistoria(alvo,genero='',tom='',sugestao=''){
  volume.oninput=()=>{if(tocadorJornada?.b===b)audioJornada.volume=Number(volume.value)/100;};
  b.onclick=async()=>{
   if(tocadorJornada?.b===b&&!audioJornada.paused){pararJornada();return;}
-  pararJornada();const v=sons[sel.value];tocadorJornada={b,s:estado};audioJornada.src=url('Special:Redirect/file/',v);audioJornada.volume=Number(volume.value)/100;b.disabled=true;b.textContent='Carregando...';
+  musicaParar();pararJornada();const v=sons[sel.value];tocadorJornada={b,s:estado};audioJornada.src=url('Special:Redirect/file/',v);audioJornada.volume=Number(volume.value)/100;b.disabled=true;b.textContent='Carregando...';
   try{await audioJornada.play();b.textContent='❚❚ Pausar';estado.textContent='Tocando '+v[0];}
   catch{pararJornada();estado.textContent='Não foi possível carregar. Abra a fonte para ouvir.';}
   finally{b.disabled=false;}
  };
  linha.append(sel,b,volume);p.append(linha,estado,fonte);alvo.append(p);
 }
-window.addEventListener('pagehide',pararJornada);
+window.addEventListener('pagehide',()=>{pararJornada();musicaParar();});
 // ---- Fichas D&D 5e 2024: atributos-base e compra com 27 pontos ----
 const atributosDnd = [['for','Força'],['des','Destreza'],['con','Constituição'],['int','Inteligência'],['sab','Sabedoria'],['car','Carisma']];
 const custosDnd = {8:0,9:1,10:2,11:3,12:4,13:5,14:7,15:9};
@@ -1768,17 +1819,17 @@ $('mesa-exportar-btn').onclick=async()=>{
 
 
 /* Acessibilidade opcional, por conta do navegador e sem microfone. */
-const mesaA11y={fonte:false,contraste:false,movimento:false,som:false,velocidade:1,token:0,audio:null};
+const mesaA11y={fonte:false,contraste:false,movimento:false,velocidade:1,token:0,audio:null};
 function acessibilidadeAplicar(){
  document.body.classList.toggle('mesa-fonte-grande',mesaA11y.fonte);
  document.body.classList.toggle('mesa-alto-contraste',mesaA11y.contraste);
  document.documentElement.classList.toggle('mesa-movimento-reduzido',mesaA11y.movimento);
- for(const [id,chave] of [['mesa-fonte-grande','fonte'],['mesa-alto-contraste','contraste'],['mesa-reduzir-movimento','movimento'],['mesa-som-dados','som']])$(id).checked=mesaA11y[chave];
+ for(const [id,chave] of [['mesa-fonte-grande','fonte'],['mesa-alto-contraste','contraste'],['mesa-reduzir-movimento','movimento']])$(id).checked=mesaA11y[chave];
  $('mesa-velocidade-voz').value=String(mesaA11y.velocidade);
 }
 function acessibilidadeSalvar(){
  acessibilidadeAplicar();
- try{localStorage.setItem('mesa-a11y-v1',JSON.stringify({fonte:mesaA11y.fonte,contraste:mesaA11y.contraste,movimento:mesaA11y.movimento,som:mesaA11y.som,velocidade:mesaA11y.velocidade}));}catch{}
+ try{localStorage.setItem('mesa-a11y-v1',JSON.stringify({fonte:mesaA11y.fonte,contraste:mesaA11y.contraste,movimento:mesaA11y.movimento,velocidade:mesaA11y.velocidade}));}catch{}
  $('mesa-acessibilidade-status').textContent='Preferências salvas neste dispositivo.';
 }
 function acessibilidadeMovimentoReduzido(){
@@ -1821,7 +1872,7 @@ function acessibilidadeBotaoLer(alvo,conteudo){
 // Reproduz o áudio de dados enviado pelo usuário. O arquivo compactado é
 // carregado no navegador com a página; não depende de serviços externos.
 function acessibilidadeSomDado(final=false,forcar=false){
- if(final||(!mesaA11y.som&&!forcar))return Promise.resolve(false);
+ if(final)return Promise.resolve(false);
  try{
   const clip=window.MESA_DICE_AUDIO;
   if(typeof clip!=='string'||!clip.startsWith('data:audio/mpeg;base64,')){
@@ -1850,16 +1901,10 @@ function acessibilidadeSomDado(final=false,forcar=false){
 
 try{
  const dados=JSON.parse(localStorage.getItem('mesa-a11y-v1')||'{}');
- for(const k of ['fonte','contraste','movimento','som'])mesaA11y[k]=dados[k]===true;
+ for(const k of ['fonte','contraste','movimento'])mesaA11y[k]=dados[k]===true;
  if([.75,1,1.25].includes(Number(dados.velocidade)))mesaA11y.velocidade=Number(dados.velocidade);
 }catch{}
 acessibilidadeAplicar();
-$('mesa-testar-som-dados').onclick=async()=>{
- const estado=$('mesa-acessibilidade-status');
- estado.textContent='Testando o som dos dados...';
- const ok=await acessibilidadeSomDado(false,true);
- if(ok)estado.textContent='Som de teste reproduzido. Se não ouviu, aumente o volume de mídia do dispositivo.';
-};
 $('mesa-acessibilidade-abrir').onclick=()=>{
  const p=$('mesa-acessibilidade-painel'),aberto=p.hidden;
  p.hidden=!aberto;$('mesa-acessibilidade-abrir').setAttribute('aria-expanded',String(aberto));
@@ -1870,7 +1915,7 @@ $('mesa-acessibilidade-fechar').onclick=()=>{
  $('mesa-acessibilidade-abrir').focus();
 };
 for(const [id,chave] of [['mesa-fonte-grande','fonte'],['mesa-alto-contraste','contraste'],['mesa-reduzir-movimento','movimento'],['mesa-som-dados','som']]){
- $(id).onchange=()=>{mesaA11y[chave]=$(id).checked;acessibilidadeSalvar();if(chave==='som'&&mesaA11y.som){acessibilidadeSomDado(false,true).then(ok=>{$('mesa-acessibilidade-status').textContent=ok?'Som dos dados ativado.':'Som ativado, mas o navegador bloqueou a reprodução. Use Testar som.';});}};
+ $(id).onchange=()=>{mesaA11y[chave]=$(id).checked;acessibilidadeSalvar();};
 }
 $('mesa-velocidade-voz').onchange=()=>{mesaA11y.velocidade=Number($('mesa-velocidade-voz').value);acessibilidadeSalvar();};
 $('mesa-parar-leitura').onclick=()=>{acessibilidadeParar();$('mesa-acessibilidade-status').textContent='Leitura parada.';};
