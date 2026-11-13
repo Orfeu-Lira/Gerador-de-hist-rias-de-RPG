@@ -38,13 +38,13 @@ def relatorio():
     print("MESA — SIMULAÇÃO DE CARGA, NÃO TESTE DE PRODUÇÃO")
     print("Rajadas simultâneas; variação da duração +-20%; premissas hipotéticas.")
     for nome, concorrencia, duracao, cargas in cenarios:
-        print(f"\\n{nome} | capacidade assumida={concorrencia} | média={duracao}s")
+        print(f"\n{nome} | capacidade assumida={concorrencia} | média={duracao}s")
         print("usuários | p50 (s) | p95 (s) | máximo (s) | >30s")
         for usuarios in cargas:
             r = simular(usuarios, concorrencia, duracao)
             print(f"{usuarios:>8} | {r['p50']:>7.2f} | {r['p95']:>7.2f} | "
                   f"{r['maior']:>10.2f} | {r['acima_30s']:>4}")
-    print("\\nImportante: a quantidade real de instâncias, conexões de banco, cotas,"
+    print("\nImportante: a quantidade real de instâncias, conexões de banco, cotas,"
           " latência de rede e limites da API Gemini não foram medidos.")
 
 
