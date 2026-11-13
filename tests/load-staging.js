@@ -6,12 +6,9 @@ import { check, sleep } from 'k6';
 import { Rate, Trend } from 'k6/metrics';
 
 const raw=__ENV.BASE_URL||'';
-let host='';
-try{
- const url=new URL(raw);
- if(url.protocol!=='https:' || url.username || url.password || url.search || url.hash)throw Error('URL HTTPS exigida');
- host=url.hostname.toLowerCase();
-}catch{throw Error('Informe BASE_URL como URL HTTPS válida da homologação.');}
+const match=/^https:\/\/([a-z0-9.-]+)\/?$/i.exec(raw);
+if(!match)throw Error('Informe BASE_URL como URL HTTPS válida sem caminho, parâmetros ou credenciais.');
+const host=match[1].toLowerCase();
 if(__ENV.MESA_LOAD_TEST_APPROVED!=='yes')throw Error('Confirme o teste com MESA_LOAD_TEST_APPROVED=yes.');
 if(host==='historiasrpg.vercel.app'||host==='gerador-de-hist-rias-de-rpg.vercel.app'||
    host==='orfeu-lira.github.io'||host==='localhost'||host==='127.0.0.1'||
@@ -52,6 +49,8 @@ export default function(){
  timings.add(resposta.timings.duration,{endpoint:path});
  sleep(1.5+Math.random()*2);
 }
+// ATENÇÃO: preview Vercel não garante banco separado. Antes de rodar, confirme
+// que o Preview usa banco e variáveis de ambiente de HOMOLOGAÇÃO, não produção.
 // O script não envia credenciais, não cria contas, não modifica dados,
 // não utiliza endpoints de IA e não atinge URLs de produção conhecidas.
 // A confirmação MESA_LOAD_TEST_APPROVED é intencionalmente explícita.
