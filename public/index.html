@@ -458,6 +458,20 @@
       <p class="mesa-legal-aviso">Termos iniciais sujeitos a revisão conforme a operação real do projeto e a legislação aplicável.</p>
     </article>
   </section>
+  <!-- Música de ambiente independente da acessibilidade, persistente entre telas. -->
+  <aside id="musica-ambiente" class="musica-ambiente" aria-label="Música de ambiente">
+    <button type="button" id="musica-abrir" class="musica-gatilho" aria-expanded="false" aria-controls="musica-painel" aria-label="Abrir músicas de ambiente"><span aria-hidden="true">♫</span><span>Música</span><span id="musica-indicador" class="musica-indicador" aria-hidden="true"></span></button>
+    <div id="musica-painel" class="musica-painel" hidden>
+      <div class="musica-painel-topo"><div><span class="sobretitulo">TRILHA DO MESA</span><h2>Música de ambiente</h2></div><button id="musica-fechar" class="musica-fechar" type="button" aria-label="Fechar painel de músicas">×</button></div>
+      <div class="musica-ambiente-controles">
+        <label for="musica-faixa">Escolha a música</label><select id="musica-faixa"></select>
+        <button type="button" id="musica-tocar">▶ Tocar música</button>
+        <label for="musica-volume">Volume</label><input type="range" id="musica-volume" min="0" max="100" value="30" aria-label="Volume da música">
+      </div>
+      <p id="musica-estado" role="status" aria-live="polite" class="suave">Escolha uma faixa para começar. A música continuará ao navegar entre as abas.</p>
+      <p class="musica-creditos"><a id="musica-fonte" href="https://commons.wikimedia.org/" target="_blank" rel="noopener noreferrer">Ver licença e fonte da música</a></p>
+    </div>
+  </aside>
   <!-- Preferências locais de acessibilidade. Nenhuma gravação ou envio de voz ao servidor. -->
   <div class="mesa-acessibilidade" id="mesa-acessibilidade">
     <button id="mesa-acessibilidade-abrir" class="mesa-acessibilidade-atalho" type="button" aria-controls="mesa-acessibilidade-painel" aria-expanded="false" aria-label="Abrir opções de acessibilidade">♿ <span>Acessibilidade</span></button>
@@ -473,9 +487,7 @@
       <label class="mesa-acessibilidade-check"><input type="checkbox" id="mesa-fonte-grande"> Aumentar tamanho dos textos</label>
       <label class="mesa-acessibilidade-check"><input type="checkbox" id="mesa-alto-contraste"> Alto contraste</label>
       <label class="mesa-acessibilidade-check"><input type="checkbox" id="mesa-reduzir-movimento"> Reduzir animações</label>
-      <label class="mesa-acessibilidade-check"><input type="checkbox" id="mesa-som-dados"> Efeito sonoro ao rolar dados (opcional)</label>
-      <button type="button" id="mesa-testar-som-dados">🔊 Testar som dos dados</button>
-      <p class="suave">O som só toca depois de ser habilitado e pode depender do volume de mídia do aparelho.</p>
+
       <p id="mesa-acessibilidade-status" class="suave" role="status" aria-live="polite">As opções são salvas neste dispositivo.</p>
     </section>
   </div>
