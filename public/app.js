@@ -873,7 +873,8 @@ async function carregarAventurasDaFicha(){
 const sons={
  floresta:['Medieval Dream','Frank Schröter','CC BY 4.0','Medieval_Dream_by_Frank_Schr%C3%B6ter.ogg'],
  taverna:['Medieval Story','Frank Schröter','CC BY 4.0','Medieval_Story_by_Frank_Schr%C3%B6ter.ogg'],
- jornada:['Chominciamento de Gioia','Ririkuku','CC BY-SA 4.0','Chominciamento_de_Gioia1.ogg']
+ jornada:['Chominciamento de Gioia','Ririkuku','CC BY-SA 4.0','Chominciamento_de_Gioia1.ogg'],
+ frieren:['Frieren · trilha escolhida','YouTube','Player oficial','2E_qlyy5N-I']
 };
 // A faixa global continua tocando ao navegar entre as telas, sem autoplay.
 const musicaGlobal=new Audio();musicaGlobal.loop=true;musicaGlobal.preload='none';
@@ -882,13 +883,36 @@ const musicaFonteUrl=v=>'https://commons.wikimedia.org/wiki/File:'+v[3];
 const musicaSelecionada=$('musica-faixa');
 for(const [id,faixa] of Object.entries(sons))musicaSelecionada.add(new Option(faixa[0]+' · '+faixa[1],id));
 try{const escolhida=localStorage.getItem('mesa-faixa-preferida');if(escolhida&&sons[escolhida])musicaSelecionada.value=escolhida;}catch{}
-const musicaStatus=$('musica-estado'),musicaBotao=$('musica-tocar');
+const musicaStatus=$('musica-estado'),musicaBotao=$('musica-tocar'),musicaVideo=$('musica-video');
+function musicaFecharVideo(){
+ musicaVideo.replaceChildren();
+ musicaVideo.hidden=true;
+}
+function musicaEYouTube(){return musicaSelecionada.value==='frieren';}
+function musicaMostrarYouTube(){
+ musicaFecharVideo();
+ // YouTube opera o reprodutor e as permissões da própria música; nenhum
+ // arquivo com direitos de terceiros é baixado ou republicado pelo Mesa.
+ const frame=document.createElement('iframe');
+ frame.src='https://www.youtube-nocookie.com/embed/2E_qlyy5N-I?rel=0';
+ frame.title='Frieren — música escolhida, reprodutor do YouTube';
+ frame.loading='lazy';frame.allow='encrypted-media; picture-in-picture';
+ frame.referrerPolicy='strict-origin-when-cross-origin';
+ frame.setAttribute('allowfullscreen','');
+ musicaVideo.appendChild(frame);musicaVideo.hidden=false;
+ musicaBotao.textContent='■ Fechar player de Frieren';
+ $('musica-indicador').classList.add('tocando');
+ musicaStatus.textContent='Player de Frieren aberto. Toque em reproduzir dentro do YouTube; o volume é controlado no vídeo.';
+}
 function musicaAtualizarFonte(){
- const v=sons[musicaSelecionada.value];$('musica-fonte').href=musicaFonteUrl(v);
- $('musica-fonte').textContent='Fonte e licença: '+v[1]+' · '+v[2]+' ↗';
+ const v=sons[musicaSelecionada.value];
+ $('musica-fonte').href=musicaEYouTube()?'https://www.youtube.com/watch?v=2E_qlyy5N-I':musicaFonteUrl(v);
+ $('musica-fonte').textContent=musicaEYouTube()?'Abrir música de Frieren no YouTube ↗':'Fonte e licença: '+v[1]+' · '+v[2]+' ↗';
+ $('musica-volume').disabled=musicaEYouTube();
+ $('musica-volume').title=musicaEYouTube()?'Ajuste o volume no player do YouTube':'Volume da música';
 }
 function musicaParar(){
- musicaGlobal.pause();musicaBotao.textContent='▶ Tocar música';
+ musicaGlobal.pause();musicaFecharVideo();musicaBotao.textContent='▶ Tocar música';
  $('musica-indicador').classList.remove('tocando');
 }
 musicaGlobal.onended=musicaParar;
@@ -908,6 +932,10 @@ $('musica-volume').oninput=()=>{
  musicaGlobal.volume=Number($('musica-volume').value)/100;
 };
 musicaBotao.onclick=async()=>{
+ if(musicaEYouTube()){
+  if(!musicaVideo.hidden){musicaParar();musicaStatus.textContent='Player de Frieren fechado.';return;}
+  pararJornada();musicaGlobal.pause();musicaMostrarYouTube();return;
+ }
  if(!musicaGlobal.paused){musicaParar();musicaStatus.textContent='Música pausada.';return;}
  // Não permite duas músicas simultâneas entre o player global e os cards da história.
  pararJornada();
