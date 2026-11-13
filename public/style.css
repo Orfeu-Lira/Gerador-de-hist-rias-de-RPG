@@ -854,3 +854,39 @@ html.mesa-movimento-reduzido *,html.mesa-movimento-reduzido *::before,html.mesa-
   border:1px solid #112d2b;
 }
 .topo::-webkit-scrollbar-thumb:hover{background:#d1ad73}
+
+/* Música recuperada: canto inferior esquerdo da área útil; acessibilidade à direita.
+   No celular, os dois botões permanecem separados e usáveis por toque. */
+.musica-ambiente{
+ position:fixed;
+ z-index:940;
+ left:calc(var(--mesa-menu-largura) + 16px);
+ right:auto;
+ bottom:16px;
+ margin:0;
+ padding:0;
+ max-width:calc(100vw - var(--mesa-menu-largura) - 40px);
+}
+body.menu-compacto .musica-ambiente{left:calc(var(--mesa-menu-compacto) + 16px)}
+.musica-painel{
+ left:0;
+ right:auto;
+ width:min(430px,calc(100vw - var(--mesa-menu-largura) - 36px));
+ max-height:min(74dvh,640px);
+ overflow-y:auto;
+}
+.musica-painel[hidden]{display:none!important}
+.musica-ambiente .musica-gatilho{min-height:48px;padding:9px 15px}
+.musica-ambiente .musica-painel .musica-ambiente-controles{display:grid;grid-template-columns:auto minmax(0,1fr)}
+.musica-ambiente .musica-painel .musica-ambiente-controles #musica-tocar{grid-column:1/-1}
+.musica-ambiente .musica-painel .musica-ambiente-controles #musica-volume{grid-column:2}
+@media(max-width:850px){
+ .musica-ambiente,body.menu-compacto .musica-ambiente{left:10px;bottom:9px;right:auto;max-width:calc(100vw - 175px)}
+ .musica-painel{left:0;right:auto;width:min(370px,calc(100vw - 20px));max-width:calc(100vw - 20px)}
+ .mesa-acessibilidade{right:9px;bottom:9px}
+}
+@media(max-width:420px){
+ .musica-gatilho{min-height:44px!important;padding:8px 10px!important}
+ .musica-gatilho span:not(.musica-indicador):not(:first-child){font-size:.78rem}
+ .mesa-acessibilidade-atalho{font-size:.78rem}
+}
