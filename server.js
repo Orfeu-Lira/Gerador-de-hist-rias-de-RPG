@@ -337,6 +337,9 @@ app.post('/api/conta/excluir',asyncHandler(async(req,res)=>{
    'SELECT a.storage_path FROM public.personagem_avatares a JOIN public.personagens_dnd p ON p.id=a.personagem_id WHERE p.usuario_id=$1',[u.id]);
   imagens=arquivos.rows.map(x=>x.storage_path).filter(x=>typeof x==='string');
   await client.query("DELETE FROM public.sessoes WHERE sessao->>'userId'=$1::text",[String(u.id)]);
+  // Remove também contadores identificados pela conta; o restante de quotas
+  // anônimas por IP é tratado separadamente pelas regras de retenção.
+  await client.query('DELETE FROM public.geracoes_limite WHERE identificador LIKE $1',['usuario:'+u.id+':%']);
   const excluida=await client.query('DELETE FROM public.usuarios WHERE id=$1 RETURNING id',[u.id]);
   if(!excluida.rowCount)throw new Error('Exclusão não efetuada');
   await client.query('COMMIT');
@@ -1070,7 +1073,9 @@ app.get('/api/suporte',asyncHandler(async(req,res)=>{
 app.get('/', (req, res) => res.sendFile(require('path').join(__dirname, 'public', 'index.html')));
 app.use('/api',(req,res)=>res.status(404).json({erro:'Rota não encontrada.'}));
 app.use((err,req,res,next)=>{
-  console.error('Mesa API error:',err.code||err.message);
+  // Evita enviar consultas, tokens ou valores de entrada para logs técnicos.
+  const codigo=typeof err.code==='string'&&/^[A-Z0-9]{2,12}$/.test(err.code)?err.code:'INTERNAL';
+  console.error('Mesa API error:',codigo,typeof err.name==='string'?err.name:'Error');
   if(res.headersSent) return next(err);
   res.status(500).json({erro:'Não foi possível concluir a solicitação agora.'});
 });
