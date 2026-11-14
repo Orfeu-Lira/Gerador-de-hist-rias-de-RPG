@@ -28,6 +28,22 @@ jobs:
           node --check public/mesa-dice-audio.js
       - name: Check protected source files
         run: node tests/security-static.mjs
+      - name: Validate two-account test syntax without executing it
+        run: node --check tests/security-two-accounts.mjs
+      - name: Validate anonymous API smoke test syntax
+        run: node --check tests/security-smoke.mjs
+  anonymous-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Non-destructive GET checks on public API
+        env:
+          MESA_BASE_URL: https://historiasrpg.vercel.app
+        run: node tests/security-smoke.mjs
   dependencies:
     runs-on: ubuntu-latest
     timeout-minutes: 15
