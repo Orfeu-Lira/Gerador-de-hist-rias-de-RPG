@@ -426,6 +426,18 @@
         <button id="mesa-exportar-btn" type="button" class="guia-abrir">Baixar meus dados (JSON)</button>
         <p id="mesa-exportar-status" role="status" aria-live="polite" class="suave"></p>
       </div>
+      <details class="mesa-exclusao-conta">
+        <summary>Excluir minha conta e os dados associados</summary>
+        <p>Esta ação é irreversível. Remove sua conta, aventuras, fichas, NPCs, campanhas, mensagens e solicitações de suporte vinculadas. Antes, use a exportação acima se quiser guardar uma cópia. Registros legalmente obrigatórios e cópias de segurança poderão seguir períodos de retenção distintos.</p>
+        <form id="mesa-exclusao-form">
+          <label for="mesa-exclusao-senha">Confirme sua senha atual</label>
+          <input id="mesa-exclusao-senha" type="password" autocomplete="current-password" maxlength="72" required>
+          <label for="mesa-exclusao-confirmacao">Digite exatamente EXCLUIR MINHA CONTA</label>
+          <input id="mesa-exclusao-confirmacao" type="text" autocomplete="off" maxlength="20" required>
+          <button type="submit" id="mesa-exclusao-botao">Excluir minha conta definitivamente</button>
+          <p id="mesa-exclusao-status" class="suave" role="status" aria-live="polite"></p>
+        </form>
+      </details>
       <p>Você pode solicitar informações sobre o tratamento de seus dados, acesso, correção, eliminação quando cabível e demais direitos previstos na Lei Geral de Proteção de Dados. Usuários autenticados podem usar a área <strong>Suporte</strong>, escolhendo o assunto LGPD, para apresentar uma solicitação relacionada à privacidade. Para solicitações de privacidade, inclusive sem acesso à conta, entre em contato pelo e-mail <a href="mailto:matheusrenner323@gmail.com">matheusrenner323@gmail.com</a>.</p>
       <h2>8. Crianças e adolescentes</h2>
       <p>O Mesa não deve ser utilizado para compartilhar dados pessoais de menores sem uma base legal apropriada. Não envie dados identificáveis de outras pessoas ou de menores no campo de histórias.</p>
