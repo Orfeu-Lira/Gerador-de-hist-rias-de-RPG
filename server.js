@@ -120,7 +120,7 @@ const exigirLimiteAuth=async(req,res,classe,email='')=>{
  const ip=String(req.ip||'indefinido').slice(0,120);
  const id=classe+':'+crypto.createHmac('sha256',process.env.SESSION_SECRET)
   .update(email?email.trim().toLowerCase():ip).digest('hex');
- const janelas={cadastro:[5,1800],loginIp:[20,900],loginConta:[8,900],recuperacao:[5,900]};
+ const janelas={cadastro:[5,1800],loginIp:[20,900],loginConta:[8,900],recuperacao:[5,900],exclusao:[5,900]};
  const [max,segundos]=janelas[classe];
  const r=await query(`INSERT INTO public.mesa_rate_limits(chave,total,expira_em)
  VALUES($1,1,now()+($2::int * interval '1 second'))
@@ -307,6 +307,64 @@ app.get('/api/conta/meus-dados',asyncHandler(async(req,res)=>{
   campanhasSolo:campanhas.rows,mensagensSolo:mensagens.rows,chamadosSuporte:suporte.rows
  }));
 }));
+// Exclusão de conta solicitada pelo próprio titular, com verificação de senha.
+// A FK CASCADE remove conteúdo privado relacionado; o perfil admin não pode
+// ser removido desta rota, evitando perda da única conta administrativa.
+app.post('/api/conta/excluir',asyncHandler(async(req,res)=>{
+ const u=await atual(req);
+ if(!u)return res.status(401).json({erro:'Entre na sua conta para excluí-la.'});
+ if(u.papel==='admin')return res.status(403).json({erro:'Contas administrativas exigem procedimento manual supervisionado pelo suporte.'});
+ const senha=req.body?.senha,confirmacao=req.body?.confirmacao;
+ if(typeof senha!=='string'||senha.length>72||confirmacao!=='EXCLUIR MINHA CONTA')
+  return res.status(400).json({erro:'Informe a senha e digite EXCLUIR MINHA CONTA para confirmar.'});
+ if(!await exigirLimiteAuth(req,res,'exclusao'))return;
+ const {pool}=require('./postgres');
+ const client=await pool.connect();
+ let imagens=[];
+ try{
+  await client.query('BEGIN');
+  const conta=await client.query('SELECT senha_hash,papel FROM public.usuarios WHERE id=$1 FOR UPDATE',[u.id]);
+  if(!conta.rowCount||conta.rows[0].papel==='admin'){
+   await client.query('ROLLBACK');
+   return res.status(403).json({erro:'Exclusão não autorizada.'});
+  }
+  const correta=await bcrypt.compare(senha,conta.rows[0].senha_hash);
+  if(!correta){
+   await client.query('ROLLBACK');
+   return res.status(403).json({erro:'Senha incorreta. A exclusão não foi realizada.'});
+  }
+  const arquivos=await client.query(
+   'SELECT a.storage_path FROM public.personagem_avatares a JOIN public.personagens_dnd p ON p.id=a.personagem_id WHERE p.usuario_id=$1',[u.id]);
+  imagens=arquivos.rows.map(x=>x.storage_path).filter(x=>typeof x==='string');
+  await client.query("DELETE FROM public.sessoes WHERE sessao->>'userId'=$1::text",[String(u.id)]);
+  const excluida=await client.query('DELETE FROM public.usuarios WHERE id=$1 RETURNING id',[u.id]);
+  if(!excluida.rowCount)throw new Error('Exclusão não efetuada');
+  await client.query('COMMIT');
+ }catch(e){
+  await client.query('ROLLBACK').catch(()=>{});
+  throw e;
+ }finally{client.release();}
+ // Arquivos em Storage não participam da transação SQL: tentamos a limpeza
+ // após commit e relatamos eventuais falhas, sem prometer remoção total.
+ let arquivosPendentes=0;
+ if(imagens.length){
+  if(!avatarConfigurado())arquivosPendentes=imagens.length;
+  else for(const path of imagens){
+   try{
+    const r=await fetch(avatarBase()+path,{method:'DELETE',headers:avatarHeaders(),signal:AbortSignal.timeout(8000)});
+    if(!r.ok)arquivosPendentes++;
+   }catch{arquivosPendentes++;}
+  }
+ }
+ if(arquivosPendentes)console.error('Mesa exclusão de conta: limpeza de avatares pendente',arquivosPendentes);
+ await new Promise(resolve=>req.session.destroy(()=>resolve()));
+ res.clearCookie('mesa.sid',{sameSite:PRODUCAO?'none':'lax',secure:PRODUCAO});
+ res.set('Cache-Control','no-store');
+ res.json({ok:true,arquivosPendentes,observacao:arquivosPendentes
+  ? 'Conta removida do banco, mas alguns avatares exigem limpeza adicional pelo suporte.'
+  : 'Conta e registros associados excluídos do banco. Backups e registros obrigatórios podem seguir prazos específicos.'});
+}));
+
 // Manutenção é imposta no servidor; não basta desabilitar botões no navegador.
 const modoManutencao=asyncHandler(async(req,res,next)=>{
  const r=await query("SELECT valor FROM public.mesa_config WHERE chave='modo_manutencao'");
