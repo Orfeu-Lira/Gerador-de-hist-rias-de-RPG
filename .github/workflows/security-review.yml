@@ -1,0 +1,42 @@
+name: Mesa security review
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '23 8 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify JavaScript parses
+        run: |
+          node --check server.js
+          node --check ia.js
+          node --check public/app.js
+          node --check public/mesa-dice-audio.js
+      - name: Check protected source files
+        run: node tests/security-static.mjs
+  dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Resolve dependency manifest for audit
+        run: npm install --package-lock-only --ignore-scripts --no-audit
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
