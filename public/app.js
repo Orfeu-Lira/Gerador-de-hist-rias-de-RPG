@@ -1846,6 +1846,30 @@ $('mesa-exportar-btn').onclick=async()=>{
 };
 
 
+// Solicitação expressa de exclusão: exige senha e frase de confirmação.
+$('mesa-exclusao-form').onsubmit=async e=>{
+ e.preventDefault();
+ const senha=$('mesa-exclusao-senha').value;
+ const confirmacao=$('mesa-exclusao-confirmacao').value.trim();
+ const status=$('mesa-exclusao-status'),botao=$('mesa-exclusao-botao');
+ if(confirmacao!=='EXCLUIR MINHA CONTA'){
+  status.textContent='Digite EXCLUIR MINHA CONTA exatamente como indicado.';return;
+ }
+ if(!eu.logado){status.textContent='Entre na sua conta para concluir esta solicitação.';return;}
+ if(eu.papel==='admin'){status.textContent='A exclusão de conta administrativa exige contato com o suporte.';return;}
+ if(!window.confirm('Esta ação excluirá permanentemente sua conta e os registros vinculados. Deseja continuar?'))return;
+ botao.disabled=true;status.textContent='Processando exclusão...';
+ try{
+  const r=await api('/api/conta/excluir','POST',{senha,confirmacao});
+  $('mesa-exclusao-senha').value='';$('mesa-exclusao-confirmacao').value='';
+  status.textContent=r.observacao||'Conta excluída.';
+  await atualizarEu();
+  mostrar('gerador');
+  aviso(r.arquivosPendentes?'Conta excluída. Alguns avatares exigem limpeza adicional pelo suporte.':'Sua conta foi excluída.');
+ }catch(err){status.textContent=err.message||'Não foi possível excluir sua conta.';}
+ finally{botao.disabled=false;}
+};
+
 /* Acessibilidade opcional, por conta do navegador e sem microfone. */
 const mesaA11y={fonte:false,contraste:false,movimento:false,velocidade:1,token:0,audio:null};
 function acessibilidadeAplicar(){
