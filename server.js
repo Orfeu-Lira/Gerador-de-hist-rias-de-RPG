@@ -308,6 +308,30 @@ app.get('/api/conta/meus-dados',asyncHandler(async(req,res)=>{
   campanhasSolo:campanhas.rows,mensagensSolo:mensagens.rows,chamadosSuporte:suporte.rows
  }));
 }));
+// Limpeza recuperável: somente caminhos previamente enfileirados em transação,
+// não aceita caminhos arbitrários do cliente e nunca expõe o token de Storage.
+async function limparAvataresPendentes(limite=3){
+ const resultado={removidos:0,falhas:0};
+ if(!avatarConfigurado())return resultado;
+ const rows=(await query('SELECT id,storage_path FROM public.mesa_storage_exclusoes_pendentes ORDER BY criado_em,id LIMIT $1',[Math.max(1,Math.min(5,limite))])).rows;
+ for(const item of rows){
+  try{
+   const url=avatarBase()+item.storage_path.split('/').map(encodeURIComponent).join('/');
+   const r=await fetch(url,{method:'DELETE',headers:avatarHeaders(),signal:AbortSignal.timeout(2500)});
+   if(r.ok||r.status===404){
+    await query('DELETE FROM public.mesa_storage_exclusoes_pendentes WHERE id=$1',[item.id]);
+    resultado.removidos++;
+   }else{
+    resultado.falhas++;
+    await query('UPDATE public.mesa_storage_exclusoes_pendentes SET tentativas=tentativas+1,ultima_tentativa=now() WHERE id=$1',[item.id]);
+   }
+  }catch{
+   resultado.falhas++;
+   await query('UPDATE public.mesa_storage_exclusoes_pendentes SET tentativas=tentativas+1,ultima_tentativa=now() WHERE id=$1',[item.id]).catch(()=>{});
+  }
+ }
+ return resultado;
+}
 // Exclusão de conta solicitada pelo próprio titular, com verificação de senha.
 // A FK CASCADE remove conteúdo privado relacionado; o perfil admin não pode
 // ser removido desta rota, evitando perda da única conta administrativa.
@@ -337,6 +361,12 @@ app.post('/api/conta/excluir',asyncHandler(async(req,res)=>{
   const arquivos=await client.query(
    'SELECT a.storage_path FROM public.personagem_avatares a JOIN public.personagens_dnd p ON p.id=a.personagem_id WHERE p.usuario_id=$1',[u.id]);
   imagens=arquivos.rows.map(x=>x.storage_path).filter(x=>typeof x==='string');
+  // Grava pendências na MESMA transação do apagamento da conta.
+  // Se o Storage ficar indisponível, o caminho continua disponível para nova tentativa.
+  await client.query(`INSERT INTO public.mesa_storage_exclusoes_pendentes(storage_path)
+    SELECT a.storage_path FROM public.personagem_avatares a
+    JOIN public.personagens_dnd p ON p.id=a.personagem_id
+    WHERE p.usuario_id=$1 ON CONFLICT(storage_path) DO NOTHING`,[u.id]);
   await client.query("DELETE FROM public.sessoes WHERE sessao->>'userId'=$1::text",[String(u.id)]);
   // Remove também contadores identificados pela conta; o restante de quotas
   // anônimas por IP é tratado separadamente pelas regras de retenção.
@@ -348,19 +378,10 @@ app.post('/api/conta/excluir',asyncHandler(async(req,res)=>{
   await client.query('ROLLBACK').catch(()=>{});
   throw e;
  }finally{client.release();}
- // Arquivos em Storage não participam da transação SQL: tentamos a limpeza
- // após commit e relatamos eventuais falhas, sem prometer remoção total.
- let arquivosPendentes=0;
- if(imagens.length){
-  if(!avatarConfigurado())arquivosPendentes=imagens.length;
-  else for(const path of imagens){
-   try{
-    const r=await fetch(avatarBase()+path,{method:'DELETE',headers:avatarHeaders(),signal:AbortSignal.timeout(8000)});
-    if(!r.ok)arquivosPendentes++;
-   }catch{arquivosPendentes++;}
-  }
- }
- if(arquivosPendentes)console.error('Mesa exclusão de conta: limpeza de avatares pendente',arquivosPendentes);
+ // Limitamos o processamento síncrono para evitar timeout em serverless.
+ const limpeza=await limparAvataresPendentes(3);
+ const arquivosPendentes=Math.max(0,imagens.length-limpeza.removidos);
+ if(arquivosPendentes)console.warn('Mesa: avatares ainda aguardam limpeza',arquivosPendentes);
  await new Promise(resolve=>req.session.destroy(()=>resolve()));
  res.clearCookie('mesa.sid',{sameSite:PRODUCAO?'none':'lax',secure:PRODUCAO});
  res.set('Cache-Control','no-store');
@@ -913,6 +934,16 @@ async function auditoriaAdmin(u,acao,tipo,id,detalhes={}){
 }
 const adminLeituras=require('express-rate-limit').rateLimit({windowMs:60000,limit:120,standardHeaders:'draft-7',legacyHeaders:false,message:{erro:'Muitas consultas. Aguarde um minuto.'}});
 app.use('/api/admin',exigeAdmin,adminLeituras);
+// Reprocessamento manual autorizado de exclusões pendentes; não retorna caminhos privados.
+app.get('/api/admin/manutencao/avatares-pendentes',asyncHandler(async(req,res)=>{
+ const r=await query('SELECT COUNT(*)::int AS pendentes FROM public.mesa_storage_exclusoes_pendentes');
+ res.json({pendentes:r.rows[0].pendentes});
+}));
+app.post('/api/admin/manutencao/limpar-avatares',asyncHandler(async(req,res)=>{
+ const resultado=await limparAvataresPendentes(3);
+ const r=await query('SELECT COUNT(*)::int AS pendentes FROM public.mesa_storage_exclusoes_pendentes');
+ res.json({...resultado,pendentes:r.rows[0].pendentes});
+}));
 app.get('/api/admin/dashboard',asyncHandler(async(req,res)=>{
  const [indicadores,serie,cenarios]=await Promise.all([
   query(`SELECT (SELECT COUNT(*) FROM public.usuarios)::int usuarios,(SELECT COUNT(*) FROM public.aventuras)::int aventuras,(SELECT COUNT(*) FROM public.personagens_dnd)::int personagens,(SELECT COUNT(*) FROM public.aventuras WHERE criado_em>=CURRENT_DATE)::int aventuras_hoje,(SELECT COUNT(*) FROM public.mesa_chamados WHERE status<>'resolvido')::int chamados_abertos`),
