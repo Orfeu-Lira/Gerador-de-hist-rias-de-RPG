@@ -40,7 +40,8 @@ class PostgresSessionStore extends session.Store {
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
-app.use(helmet({ contentSecurityPolicy: false }));
+// Alinha X-Frame-Options ao CSP frame-ancestors 'none' já definido no Vercel.
+app.use(helmet({ contentSecurityPolicy: false, frameguard: { action: 'deny' } }));
 app.use((req,res,next) => {
   const origin = req.get('Origin');
   res.vary('Origin');
