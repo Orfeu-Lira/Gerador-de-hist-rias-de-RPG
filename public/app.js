@@ -1737,6 +1737,26 @@ async function adminExibirConfig(alvo){
 }
 async function adminExibirAuditoria(alvo){
  adminTitulo(alvo,'Segurança e auditoria','Últimas 100 ações administrativas registradas. Nenhuma senha é armazenada neste histórico.');
+ const limpeza=add('section',alvo,'','admin-editor');
+ add('h3',limpeza,'Limpeza de avatares pendentes');
+ const contador=add('p',limpeza,'Consultando pendências...','suave');
+ const refazer=add('button',limpeza,'Tentar limpar até 3 avatares','principal');
+ refazer.type='button';
+ const retorno=add('p',limpeza,'','suave');
+ const consultar=async()=>{
+  const dados=await api('/api/admin/manutencao/avatares-pendentes');
+  contador.textContent='Arquivos aguardando exclusão: '+dados.pendentes;
+  refazer.disabled=!dados.pendentes;
+ };
+ refazer.onclick=async()=>{
+  refazer.disabled=true;retorno.textContent='Verificando arquivos no Storage...';
+  try{
+   const dados=await api('/api/admin/manutencao/limpar-avatares','POST',{});
+   retorno.textContent='Removidos: '+dados.removidos+' · Falhas: '+dados.falhas+'.';
+   await consultar();
+  }catch(e){retorno.textContent='Não foi possível concluir: '+e.message;refazer.disabled=false;}
+ };
+ try{await consultar();}catch(e){contador.textContent='Não foi possível consultar as pendências.';refazer.disabled=true;}
  const r=await api('/api/admin/auditoria');
  if(!r.length)add('p',alvo,'Ainda não há ações administrativas registradas.');
  const area=add('div',alvo,'','admin-lista');
