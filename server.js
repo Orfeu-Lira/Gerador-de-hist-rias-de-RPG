@@ -6,6 +6,7 @@ const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
 const { query } = require('./postgres');
 const { gerarAventura, gerarNpc, narrarSolo } = require('./ia');
+const {rolar: calcularDadosRpg}=require('./public/dice-rules.js');
 
 const PRODUCAO = process.env.NODE_ENV === 'production';
 const ORIGEM = (process.env.FRONTEND_ORIGIN || '').replace(/\/+$/, '');
@@ -653,12 +654,35 @@ app.post('/api/solo/campanhas/:id/turnos',asyncHandler(async(req,res)=>{
     const erro=new Error('Este teste já foi concluído ou não está mais disponível. Atualize a campanha.');erro.status=409;throw erro;
    }
    const faces=Number(teste.dado),quant=Number(teste.quantidade),mod=Number(teste.modificador);
-   if(![4,6,8,10,12,20,100].includes(faces)||!Number.isInteger(quant)||quant<1||quant>5||!Number.isInteger(mod)||Math.abs(mod)>20)throw new Error('Pedido de teste inválido.');
-   const valores=Array.from({length:quant},()=>crypto.randomInt(1,faces+1));
-   const soma=valores.reduce((a,b)=>a+b,0),total=soma+mod;
-   const dificuldade=Number.isInteger(teste.dificuldade)?teste.dificuldade:null;
-   rolagem={nome:String(teste.nome).slice(0,80),dado:faces,quantidade:quant,modificador:mod,valores,total,dificuldade,passou:dificuldade===null?null:total>=dificuldade};
-   textoAcao='[Resultado de rolagem validado pelo servidor: '+rolagem.nome+': '+quant+'d'+faces+' = ['+valores.join(', ')+']; soma '+soma+'; modificador '+(mod>=0?'+':'')+mod+'; total '+total+(dificuldade===null?'; sem dificuldade fixada':'; dificuldade '+dificuldade+'; '+(rolagem.passou?'sucesso':'falha'))+'. Narre a consequência desta rolagem; não peça novo teste para a mesma ação.]';
+   if(![4,6,8,10,12,20,100].includes(faces)||!Number.isInteger(quant)||quant<1||quant>5||
+      !Number.isInteger(mod)||Math.abs(mod)>20)throw new Error('Pedido de teste inválido.');
+   // O mesmo motor de cálculo da aba Dados é usado no servidor, mas com
+   // aleatoriedade do Node. O navegador não define o resultado do RPG Solo.
+   const tipo=['dano','cura','ataque','teste'].includes(teste.tipo)?teste.tipo:'teste';
+   const extraQuantidade=Number(teste.extraQuantidade??0);
+   const extraLados=Number(teste.extraLados??4);
+   const calculo=calcularDadosRpg({
+      tipo,lados:faces,quantidade:quant,modificador:mod,extraQuantidade,extraLados,
+      critico:teste.critico===true,vantagem:teste.vantagem||'normal'
+   },facesDado=>crypto.randomInt(1,facesDado+1));
+   const dificuldade=Number.isInteger(teste.dificuldade)&&!['dano','cura'].includes(tipo)?teste.dificuldade:null;
+   let passou=dificuldade===null?null:calculo.total>=dificuldade;
+   if(tipo==='ataque'&&calculo.criticoNatural)passou=true;
+   if(tipo==='ataque'&&calculo.falhaNatural)passou=false;
+   rolagem={
+     nome:String(teste.nome).slice(0,80),dado:faces,quantidade:quant,
+     modificador:mod,valores:calculo.valores,adicionais:calculo.adicionais,
+     extraQuantidade,extraLados,critico:calculo.critico,criticoNatural:calculo.criticoNatural,
+     falhaNatural:calculo.falhaNatural,comparacao:calculo.comparacao,
+     tipo,total:calculo.total,expressao:calculo.expressao,dificuldade,passou
+   };
+   textoAcao='[Rolagem validada pelo servidor: '+rolagem.nome+' ('+calculo.expressao+
+     '); dados ['+calculo.valores.join(', ')+']'+(calculo.adicionais.length?'; extras ['+calculo.adicionais.join(', ')+']':'')+
+     '; modificador '+mod+'; total '+calculo.total+
+     (calculo.criticoNatural?'; 20 natural, acerto crítico':'')+
+     (calculo.falhaNatural?'; 1 natural, falha no ataque':'')+
+     (dificuldade===null?'; sem dificuldade fixa':'; dificuldade '+dificuldade+'; '+(passou?'sucesso':'falha'))+
+     '. Descreva a consequência e não repita o teste.]';
   }
   quota=await soloCota(u);
   const h=await query('SELECT papel,tipo,texto FROM public.mesa_solo_mensagens WHERE campanha_id=$1 ORDER BY numero DESC,CASE WHEN papel=\'mestre\' THEN 0 ELSE 1 END ASC LIMIT 16',[id]);
