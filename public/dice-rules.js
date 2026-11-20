@@ -36,15 +36,15 @@
  }
  function rolar(op,gerador){
   const c=normalizar(op);
-  const rng=typeof gerador==='function'?gerador:()=>{
+  const rng=typeof gerador==='function'?gerador:(faces)=>{
    // O navegador oferece fonte aleatória segura para rolagens locais.
    if(typeof crypto!=='undefined'&&crypto.getRandomValues){
     const array=new Uint32Array(1);
-    const limite=0x100000000-(0x100000000%c.lados);
+    const limite=0x100000000-(0x100000000%faces);
     let n;do{crypto.getRandomValues(array);n=array[0]}while(n>=limite);
-    return 1+(n%c.lados);
+    return 1+(n%faces);
    }
-   return 1+Math.floor(Math.random()*c.lados);
+   return 1+Math.floor(Math.random()*faces);
   };
   const dado=(faces)=>{
    const v=Number(rng(faces));
