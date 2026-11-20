@@ -247,14 +247,38 @@
         <div id="dados-vantagem-campo">
           <label for="dados-vantagem">Rolagem com d20</label>
           <select id="dados-vantagem"><option value="normal">Normal</option><option value="vantagem">Vantagem (2d20, maior)</option><option value="desvantagem">Desvantagem (2d20, menor)</option></select>
+          <label for="dados-alvo">CA do alvo ou CD do teste (opcional)</label>
+          <input id="dados-alvo" type="number" inputmode="numeric" min="0" max="1000" step="1" placeholder="Ex.: 15">
         </div>
+        <fieldset id="dados-defesas" class="dados-defesas" hidden>
+          <legend>Proteções do alvo contra este tipo de dano</legend>
+          <p class="suave">Para uma única parcela de dano do mesmo tipo. Se o ataque causar tipos diferentes, role cada parcela separadamente.</p>
+          <div class="dados-calculadora-grade">
+            <div><label for="dados-tipo-dano">Tipo de dano</label>
+              <select id="dados-tipo-dano">
+                <option value="ácido">Ácido</option><option value="contundente">Contundente</option>
+                <option value="cortante">Cortante</option><option value="elétrico">Elétrico</option>
+                <option value="energético">Energético</option><option value="ígneo">Fogo</option>
+                <option value="frio">Frio</option><option value="necrótico">Necrótico</option>
+                <option value="perfurante">Perfurante</option><option value="psíquico">Psíquico</option>
+                <option value="radiante">Radiante</option><option value="trovejante">Trovejante</option>
+                <option value="venenoso">Venenoso</option>
+              </select></div>
+            <div><label for="dados-reducao">Redução fixa antes de resistência</label>
+              <input id="dados-reducao" type="number" inputmode="numeric" min="0" max="300" step="1" value="0"></div>
+          </div>
+          <label class="dados-calculadora-check"><input id="dados-resistencia" type="checkbox"> Alvo tem resistência (metade, arredondada para baixo)</label>
+          <label class="dados-calculadora-check"><input id="dados-vulnerabilidade" type="checkbox"> Alvo tem vulnerabilidade (dobra o dano restante)</label>
+          <label class="dados-calculadora-check"><input id="dados-imunidade" type="checkbox"> Alvo é imune a este tipo (dano zero)</label>
+        </fieldset>
         <p id="dados-calculadora-ajuda" class="suave">Dica: no D&D, proficiência normalmente entra no ataque, mas não no dano.</p>
       </fieldset>
       <div class="acoes" id="dados"></div>
       <div id="dados-animacao" class="dados-animacao-area" aria-label="Animação da rolagem de dados"></div>
       <p class="resultado" id="total" aria-live="polite">–</p>
       <p class="suave" id="detalhe"></p>
-      <p class="suave" id="info-dados"></p>
+      <p class="suave" id="info-dados" aria-live="polite"></p>
+      <button type="button" id="dados-preparar-dano" class="guia-abrir" hidden>Preparar rolagem de dano</button>
     </div>
   </section>
 
