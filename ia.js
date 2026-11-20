@@ -164,7 +164,20 @@ function validarTesteIA(t){
  if(!t||typeof t!=='object'||Array.isArray(t))return null;
  const dado=Number(t.dado),quantidade=Number(t.quantidade),modificador=Number(t.modificador),dificuldade=t.dificuldade===null||t.dificuldade===undefined?null:Number(t.dificuldade);
  if(![4,6,8,10,12,20,100].includes(dado)||!Number.isInteger(quantidade)||quantidade<1||quantidade>5||!Number.isInteger(modificador)||Math.abs(modificador)>20||dificuldade!==null&&(!Number.isInteger(dificuldade)||dificuldade<1||dificuldade>100))return null;
- return {nome:txt(t.nome,80).trim()||'Teste de habilidade',dado,quantidade,modificador,dificuldade,explicacao:txt(t.explicacao,350).trim()||'Role o dado indicado para descobrir o resultado.'};
+ const tipo=['dano','cura','ataque','teste'].includes(t.tipo)?t.tipo:'teste';
+ const extraQuantidade=t.extraQuantidade===undefined?0:Number(t.extraQuantidade);
+ const extraLados=t.extraLados===undefined?4:Number(t.extraLados);
+ if(!Number.isInteger(extraQuantidade)||extraQuantidade<0||extraQuantidade>5||
+    (extraQuantidade>0&&!([4,6,8,10,12,20,100].includes(extraLados))))return null;
+ const vantagem=tipo==='ataque'||tipo==='teste'
+    ?(['normal','vantagem','desvantagem'].includes(t.vantagem)?t.vantagem:'normal'):'normal';
+ if(vantagem!=='normal'&&(dado!==20||quantidade!==1))return null;
+ if(extraQuantidade&&tipo!=='dano'&&tipo!=='cura')return null;
+ const critico=tipo==='dano'&&t.critico===true;
+ return {nome:txt(t.nome,80).trim()||'Teste de habilidade',dado,quantidade,modificador,
+  dificuldade:['dano','cura'].includes(tipo)?null:dificuldade,
+  explicacao:txt(t.explicacao,350).trim()||'Role o dado indicado para descobrir o resultado.',
+  tipo,extraQuantidade,extraLados,critico,vantagem};
 }
 async function narrarSolo({genero,tom,premissa,resumo,historico,acao,tipo,inicio}) {
   const prompt = [
@@ -174,8 +187,12 @@ async function narrarSolo({genero,tom,premissa,resumo,historico,acao,tipo,inicio
     'Aceite pedidos de alterações narrativas e retcons razoáveis sem resistir. Continue mantendo coerência.',
     'Não invente resultados de dados. Se um teste for necessário, descreva na narração e retorne também o objeto teste.',
     'Use teste SOMENTE quando o personagem realmente precisar rolar para decidir uma consequência incerta; não peça rolagem toda cena.',
-    'Objeto teste: {"nome":"Furtividade","dado":20,"quantidade":1,"modificador":0,"dificuldade":12,"explicacao":"Role 1d20 e some o modificador para tentar passar despercebido."}.',
-    'dado deve ser 4,6,8,10,12,20 ou 100; quantidade 1 a 5; modificador entre -20 e 20. dificuldade inteira 1 a 100 ou null.',
+    'Objeto teste: {"nome":"Furtividade","tipo":"teste","dado":20,"quantidade":1,"modificador":0,"dificuldade":12,"extraQuantidade":0,"extraLados":4,"critico":false,"vantagem":"normal","explicacao":"Role 1d20 e some o modificador para tentar passar despercebido."}.',
+    'tipo deve ser teste, ataque, dano ou cura. dado 4,6,8,10,12,20 ou 100; quantidade 1 a 5; modificador entre -20 e 20; dificuldade 1 a 100 ou null.',
+    'Para ataque ou teste com d20 e quantidade 1, pode usar vantagem normal, vantagem ou desvantagem; nunca invente esses efeitos se o cenário não os justificar.',
+    'Para dano e cura, extraQuantidade é 0 a 5 com extraLados 4,6,8,10,12,20 ou 100, quando houver dados extras legítimos (por exemplo magia ou habilidade).',
+    'No D&D clássico, dano crítico duplica os DADOS de dano, inclusive os adicionais, mas não os modificadores. Use critico=true SOMENTE se o dano for explicitamente de um acerto crítico confirmado, nunca aleatoriamente.',
+    'Para dano e cura, dificuldade deve ser null. Nunca invente os resultados: a rolagem é calculada pelo servidor.',
     'Se não houver teste, teste deve ser null. Se o último turno relatou uma rolagem, NUNCA peça novamente o mesmo teste: use o resultado e a dificuldade para narrar o sucesso ou falha.',
     'Evite assumir D&D; use d20 em testes narrativos como padrão, explicando o número de faces e possíveis modificadores.',
     'Faça 2 a 5 parágrafos curtos de narração, encerrando com oportunidade para ação livre.',
