@@ -474,8 +474,18 @@ function soloAdicionarTeste(art,teste,numero){
  if(!teste||![4,6,8,10,12,20,100].includes(Number(teste.dado))||!Number.isInteger(Number(teste.quantidade))||Number(teste.quantidade)<1||Number(teste.quantidade)>5)return;
  const caixa=el('div','','solo-teste');
  caixa.appendChild(el('strong','🎲 '+(teste.nome||'Teste solicitado'),'solo-teste-nome'));
- const formula=Number(teste.quantidade)+'d'+Number(teste.dado)+(Number(teste.modificador)?(teste.modificador>0?'+':'')+teste.modificador:'');
- caixa.appendChild(el('p','Role '+formula+(Number.isInteger(teste.dificuldade)?' · Dificuldade '+teste.dificuldade:''),'solo-teste-formula'));
+ const tipo=['dano','cura','ataque','teste'].includes(teste.tipo)?teste.tipo:'teste';
+ const q=Number(teste.quantidade),faces=Number(teste.dado),mod=Number(teste.modificador);
+ const critico=tipo==='dano'&&teste.critico===true;
+ const extras=['dano','cura'].includes(tipo)?Number(teste.extraQuantidade||0):0;
+ const extraFaces=Number(teste.extraLados||4);
+ const bonus=mod?(mod>0?' + '+mod:' - '+Math.abs(mod)):'';
+ const formula=(critico?'Crítico: ':'')+(critico?q*2:q)+'d'+faces+
+  (extras?' + '+(critico?extras*2:extras)+'d'+extraFaces:'')+bonus;
+ const vantagem=teste.vantagem==='vantagem'?' · Vantagem (maior d20)'
+  :teste.vantagem==='desvantagem'?' · Desvantagem (menor d20)':'';
+ caixa.appendChild(el('p','Role '+formula+vantagem+
+  (Number.isInteger(teste.dificuldade)?' · Dificuldade '+teste.dificuldade:''),'solo-teste-formula'));
  caixa.appendChild(el('p',teste.explicacao||'O dado indica o resultado de uma ação incerta.','solo-teste-explicacao'));
  const palco=el('div','','solo-dado-animacao');
  caixa.appendChild(palco);
@@ -483,14 +493,22 @@ function soloAdicionarTeste(art,teste,numero){
  botao.onclick=async()=>{
   if(soloOcupado||!soloCampanhaId)return;
   soloOcupado=true;botao.disabled=true;$('solo-enviar').disabled=true;$('solo-voltar').disabled=true;
-  const animacao=iniciarAnimacaoDado(palco,Number(teste.dado),Number(teste.quantidade));
+  const animacao=iniciarAnimacaoDado(palco,faces,critico?q*2:q);
   acessibilidadeSomDado();
   const texto=el('p','Rolando e consultando o Mestre IA...','solo-teste-status');caixa.appendChild(texto);
   try{
    const r=await api('/api/solo/campanhas/'+soloCampanhaId+'/turnos','POST',{tipo:'rolagem',numero});
    const v=r.rolagem;
    animacao.concluir(v.valores);
-   const resultado='🎲 '+v.nome+': '+v.valores.join(' + ')+' ('+v.quantidade+'d'+v.dado+') '+(v.modificador>=0?'+ ':'- ')+Math.abs(v.modificador)+' = '+v.total+(v.passou===null?'':v.passou?' · Sucesso!':' · Falha');
+   const detalhe=v.comparacao
+     ?'2d20 ['+v.comparacao.primeiro+', '+v.comparacao.segundo+'] → '+v.comparacao.escolhido
+     :'['+v.valores.join(' + ')+']';
+   const outros=v.adicionais?.length?' + ['+v.adicionais.join(' + ')+']':'';
+   const modificador=v.modificador?(v.modificador>=0?' + ':' - ')+Math.abs(v.modificador):'';
+   const resultado='🎲 '+v.nome+' · '+(v.expressao||formula)+': '+detalhe+outros+
+     modificador+' = '+v.total+
+     (v.criticoNatural?' · 🎯 Acerto crítico (20 natural)!':v.falhaNatural?' · Falha automática (1 natural)':'')+
+     (v.passou===null?'':v.passou?' · Sucesso!':' · Falha');
    soloMensagem('jogador',resultado,'acao');
    soloMensagem('mestre',r.narracao,'acao',r.teste,r.numero);
    botao.remove();texto.textContent='Resultado registrado nesta campanha.';
