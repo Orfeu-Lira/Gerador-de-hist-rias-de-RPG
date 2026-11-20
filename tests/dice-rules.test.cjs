@@ -64,6 +64,8 @@ test('Free rolls retain negative totals and permit bonus dice',()=>{
 test('Prevent malformed inputs and too many dice',()=>{
  assert.throws(()=>rules.rolar({tipo:'dano',lados:6,quantidade:100,modificador:0}));
  assert.throws(()=>rules.rolar({tipo:'ataque',lados:20,quantidade:2,modificador:0,vantagem:'vantagem'}));
- assert.throws(()=>rules.rolar({tipo:'dano',lados:8,quantidade:20,extraQuantidade:20,extraLados:6,critico:true,modificador:0}),/Máximo/);
+ const limite=rules.rolar({tipo:'dano',lados:8,quantidade:20,extraQuantidade:20,extraLados:6,critico:true,modificador:0},()=>1);
+ assert.equal(limite.valores.length+limite.adicionais.length,80);
+ assert.throws(()=>rules.rolar({tipo:'dano',lados:8,quantidade:20,extraQuantidade:21,extraLados:6,critico:true,modificador:0}));
  assert.throws(()=>rules.rolar({tipo:'dano',lados:8,quantidade:1,modificador:1.5}));
 });
