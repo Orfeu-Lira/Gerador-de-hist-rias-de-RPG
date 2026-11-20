@@ -69,3 +69,49 @@ test('Prevent malformed inputs and too many dice',()=>{
  assert.throws(()=>rules.rolar({tipo:'dano',lados:8,quantidade:20,extraQuantidade:21,extraLados:6,critico:true,modificador:0}));
  assert.throws(()=>rules.rolar({tipo:'dano',lados:8,quantidade:1,modificador:1.5}));
 });
+
+test('Attack roll compares against target AC and auto-hits on natural 20',()=>{
+ const ordinary=rules.rolar({tipo:'ataque',lados:20,quantidade:1,modificador:5,alvo:17},sequence([11]));
+ assert.equal(ordinary.passou,false);
+ const hit=rules.rolar({tipo:'ataque',lados:20,quantidade:1,modificador:5,alvo:17},sequence([12]));
+ assert.equal(hit.passou,true);
+ const natural20=rules.rolar({tipo:'ataque',lados:20,quantidade:1,modificador:-15,alvo:99},sequence([20]));
+ assert.equal(natural20.passou,true);
+ const natural1=rules.rolar({tipo:'ataque',lados:20,quantidade:1,modificador:90,alvo:2},sequence([1]));
+ assert.equal(natural1.passou,false);
+});
+test('Skill check uses DC without automatic failure or success on natural 1/20',()=>{
+ const max=rules.rolar({tipo:'teste',lados:20,quantidade:1,modificador:-4,alvo:19},sequence([20]));
+ assert.equal(max.passou,false);
+ const min=rules.rolar({tipo:'teste',lados:20,quantidade:1,modificador:6,alvo:7},sequence([1]));
+ assert.equal(min.passou,true);
+ assert.equal(rules.rolar({tipo:'teste',lados:20,quantidade:1,modificador:1},sequence([15])).passou,null);
+});
+test('Damage resistance rounds down and vulnerability applies after resistance',()=>{
+ const r=rules.rolar({tipo:'dano',lados:20,quantidade:1,modificador:0,resistencia:true,vulnerabilidade:true},sequence([15]));
+ assert.equal(r.aposResistencia,7);
+ assert.equal(r.total,14);
+});
+test('Fixed damage reduction precedes resistance and vulnerability',()=>{
+ const r=rules.rolar({tipo:'dano',lados:20,quantidade:1,modificador:4,reducao:5,resistencia:true,vulnerabilidade:true},sequence([9]));
+ assert.equal(r.bruto,13);
+ assert.equal(r.aposReducao,8);
+ assert.equal(r.aposResistencia,4);
+ assert.equal(r.total,8);
+});
+test('Immunity zeroes damage including critical and bonus dice',()=>{
+ const r=rules.rolar({tipo:'dano',lados:8,quantidade:1,extraQuantidade:1,extraLados:6,modificador:5,critico:true,imunidade:true},sequence([7,6,5,4]));
+ assert.equal(r.bruto,27);
+ assert.equal(r.total,0);
+});
+test('Damage reductions do not alter checks or healing',()=>{
+ const r=rules.rolar({tipo:'cura',lados:6,quantidade:1,modificador:2,resistencia:true,imunidade:true,reducao:15},sequence([3]));
+ assert.equal(r.total,5);
+ assert.equal(r.reducao,0);
+ assert.equal(r.imunidade,false);
+});
+test('Reject invalid targets, fractional reduction, and oversized modifiers',()=>{
+ assert.throws(()=>rules.rolar({tipo:'ataque',lados:20,quantidade:1,modificador:0,alvo:1001}));
+ assert.throws(()=>rules.rolar({tipo:'dano',lados:8,quantidade:1,modificador:0,reducao:1.5}));
+ assert.throws(()=>rules.rolar({tipo:'dano',lados:8,quantidade:1,modificador:0,reducao:-2}));
+});
