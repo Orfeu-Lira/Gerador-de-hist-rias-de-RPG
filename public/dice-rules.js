@@ -24,6 +24,12 @@
   const extraLados=inteiro(op.extraLados??4,4,100,'Dado adicional');
   if(extraQuantidade&&!facesPermitidas.includes(extraLados))throw new Error('Dado adicional inválido.');
   const critico=tipo==='dano'&&op.critico===true;
+  const alvo=['ataque','teste'].includes(tipo)&&op.alvo!==''&&op.alvo!==null&&op.alvo!==undefined
+   ?inteiro(op.alvo,0,1000,'CA/CD'):null;
+  const reducao=tipo==='dano'?inteiro(op.reducao??0,0,300,'Redução fixa de dano'):0;
+  const resistencia=tipo==='dano'&&op.resistencia===true;
+  const vulnerabilidade=tipo==='dano'&&op.vulnerabilidade===true;
+  const imunidade=tipo==='dano'&&op.imunidade===true;
   const vantagem=tipo==='ataque'||tipo==='teste'
    ?(['normal','vantagem','desvantagem'].includes(op.vantagem)?op.vantagem:'normal'):'normal';
   if(vantagem!=='normal'&&(lados!==20||quantidade!==1))
@@ -32,7 +38,7 @@
    throw new Error('Dados adicionais disponíveis para dano, cura e rolagem livre.');
   const nRolagens=(quantidade+extraQuantidade)*(critico?2:1)+(vantagem==='normal'?0:1);
   if(nRolagens>80)throw new Error('Máximo de 80 dados por rolagem.');
-  return {tipo,lados,quantidade,modificador,extraQuantidade,extraLados,critico,vantagem};
+  return {tipo,lados,quantidade,modificador,extraQuantidade,extraLados,critico,vantagem,alvo,reducao,resistencia,vulnerabilidade,imunidade};
  }
  function rolar(op,gerador){
   const c=normalizar(op);
@@ -64,15 +70,24 @@
   const base=valores.reduce((x,y)=>x+y,0);
   const somaExtras=adicionais.reduce((x,y)=>x+y,0);
   const bruto=base+somaExtras+c.modificador;
-  const total=['dano','cura'].includes(c.tipo)?Math.max(0,bruto):bruto;
+  // D&D 2024: primeiro reduções fixas, depois resistência (arredonda
+  // para baixo), depois vulnerabilidade. Imunidade zera o tipo de dano.
+  const aposReducao=c.tipo==='dano'?Math.max(0,bruto-c.reducao):Math.max(0,bruto);
+  const aposResistencia=c.tipo==='dano'&&c.resistencia?Math.floor(aposReducao/2):aposReducao;
+  const total=c.tipo==='dano'
+   ?(c.imunidade?0:c.vulnerabilidade?aposResistencia*2:aposResistencia)
+   :c.tipo==='cura'?Math.max(0,bruto):bruto;
   const natural=(c.lados===20&&c.quantidade===1&&!c.critico&&(c.tipo==='ataque'||c.tipo==='teste'))?valores[0]:null;
   const criticoNatural=c.tipo==='ataque'&&natural===20;
   const falhaNatural=c.tipo==='ataque'&&natural===1;
+  const passou=c.tipo==='ataque'
+   ?(criticoNatural?true:falhaNatural?false:c.alvo===null?null:total>=c.alvo)
+   :c.tipo==='teste'&&c.alvo!==null?total>=c.alvo:null;
   const formato=n=>n>=0?' + '+n:' - '+Math.abs(n);
   const expressao=(c.critico?'Crítico: ':'')+(c.critico?String(c.quantidade*2):String(c.quantidade))+'d'+c.lados+
     (c.extraQuantidade?' + '+(c.critico?c.extraQuantidade*2:c.extraQuantidade)+'d'+c.extraLados:'')+
     (c.modificador?formato(c.modificador):'');
-  return {...c,valores,adicionais,base,somaExtras,bruto,total,natural,criticoNatural,falhaNatural,comparacao,expressao};
+  return {...c,valores,adicionais,base,somaExtras,bruto,aposReducao,aposResistencia,total,natural,criticoNatural,falhaNatural,passou,comparacao,expressao};
  }
  return Object.freeze({normalizar,rolar,facesPermitidas});
 });
