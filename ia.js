@@ -186,7 +186,7 @@ async function narrarSolo({genero,tom,premissa,resumo,historico,acao,tipo,inicio
     'Nunca controle ações, pensamentos ou falas do protagonista do usuário; descreva o mundo, NPCs e consequências.',
     'Aceite pedidos de alterações narrativas e retcons razoáveis sem resistir. Continue mantendo coerência.',
     'Não invente resultados de dados. Se um teste for necessário, descreva na narração e retorne também o objeto teste.',
-    'Use teste SOMENTE quando o personagem realmente precisar rolar para decidir uma consequência incerta; não peça rolagem toda cena.',
+    'Use teste apenas quando houver uma rolagem necessária de ataque, perícia, resistência, dano ou cura; não peça rolagem a cada cena. Depois de um ataque bem-sucedido que exige dano, peça uma rolagem separada de tipo dano com os dados e modificadores apropriados.',
     'Objeto teste: {"nome":"Furtividade","tipo":"teste","dado":20,"quantidade":1,"modificador":0,"dificuldade":12,"extraQuantidade":0,"extraLados":4,"critico":false,"vantagem":"normal","explicacao":"Role 1d20 e some o modificador para tentar passar despercebido."}.',
     'tipo deve ser teste, ataque, dano ou cura. dado 4,6,8,10,12,20 ou 100; quantidade 1 a 5; modificador entre -20 e 20; dificuldade 1 a 100 ou null.',
     'Para ataque ou teste com d20 e quantidade 1, pode usar vantagem normal, vantagem ou desvantagem; nunca invente esses efeitos se o cenário não os justificar.',
