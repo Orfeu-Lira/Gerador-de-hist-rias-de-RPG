@@ -1,6 +1,6 @@
 /* Mesa PWA. Cache estritamente limitado a recursos públicos estáticos. */
-const CACHE_NAME='mesa-shell-v1';
-const STATIC=['/offline.html','/style.css','/app.js','/icons/mesa-192.png','/icons/mesa-512.png','/manifest.webmanifest'];
+const CACHE_NAME='mesa-shell-v2';
+const STATIC=['/offline.html','/style.css','/app.js','/dice-rules.js','/icons/mesa-192.png','/icons/mesa-512.png','/manifest.webmanifest'];
 self.addEventListener('install',event=>{
  event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(['/offline.html'])));
  self.skipWaiting();
