@@ -657,6 +657,8 @@ function dadosTipoAtualizar(){
  $('dados-extras-campos').hidden=!comExtras;
  $('dados-critico-campo').hidden=tipo!=='dano';
  $('dados-vantagem-campo').hidden=!['ataque','teste'].includes(tipo);
+ $('dados-defesas').hidden=tipo!=='dano';
+ $('dados-preparar-dano').hidden=true;
  const d20=['ataque','teste'].includes(tipo);
  if(d20){$('qtd').value='1';$('qtd').disabled=true;}
  else $('qtd').disabled=false;
@@ -681,7 +683,8 @@ function dadosNumero(id,min,max){
  return numero;
 }
 function dadosRolar(lados){
- const palco=$('dados-animacao');
+ const palco=$('dados-animacao'),preparar=$('dados-preparar-dano');
+ preparar.hidden=true;
  try{
   const tipo=$('dados-tipo').value;
   const quantidade=dadosNumero('qtd',1,20);
@@ -690,11 +693,20 @@ function dadosRolar(lados){
   const outro=dadosNumero('dados-outro-bonus',-100,100);
   const extraQuantidade=['livre','dano','cura'].includes(tipo)?dadosNumero('dados-extra-quantidade',0,20):0;
   const extraLados=Number($('dados-extra-lados').value);
-  const resultado=dadosRegras.rolar({tipo,lados,quantidade,modificador:atributo+proficiencia+outro,
-    extraQuantidade,extraLados,critico:tipo==='dano'&&$('dados-critico').checked,
-    vantagem:['ataque','teste'].includes(tipo)?$('dados-vantagem').value:'normal'});
+  const d20=tipo==='ataque'||tipo==='teste';
+  const alvo=d20&&$('dados-alvo').value.trim()!==''?dadosNumero('dados-alvo',0,1000):null;
+  const reducao=tipo==='dano'?dadosNumero('dados-reducao',0,300):0;
+  const resistencia=tipo==='dano'&&$('dados-resistencia').checked;
+  const vulnerabilidade=tipo==='dano'&&$('dados-vulnerabilidade').checked;
+  const imunidade=tipo==='dano'&&$('dados-imunidade').checked;
+  const resultado=dadosRegras.rolar({
+   tipo,lados,quantidade,modificador:atributo+proficiencia+outro,
+   extraQuantidade,extraLados,critico:tipo==='dano'&&$('dados-critico').checked,
+   vantagem:d20?$('dados-vantagem').value:'normal',
+   alvo,reducao,resistencia,vulnerabilidade,imunidade
+  });
   const animacao=iniciarAnimacaoDado(palco,lados,resultado.valores.length);
-  acessibilidadeSomDado(); // A gravação fornecida pelo usuário sempre toca na rolagem.
+  acessibilidadeSomDado();
   $('total').textContent='🎲';
   $('detalhe').textContent='Rolando '+resultado.expressao+'...';
   $('info-dados').textContent='';
@@ -702,20 +714,43 @@ function dadosRolar(lados){
    if(palco._mesaAnimacao!==animacao)return;
    animacao.concluir(resultado.valores);
    $('total').textContent=String(resultado.total);
-   const base=resultado.valores.join(' + ');
-   const bonus=[atributo,proficiencia,outro].filter(x=>x!==0).map(x=>(x>=0?' + ':' - ')+Math.abs(x)).join('');
-   const extra=resultado.adicionais.length?' + ['+resultado.adicionais.join(' + ')+']':'';
-   const rolagem=resultado.comparacao
-    ?'2d20: '+resultado.comparacao.primeiro+' e '+resultado.comparacao.segundo+
-      ' → '+resultado.comparacao.escolhido+' ('+resultado.vantagem+')'
-    :resultado.valores.length+'d'+lados+': ['+base+']';
-   $('detalhe').textContent=resultado.expressao+' = '+rolagem+extra+bonus+
-     (resultado.bruto!==resultado.total?' → mínimo 0':'')+' = '+resultado.total;
-   const situacao=resultado.criticoNatural?'🎯 Acerto crítico (20 natural)! Na próxima rolagem de dano, marque Crítico.'
-     :resultado.falhaNatural?'⚠️ Falha automática no ataque (1 natural).'
-     :resultado.natural===20?'20 natural no d20. Consulte as regras do teste com o mestre.':'';
-   $('info-dados').textContent=situacao||
-    (resultado.critico?'Crítico de dano: todos os dados de dano foram duplicados; bônus fixos foram aplicados apenas uma vez.':'');
+   const principal=resultado.comparacao
+    ?'2d20 ['+resultado.comparacao.primeiro+', '+resultado.comparacao.segundo+'] → '+resultado.comparacao.escolhido+' ('+resultado.vantagem+')'
+    :resultado.valores.length+'d'+lados+' ['+resultado.valores.join(' + ')+']';
+   const extras=resultado.adicionais.length?' + '+resultado.adicionais.length+'d'+extraLados+' ['+resultado.adicionais.join(' + ')+']':'';
+   const bonus=[['atributo',atributo],['proficiência',proficiencia],['outros',outro]]
+    .filter(([,v])=>v!==0).map(([nome,v])=>(v>=0?' + ':' - ')+Math.abs(v)+' ('+nome+')').join('');
+   let conta=resultado.expressao+' = '+principal+extras+bonus+' = '+resultado.bruto;
+   const notas=[];
+   if(tipo==='dano'){
+    const tipoDano=$('dados-tipo-dano').selectedOptions[0]?.textContent||'dano';
+    if(resultado.bruto<0)conta+=' → mínimo 0';
+    if(reducao)conta+=' → redução '+reducao+': '+resultado.aposReducao;
+    if(resistencia)conta+=' → resistência ÷ 2 (arredonda para baixo): '+resultado.aposResistencia;
+    if(vulnerabilidade)conta+=' → vulnerabilidade × 2: '+resultado.aposResistencia*2;
+    if(imunidade)conta+=' → imunidade: 0';
+    conta+=' = '+resultado.total+' de dano ('+tipoDano+')';
+    if(resultado.critico)notas.push('🎯 Crítico: dados de dano e dados adicionais duplicados; bônus fixos aplicados uma só vez.');
+    if(resistencia||vulnerabilidade||imunidade)notas.push('As proteções foram calculadas somente para este tipo de dano.');
+   }else if(tipo==='cura'){
+    if(resultado.bruto<0)conta+=' → mínimo 0';
+    conta+=' = '+resultado.total+' de cura';
+   }else{
+    if(alvo!==null)conta+=' · '+(tipo==='ataque'?'CA ':'CD ')+alvo;
+    if(resultado.passou===true)notas.push(tipo==='ataque'?'✅ Ataque acertou!':'✅ Teste bem-sucedido!');
+    if(resultado.passou===false)notas.push(tipo==='ataque'?'❌ Ataque errou.':'❌ Teste falhou.');
+    if(resultado.criticoNatural)notas.push('🎯 20 natural: acerto crítico! Prepare a rolagem de dano.');
+    if(resultado.falhaNatural)notas.push('⚠️ 1 natural: ataque erra independentemente do bônus.');
+    if(tipo==='teste'&&resultado.natural===20)notas.push('20 natural no teste não significa sucesso automático.');
+    if(tipo==='teste'&&resultado.natural===1)notas.push('1 natural no teste não significa falha automática.');
+    if(tipo==='ataque'&&resultado.passou===true){
+     preparar.dataset.critico=String(resultado.criticoNatural);
+     preparar.textContent=resultado.criticoNatural?'🎯 Preparar dano crítico':'⚔️ Preparar dano do ataque';
+     preparar.hidden=false;
+    }
+   }
+   $('detalhe').textContent=conta;
+   $('info-dados').textContent=notas.join(' ');
   };
   if(acessibilidadeMovimentoReduzido())finalizar();
   else setTimeout(finalizar,950);
@@ -725,6 +760,19 @@ function dadosRolar(lados){
   $('info-dados').textContent='Revise os campos e tente novamente.';
  }
 }
+$('dados-preparar-dano').onclick=()=>{
+ const critico=$('dados-preparar-dano').dataset.critico==='true';
+ $('dados-tipo').value='dano';
+ dadosTipoAtualizar();
+ $('dados-critico').checked=critico;
+ $('dados-proficiencia').value='0'; // Em geral, proficiência não é somada ao dano.
+ $('qtd').value='1';
+ $('dados-calculadora-ajuda').textContent=critico
+  ?'🎯 Crítico preparado. Escolha o dado da arma ou magia e role. Dados extras também são dobrados; bônus fixos entram uma vez.'
+  :'⚔️ Dano preparado. Escolha o dado da arma ou magia e role. Proficiência foi retirada; confira os outros bônus.';
+ $('dados-critico').focus();
+};
+
 [4,6,8,10,12,20,100].forEach(lados=>{
  const botao=el('button','d'+lados,'dado');botao.type='button';
  botao.onclick=()=>dadosRolar(lados);
