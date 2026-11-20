@@ -25,7 +25,10 @@ jobs:
           node --check server.js
           node --check ia.js
           node --check public/app.js
+          node --check public/dice-rules.js
           node --check public/mesa-dice-audio.js
+      - name: Verify dice math (criticals, modifiers and advantage)
+        run: node tests/dice-rules.test.cjs
       - name: Check protected source files
         run: node tests/security-static.mjs
       - name: Validate two-account test syntax without executing it
