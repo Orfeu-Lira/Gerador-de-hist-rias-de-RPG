@@ -19,7 +19,7 @@
   const lados=inteiro(op.lados,1,100,'Dado');
   if(!facesPermitidas.includes(lados))throw new Error('Escolha um dado válido.');
   const quantidade=inteiro(op.quantidade,1,20,'Quantidade');
-  const modificador=inteiro(op.modificador, -100,100,'Modificador');
+  const modificador=inteiro(op.modificador, -300,300,'Modificador');
   const extraQuantidade=inteiro(op.extraQuantidade??0,0,20,'Quantidade adicional');
   const extraLados=inteiro(op.extraLados??4,4,100,'Dado adicional');
   if(extraQuantidade&&!facesPermitidas.includes(extraLados))throw new Error('Dado adicional inválido.');
