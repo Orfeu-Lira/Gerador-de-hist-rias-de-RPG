@@ -907,3 +907,21 @@ body.menu-compacto .musica-ambiente{left:calc(var(--mesa-menu-compacto) + 16px)}
 .mesa-exclusao-conta input{width:100%;max-width:480px;min-height:44px;border:1px solid #a98a7a;border-radius:8px;padding:10px;background:#fff;color:#26201e}
 .mesa-exclusao-conta button{width:fit-content;max-width:100%;min-height:44px;padding:10px 15px;border-radius:8px;border:1px solid #942e29;background:#842d29;color:#fff;cursor:pointer;font-weight:800}
 .mesa-exclusao-conta button:disabled{opacity:.55;cursor:wait}
+
+/* Calculadora de rolagens: dano, testes, ataques e cura com contas detalhadas. */
+.dados-calculadora{border:1px solid #c8ae7d;border-radius:14px;background:#fff9ed;color:#382b20;padding:17px 19px;margin:18px 0;min-width:0;display:grid;gap:13px}
+.dados-calculadora legend{color:#754932;font-weight:800;padding:0 8px;font-size:1.02rem}
+.dados-calculadora .suave{margin:0;line-height:1.55;color:#655643}
+.dados-calculadora-grade{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.dados-calculadora-grade>div{min-width:0}
+.dados-calculadora label{display:block;margin-bottom:5px;font-weight:700;color:#4b3428}
+.dados-calculadora :is(input[type="number"],select){display:block;width:100%;max-width:100%;min-height:44px;background:#fff;color:#33281e;border:1px solid #c5ae85;border-radius:8px;padding:8px 11px;font:inherit}
+.dados-calculadora-check{display:flex!important;align-items:start;gap:10px;line-height:1.45;cursor:pointer}
+.dados-calculadora-check input{width:20px;height:20px;margin-top:2px;flex:0 0 20px;accent-color:#975333}
+#dados-vantagem-campo{max-width:420px}
+.dados-calculadora [hidden],#dados-extras-campos[hidden],#dados-vantagem-campo[hidden],#dados-critico-campo[hidden]{display:none!important}
+.dados-calculadora :is(input,select):focus-visible{outline:3px solid #bd8050;outline-offset:2px}
+#dados .dado:disabled{opacity:.4;cursor:not-allowed}
+#detalhe,#info-dados{overflow-wrap:anywhere;line-height:1.65}
+#detalhe{font-weight:650;font-variant-numeric:tabular-nums}
+@media(max-width:600px){.dados-calculadora{padding:14px}.dados-calculadora-grade{grid-template-columns:minmax(0,1fr)}}
