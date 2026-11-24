@@ -39,7 +39,7 @@ const estadoNavegacao={
 
 $('dnd-tutorial-mesa').onclick=()=>{mostrar('tutorial');tutorialMostrarPasso(0);};
 const tutorialEtapas = [
- {titulo:'Bem-vindo ao Mesa',sub:'Seu espaço de histórias',texto:'O Mesa reúne aventuras, dados e fichas em um só lugar. Use o menu lateral para alternar de ferramenta. Você pode deixá-lo expandido ou compacto, e no celular basta tocar em Menu.',dicas:['O tutorial fica disponível sempre no menu lateral.','Sua conta guarda o histórico e as fichas privadas.'],tela:'gerador',rotulo:'Conhecer o gerador'},
+ {titulo:'Bem-vindo ao Mesa',sub:'Seu espaço de histórias',texto:'Use o Gerador para preparar uma aventura ou escolha RPG Solo · Mestre IA para jogar no seu ritmo. Os dois últimos capítulos deste guia ensinam a começar e retomar uma campanha solo. Use o menu lateral para alternar de ferramenta. Você pode deixá-lo expandido ou compacto, e no celular basta tocar em Menu.',dicas:['O tutorial fica disponível sempre no menu lateral.','Sua conta guarda o histórico e as fichas privadas.'],tela:'gerador',rotulo:'Conhecer o gerador'},
  {titulo:'Crie sua primeira aventura',sub:'Gerador de histórias',texto:'Escolha o gênero, defina o tom e o número de jogadores. Escreva uma ideia opcional, como uma vila cercada por névoa, e clique em Gerar minha aventura. O Mesa usa IA e aplica limites de uso.',dicas:['Uma ideia curta pode orientar toda a aventura.','Leia a história gerada e adapte-a livremente à sua mesa.'],tela:'gerador',rotulo:'Ir ao gerador'},
  {titulo:'Role os dados',sub:'Oráculo dos dados',texto:'Os dados introduzem sorte no jogo. Um d20 tem 20 faces; d4, d6, d8, d10 e d12 possuem as quantidades de faces indicadas. No Oráculo dos dados você encontra botões para rolar e um tutorial ilustrado para iniciantes.',dicas:['O mestre determina quando uma rolagem é necessária.','Os efeitos de cada resultado dependem das regras da campanha.'],tela:'dados',rotulo:'Abrir os dados'},
  {titulo:'Crie uma conta',sub:'Acesso ao seu espaço',texto:'Ao entrar ou criar uma conta, você pode guardar aventuras, fichas e preferências. A opção Manter conectado preserva a sessão por até 30 dias. Se perder sua senha, use o link de recuperação da tela de entrada.',dicas:['Nunca compartilhe sua senha.','O login e o cadastro ficam em Entrar, no menu.'],tela:'conta',rotulo:'Abrir acesso'},
@@ -52,7 +52,19 @@ const tutorialEtapas = [
  {titulo:'Peça ajuda ao tutor',sub:'Tutor D&D',texto:'O Tutor D&D responde dúvidas sobre conceitos e regras, com base de referência na SRD 5.2.1. Abra a ferramenta, descreva a dúvida e examine a resposta. Existem limites de perguntas por conta.',dicas:['Uma pergunta específica costuma render uma explicação mais útil.','O tutor não substitui a decisão do mestre.'],tela:'assistente',rotulo:'Abrir tutor',requerLogin:true},
  {titulo:'Entenda as regras de D&D do zero',sub:'Material gratuito oficial',texto:'No Tutor D&D você encontra o guia oficial para começar a jogar e o livro eletrônico gratuito das regras de 2024. Aprenda testes, rolagens, atributos, combate, classes, espécies, antecedentes, magias, equipamentos e progressão. Depois, use o Tutor para dúvidas específicas.',dicas:['Comece pelo guia introdutório e avance para o compêndio de regras.','O conteúdo do D&D Beyond está em inglês e pode ser traduzido pelo navegador.'],tela:'assistente',rotulo:'Ver trilha oficial de D&D',requerLogin:true},
  {titulo:'Administração do Mesa',sub:'Painel do administrador',texto:'Quando a conta tem perfil de administrador, o menu inclui Painel, onde é possível consultar informações gerais como número de usuários e aventuras geradas. Usuários comuns não têm acesso a essa área.',dicas:['O painel não dá acesso às fichas privadas de outras pessoas.','Se você não for administrador, essa área não aparecerá no seu menu.'],tela:'admin',rotulo:'Abrir painel (administrador)',requerAdmin:true},
- {titulo:'Crie a atmosfera da mesa',sub:'Música e ajustes finais',texto:'O botão ♫ Música fica no canto inferior direito, inclusive no login. Abra-o para escolher entre três gravações medievais licenciadas, controlar volume e pausar. A reprodução começa somente quando você solicitar.',dicas:['O player mostra autor, licença e fonte das gravações.','Se preferir silêncio, deixe o player pausado. Pronto: sua aventura pode começar!'],tela:'gerador',rotulo:'Começar aventura'}
+ {titulo:'Crie a atmosfera da mesa',sub:'Música e ajustes finais',texto:'O botão ♫ Música fica no canto inferior direito, inclusive no login. Abra-o para escolher entre três gravações medievais licenciadas, controlar volume e pausar. A reprodução começa somente quando você solicitar.',dicas:['O player mostra autor, licença e fonte das gravações.','Se preferir silêncio, deixe o player pausado. Pronto: sua aventura pode começar!'],tela:'gerador',rotulo:'Começar aventura'},
+ {
+   titulo:'Comece sua campanha solo',sub:'RPG Solo · Mestre IA',
+   texto:'Entre na sua conta e, no Gerador, abra RPG Solo · Mestre IA. Dê um nome à campanha. Em História inicial, escolha uma aventura salva ou escreva uma ideia sua. Por exemplo: “Toda noite, o sino de uma torre submersa toca três vezes.” Escolha o gênero e o tom.',
+   dicas:['Se for sua primeira partida, marque “Sim, me ensine enquanto jogo” para receber ajuda na primeira cena.','Escolha uma ficha salva, crie um personagem ou mantenha “Sem ficha por enquanto”. Depois, toque em Iniciar aventura solo.'],
+   tela:'solo',rotulo:'Abrir RPG Solo',requerLogin:true
+ },
+ {
+   titulo:'Jogue a primeira cena e retome depois',sub:'Na mesa com o Mestre IA',
+   texto:'Leia a cena e escolha Ação do meu personagem. Conte o que você tenta fazer: “Espero o sino tocar e observo se a água se move.” Toque em Enviar ao Mestre IA para descobrir o que acontece. Se a cena pedir um teste, use o botão Rolar que aparece na mensagem.',
+   dicas:['Para mudar algo no enredo, selecione Pedir modificação da história. Por exemplo: “Quero que o mistério aconteça durante o dia.”','Para voltar depois, abra RPG Solo na mesma conta e escolha sua campanha em Minhas campanhas salvas.'],
+   tela:'solo',rotulo:'Abrir minhas campanhas',requerLogin:true
+ }
 ];
 let tutorialPasso=0;
 function tutorialMostrarPasso(indice){
@@ -79,6 +91,9 @@ $('tutorial-ir').onclick=()=>{
   mostrar(etapa.tela);
 };
 try{const guardado=Number(localStorage.getItem('mesa-tutorial-etapa'));if(Number.isInteger(guardado))tutorialPasso=Math.max(0,Math.min(tutorialEtapas.length-1,guardado));}catch{}
+if(new URL(location.href).searchParams.get('capitulo')==='solo'){
+  tutorialPasso=tutorialEtapas.findIndex(etapa=>etapa.tela==='solo');
+}
 tutorialMostrarPasso(tutorialPasso);
 
 // Menu lateral: recolhível no computador e gaveta no celular.
@@ -1826,7 +1841,7 @@ function adminEditor(alvo,item,tipo){
 }
 async function adminExibirPublicacoes(alvo,tipo){
  const conteudo=tipo==='conteudos';
- adminTitulo(alvo,conteudo?'Conteúdos e tutorial':'Central de novidades',conteudo?'Gerencie artigos adicionais, exemplos e perguntas frequentes. Os 10 passos do tutorial principal continuam no aplicativo.':'Publique novidades e avisos visíveis para os jogadores.');
+ adminTitulo(alvo,conteudo?'Conteúdos e tutorial':'Central de novidades',conteudo?'Gerencie artigos adicionais, exemplos e perguntas frequentes. Os capítulos do tutorial principal ficam disponíveis no aplicativo.':'Publique novidades e avisos visíveis para os jogadores.');
  const r=await api('/api/admin/'+tipo);
  adminEditor(alvo,null,tipo);
  const area=add('div',alvo,'','admin-lista');
