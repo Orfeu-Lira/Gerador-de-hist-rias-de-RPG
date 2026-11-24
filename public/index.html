@@ -133,7 +133,7 @@
           <select id="solo-regras"><option value="nao">Não, preciso de explicações</option><option value="basico">Conheço o básico</option><option value="sim">Sim, conheço bem</option></select>
           <label for="solo-guia">3. Quer um pequeno tutorial durante a primeira cena?</label>
           <select id="solo-guia"><option value="sim">Sim, me ensine enquanto jogo</option><option value="nao">Não, quero começar direto</option></select>
-          <p class="suave">Você não precisa aprender D&amp;D para jogar solo. <a href="/?tela=tutorial" target="_blank" rel="noopener noreferrer">Abrir o tutorial do Mesa em outra aba ↗</a></p>
+          <p class="suave">Você não precisa aprender D&amp;D para jogar solo. <a href="?tela=tutorial&amp;capitulo=solo" target="_blank" rel="noopener noreferrer">Abrir o tutorial de RPG Solo em outra aba ↗</a></p>
         </fieldset>
         <fieldset class="solo-iniciacao"><legend>Protagonista da jornada</legend>
           <label for="solo-personagem">Escolher personagem</label><select id="solo-personagem"><option value="">Sem ficha por enquanto</option></select>
@@ -185,9 +185,9 @@
   </section>
   <section id="v-novidades" hidden><div class="pagina-intro"><span class="sobretitulo">CRÔNICAS DO MESA</span><h1>Novidades e comunicados</h1><p>Acompanhe anúncios publicados pela administração.</p></div><div class="folha" id="lista-novidades"></div></section>
   <section id="v-tutorial" hidden aria-labelledby="tutorial-titulo">
-    <div class="pagina-intro"><span class="sobretitulo">MANUAL DO AVENTUREIRO</span><h1 id="tutorial-titulo">Como usar o Mesa</h1><p>Da sua primeira aventura ao inventário, descubra todas as ferramentas em poucos passos.</p></div>
+    <div class="pagina-intro"><span class="sobretitulo">MANUAL DO AVENTUREIRO</span><h1 id="tutorial-titulo">Como usar o Mesa</h1><p>Aprenda a preparar aventuras, jogar RPG Solo com o Mestre IA e usar suas fichas e dados.</p></div>
     <div class="folha tutorial-folha">
-      <div class="tutorial-progresso"><span id="tutorial-contagem">Passo 1 de 10</span><progress id="tutorial-progresso" max="10" value="1" aria-label="Progresso do tutorial"></progress></div>
+      <div class="tutorial-progresso"><span id="tutorial-contagem">Passo 1</span><progress id="tutorial-progresso" max="1" value="1" aria-label="Progresso do tutorial"></progress></div>
       <div class="tutorial-passos" role="group" aria-label="Capítulos do tutorial">
         <button type="button" id="tutorial-anterior" class="guia-abrir">← Anterior</button>
         <button type="button" id="tutorial-proximo" class="principal">Próximo capítulo →</button>
