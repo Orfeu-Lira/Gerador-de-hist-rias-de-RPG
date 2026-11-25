@@ -964,3 +964,38 @@ html.mesa-movimento-reduzido .mesa-intro{display:none!important}
 #v-musica .musica-indicador{display:inline-block;margin-left:8px;vertical-align:middle}
 body.mesa-alto-contraste #v-musica .musica-painel{background:#080808;color:#fff;border:2px solid #fff}
 body.mesa-alto-contraste #v-musica .musica-painel :is(p,label,span,h2,a){color:#fff}
+
+/* Portal Mesa: navegação por categorias e início responsivo. */
+#nav .mesa-nav-grupo{width:100%;min-width:0;border-top:1px solid #d2b77926;padding-top:7px;margin-top:3px}
+#nav .mesa-nav-titulo{cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:6px 10px;color:#d7bd8b;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.13em;list-style:none;min-height:32px}
+#nav .mesa-nav-titulo::-webkit-details-marker{display:none}
+#nav .mesa-nav-titulo::after{content:'+';font-size:1rem}
+#nav .mesa-nav-grupo[open] .mesa-nav-titulo::after{content:'−'}
+#nav .mesa-nav-titulo:focus-visible{outline:2px solid #e9be68;outline-offset:2px;border-radius:5px}
+#nav .mesa-nav-itens{display:grid;gap:3px}
+#nav .menu-item-texto{white-space:normal;line-height:1.25}
+#nav .menu-item{min-height:44px}
+.mesa-home-hero{min-height:310px}
+.mesa-home-grade{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:0 0 32px}
+.mesa-home-card{display:flex;flex-direction:column;align-items:flex-start;gap:10px;text-align:left;min-width:0;min-height:170px;padding:24px 20px;border:1px solid #d4b37a60;border-radius:16px;background:linear-gradient(145deg,#23483d,#142f2e);color:#f5e9d1;cursor:pointer;box-shadow:0 10px 28px #06171930;transition:transform .18s ease,border-color .18s ease}
+.mesa-home-card:hover{transform:translateY(-3px);border-color:#e1c489}
+.mesa-home-card strong{font:600 1.12rem/1.4 Cinzel,Georgia,serif}
+.mesa-home-icone{font-size:1.8rem;color:#e5be74;line-height:1}
+.mesa-home-descricao{color:#d2dfd4;font-size:.88rem;line-height:1.5}
+.mesa-mobile-nav{display:none}
+body.mesa-alto-contraste .mesa-home-card{color:white;background:#111;border:2px solid white}
+body.mesa-alto-contraste .mesa-home-card span{color:white}
+@media(min-width:851px){body.menu-compacto #nav .mesa-nav-titulo{font-size:0;min-height:14px;padding:2px;justify-content:center}body.menu-compacto #nav .mesa-nav-titulo::after{font-size:.8rem}}
+@media(max-width:1050px){.mesa-home-grade{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:850px){
+ .mesa-mobile-nav{position:fixed;inset:auto 0 0;z-index:110;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;padding:6px 5px calc(6px + env(safe-area-inset-bottom,0px));background:#102928;border-top:1px solid #d4b37a65;box-shadow:0 -6px 24px #06171960}
+ .mesa-mobile-nav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:0;min-height:48px;border:1px solid transparent;border-radius:9px;background:transparent;color:#e4dfd0;padding:4px 2px;cursor:pointer}
+ .mesa-mobile-nav button span{font-size:1.3rem;line-height:1}
+ .mesa-mobile-nav button small{font-size:.69rem}
+ .mesa-mobile-nav button[aria-current="page"]{color:#f3d69a;background:#d4b37a20;border-color:#d4b37a45}
+ body.menu-mobile-aberto .mesa-mobile-nav{visibility:hidden}
+ .mesa-acessibilidade{bottom:calc(70px + env(safe-area-inset-bottom,0px))}
+ main{padding-bottom:calc(125px + env(safe-area-inset-bottom,0px))}
+ .mesa-home-hero{min-height:0}
+}
+@media(max-width:480px){.mesa-home-grade{gap:10px}.mesa-home-card{padding:15px 12px;min-height:145px}.mesa-home-card strong{font-size:.93rem}.mesa-home-descricao{font-size:.8rem}}
