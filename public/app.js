@@ -121,21 +121,20 @@ $('menu-fundo').onclick=()=>menuMobile(false);
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&document.body.classList.contains('menu-mobile-aberto'))menuMobile(false);});
 window.addEventListener('resize',()=>{if(!preferirMobile())menuMobile(false);});
 try{menuRecolher(localStorage.getItem('mesa-menu-compacto')==='1');}catch{menuRecolher(false);}
-// Transições visuais sem atrasar a navegação nem bloquear os controles.
-let mesaTelaVisivel=null, mesaAnimacaoTela=null;
+// Transições sem atrasar a lógica de navegação: snapshot nativo quando disponível.
+let mesaTelaVisivel=null, mesaAnimacaoTela=null, mesaTransicaoAtiva=null;
+function mesaMovimentoReduzido(){
+ return window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+ document.documentElement.classList.contains('mesa-movimento-reduzido');
+}
 function mesaTransicaoTela(tela, primeira){
   mesaAnimacaoTela?.cancel();
   mesaAnimacaoTela=null;
   const painel=$('v-'+tela);
-  // A navegação sempre começa no topo, inclusive quando acionada por botões internos.
   window.scrollTo({top:0,left:0,behavior:'instant'});
-  if(!primeira){
-    const foco=document.activeElement;
-    if(foco?.closest('section[hidden]'))$('mesa-conteudo')?.focus({preventScroll:true});
-  }
-  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
-     document.documentElement.classList.contains('mesa-movimento-reduzido') ||
-     typeof painel.animate!=='function')return;
+  if(!primeira && document.activeElement?.closest('section[hidden]'))
+    $('mesa-conteudo')?.focus({preventScroll:true});
+  if(mesaMovimentoReduzido() || mesaTransicaoAtiva || typeof painel.animate!=='function')return;
   mesaAnimacaoTela=painel.animate(
     [{opacity:0,transform:'translateY('+ (primeira?12:7) +'px)'},{opacity:1,transform:'translateY(0)'}],
     {duration:primeira?420:220,easing:'cubic-bezier(.2,.75,.25,1)'}
@@ -255,7 +254,13 @@ function montarNav() {
     botao.title=nome;botao.setAttribute('aria-label',nome);
     const icone=el('span',simbolo,'menu-item-icone');icone.setAttribute('aria-hidden','true');
     botao.append(icone,el('span',nome,'menu-item-texto'));
-    botao.onclick=()=>mostrar(t);nav.appendChild(botao);
+    botao.onclick=()=>{
+      if(t===mesaTelaVisivel || mesaMovimentoReduzido() || typeof document.startViewTransition!=='function'){mostrar(t);return;}
+      mesaTransicaoAtiva?.skipTransition();
+      const transicao=document.startViewTransition(()=>{if(mesaTransicaoAtiva===transicao)mostrar(t);});
+      mesaTransicaoAtiva=transicao;
+      transicao.finished.catch(()=>{}).finally(()=>{if(mesaTransicaoAtiva===transicao)mesaTransicaoAtiva=null;});
+    };nav.appendChild(botao);
   });
   if(eu.logado){
     const sair=el('button','','menu-item');sair.type='button';sair.title='Sair';sair.setAttribute('aria-label','Sair');
