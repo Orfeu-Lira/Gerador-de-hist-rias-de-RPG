@@ -113,7 +113,7 @@ function menuMobile(aberto){
   $('menu-fundo').hidden=!ativo;
   $('menu-abrir-mobile').setAttribute('aria-expanded',String(ativo));
   $('menu-abrir-mobile').setAttribute('aria-label',ativo?'Fechar menu lateral':'Abrir menu lateral');
-  if(!ativo&&preferirMobile()&&document.activeElement?.closest('#menu-lateral'))$('menu-abrir-mobile').focus();
+  if(!ativo&&preferirMobile()&&document.activeElement?.closest('#menu-lateral'))$('menu-abrir-mobile').focus({preventScroll:true});
 }
 $('menu-retrair').onclick=()=>preferirMobile()?menuMobile(false):menuRecolher(!document.body.classList.contains('menu-compacto'));
 $('menu-abrir-mobile').onclick=()=>menuMobile(!document.body.classList.contains('menu-mobile-aberto'));
@@ -121,6 +121,26 @@ $('menu-fundo').onclick=()=>menuMobile(false);
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&document.body.classList.contains('menu-mobile-aberto'))menuMobile(false);});
 window.addEventListener('resize',()=>{if(!preferirMobile())menuMobile(false);});
 try{menuRecolher(localStorage.getItem('mesa-menu-compacto')==='1');}catch{menuRecolher(false);}
+// Transições visuais sem atrasar a navegação nem bloquear os controles.
+let mesaTelaVisivel=null, mesaAnimacaoTela=null;
+function mesaTransicaoTela(tela, primeira){
+  mesaAnimacaoTela?.cancel();
+  mesaAnimacaoTela=null;
+  const painel=$('v-'+tela);
+  // A navegação sempre começa no topo, inclusive quando acionada por botões internos.
+  window.scrollTo({top:0,left:0,behavior:'instant'});
+  if(!primeira){
+    const foco=document.activeElement;
+    if(foco?.closest('section[hidden]'))$('mesa-conteudo')?.focus({preventScroll:true});
+  }
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+     document.documentElement.classList.contains('mesa-movimento-reduzido') ||
+     typeof painel.animate!=='function')return;
+  mesaAnimacaoTela=painel.animate(
+    [{opacity:0,transform:'translateY('+ (primeira?12:7) +'px)'},{opacity:1,transform:'translateY(0)'}],
+    {duration:primeira?420:220,easing:'cubic-bezier(.2,.75,.25,1)'}
+  );
+}
 function mostrar(tela) {
   if(!TELAS.includes(tela))return;
   pararJornada();
@@ -132,6 +152,10 @@ function mostrar(tela) {
   document.querySelectorAll('#nav button[data-tela]').forEach((b) => b.setAttribute('aria-current', b.dataset.tela === tela?'page':'false'));
   if(tela==='tutorial')tutorialMostrarPasso(tutorialPasso);
   menuMobile(false);
+  const primeira=mesaTelaVisivel===null;
+  const mudou=mesaTelaVisivel!==tela;
+  mesaTelaVisivel=tela;
+  if(mudou)mesaTransicaoTela(tela,primeira);
   aviso('');
   if (tela === 'gerador' && !$('f-gerar-npc').hidden) { carregarOrigensNPC(); if(eu.logado)carregarBibliotecaNPC(); }
   if (tela === 'solo') soloAtualizarInicio();
