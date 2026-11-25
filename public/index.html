@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./style.css?v=portal5">
+<link rel="stylesheet" href="./style.css?v=portal6">
 </head>
 <body>
 <div id="mesa-abertura" class="mesa-intro" aria-hidden="true" inert>
@@ -398,6 +398,21 @@
     <div class="folha dnd-trilha-aprendizado"><span class="sobretitulo">COMECE DO ZERO</span><h2>Aprenda D&D do primeiro dado às regras avançadas</h2><p>Não sabe o que é RPG? Comece pela introdução oficial. Depois explore as regras gratuitas de D&D 2024: criação de personagens, testes, combate, classes, magias, equipamentos, condições e evolução.</p><div class="dnd-trilha-links"><a class="guia-abrir" href="https://www.dndbeyond.com/en/how-to-play-dnd" target="_blank" rel="noopener noreferrer">① Como jogar D&D — guia inicial ↗</a><a class="guia-abrir" href="https://www.dndbeyond.com/sources/dnd/br-2024" target="_blank" rel="noopener noreferrer">② Regras gratuitas 2024 — compêndio ↗</a><button type="button" class="guia-abrir" id="dnd-tutorial-mesa">③ Como usar o Mesa para jogar ↗</button></div><p class="suave">Os recursos oficiais são em inglês. Use a tradução do navegador caso prefira ler em português. O conteúdo gratuito é extenso, mas não inclui todas as opções dos livros pagos.</p></div>
     <div class="folha assistente-painel"><h2>O que você quer aprender?</h2><p>O assistente explica regras e dá exemplos. Ele não modifica personagens e pode cometer erros: confirme decisões importantes na fonte oficial.</p><form id="f-ajuda-dnd"><label for="pergunta-dnd">Sua pergunta</label><textarea id="pergunta-dnd" rows="4" maxlength="450" required placeholder="Ex.: Como funcionam os testes de habilidade e a dificuldade (CD)?"></textarea><div class="acoes"><button class="principal" id="ajuda-enviar" type="submit">✦ Pedir explicação</button></div></form><div id="resposta-dnd" class="assistente-resposta" role="status" aria-live="polite"></div><p class="suave">Base de referência: <a target="_blank" rel="noopener noreferrer" href="https://www.dndbeyond.com/srd">SRD 5.2.1 — D&D Beyond</a>. Limite inicial: seis consultas diárias por conta.</p></div>
   </section>
+  <section id="v-perfil" hidden aria-labelledby="perfil-titulo">
+    <div class="pagina-intro"><span class="sobretitulo">MINHA CONTA</span><h1 id="perfil-titulo">Meu perfil</h1><p>Personalize sua identidade e acompanhe suas gerações.</p></div>
+    <div class="folha mesa-perfil-card">
+      <div class="mesa-perfil-identidade"><div class="avatar-moldura"><img id="perfil-foto" alt="Sua foto de perfil" hidden><span id="perfil-foto-vazio" aria-hidden="true">♙</span></div>
+      <div><h2>Foto de perfil</h2><p class="suave">Imagem privada da sua conta. JPG, PNG ou WebP.</p><label for="perfil-arquivo">Escolher foto</label><input type="file" id="perfil-arquivo" accept="image/jpeg,image/png,image/webp"><button type="button" id="perfil-remover">Remover foto</button></div></div>
+      <form id="perfil-form" class="formulario"><label for="perfil-nome">Nome de exibição</label><input id="perfil-nome" maxlength="80" autocomplete="nickname"><label for="perfil-email">E-mail da conta</label><input id="perfil-email" type="email" readonly><button type="submit" class="principal">Salvar perfil</button></form>
+      <p id="perfil-status" role="status" aria-live="polite"></p>
+    </div>
+    <div class="folha mesa-perfil-card"><h2>Gerações disponíveis</h2><p id="perfil-cota">Consultando limite diário...</p><progress id="perfil-progresso" max="5" value="0" aria-label="Gerações disponíveis" hidden></progress><p class="suave">As histórias e os NPCs compartilham a cota diária de geração.</p><button type="button" class="principal" id="perfil-opcoes">Personalizar aparência e escrita</button></div>
+  </section>
+  <section id="v-opcoes" hidden aria-labelledby="opcoes-titulo">
+    <div class="pagina-intro"><span class="sobretitulo">PREFERÊNCIAS</span><h1 id="opcoes-titulo">Opções</h1><p>Adapte a experiência do Mesa ao seu estilo.</p></div>
+    <div class="folha mesa-perfil-card"><h2>Escrita</h2><label class="mesa-acessibilidade-check"><input type="checkbox" id="opcoes-ortografia" checked> Correção ortográfica e sugestões</label><p class="suave">Utiliza o dicionário do navegador. Clique com o botão direito ou toque prolongadamente na palavra destacada para ver sugestões, quando disponíveis.</p><label for="opcoes-teste">Experimente o corretor</label><textarea id="opcoes-teste" rows="3" placeholder="Digite uma frase em português..."></textarea></div>
+    <div class="folha mesa-perfil-card"><h2>Aparência</h2><label for="opcoes-fonte">Estilo de fonte dos textos</label><select id="opcoes-fonte"><option value="padrao">Original do Mesa</option><option value="serifada">Clássica · serifada</option><option value="simples">Moderna · sem serifa</option><option value="mono">Monoespaçada</option></select><p class="mesa-fonte-amostra">A aventura começa com uma escolha. O destino é escrito por você.</p><button type="button" id="opcoes-restaurar">Restaurar preferências de aparência e escrita</button><p id="opcoes-status" role="status" aria-live="polite">As preferências são salvas neste navegador.</p></div>
+  </section>
   <section id="v-conta" hidden>
     <div class="acesso-intro"><span class="acesso-simbolo" aria-hidden="true">✦</span><span class="sobretitulo">SEU PORTAL DE AVENTURAS</span><h1>Bem-vindo ao Mesa</h1><p>Entre na sua conta para continuar criando histórias.</p></div>
     <div class="acesso-cartao">
@@ -581,6 +596,6 @@
 <script src="./mesa-dice-audio.js"></script>
 <script src="./dice-rules.js"></script>
 <script src="./email-validation.js"></script>
-<script src="./app.js?v=portal5"></script>
+<script src="./app.js?v=portal6"></script>
 </body>
 </html>
