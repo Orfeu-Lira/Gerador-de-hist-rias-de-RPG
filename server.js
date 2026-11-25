@@ -82,7 +82,7 @@ app.use(session({
 const GENEROS = ['Fantasia sombria','Fantasia épica','D&D clássico','Ficção científica','Terror','Investigação','Piratas e mares'];
 const TONS = ['Misterioso','Aventureiro','Sombrio','Leve e bem-humorado','Tenso'];
 const HASH_FALSO = bcrypt.hashSync('senha-falsa-para-proteger-tempo-de-resposta', 12);
-const emailValido = s => typeof s === 'string' && s.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+const emailValido = require('./public/email-validation.js');
 const senhaValida = s => typeof s === 'string' && s.length >= 8 && s.length <= 72;
 const asyncHandler = f => (req,res,next) => Promise.resolve(f(req,res,next)).catch(next);
 const atual = async req => {
@@ -175,7 +175,8 @@ app.post('/api/login',asyncHandler(async(req,res) => {
   if(!await exigirLimiteAuth(req,res,'loginIp'))return;
   if(typeof req.body?.email==='string' && !await exigirLimiteAuth(req,res,'loginConta',req.body.email))return;
   const {email,senha} = req.body || {};
-  const r = typeof email === 'string' && email.length <= 254
+  if (!emailValido(email)) return res.status(400).json({erro:'Informe um e-mail em formato válido.'});
+  const r = emailValido(email)
     ? await query('SELECT id,senha_hash,bloqueado_ate FROM public.usuarios WHERE email=$1',[email.trim().toLowerCase()])
     : {rows:[]};
   const u = r.rows[0];
