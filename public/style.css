@@ -999,3 +999,23 @@ body.mesa-alto-contraste .mesa-home-card span{color:white}
  .mesa-home-hero{min-height:0}
 }
 @media(max-width:480px){.mesa-home-grade{gap:10px}.mesa-home-card{padding:15px 12px;min-height:145px}.mesa-home-card strong{font-size:.93rem}.mesa-home-descricao{font-size:.8rem}}
+
+/* Barras de rolagem discretas: preservam a área e ficam visíveis durante o uso. */
+html.mesa-scroll-dinamico,html.mesa-scroll-dinamico :is(.topo,.solo-mensagens,.notificacoes-painel,.mesa-acessibilidade-painel){
+ scrollbar-width:auto;scrollbar-color:transparent transparent;scrollbar-gutter:stable
+}
+html.mesa-scroll-dinamico.mesa-rolando,html.mesa-scroll-dinamico :is(.topo,.solo-mensagens,.notificacoes-painel,.mesa-acessibilidade-painel).mesa-rolando{
+ scrollbar-color:#b59b70 transparent
+}
+html.mesa-scroll-dinamico :is(.topo,.solo-mensagens,.notificacoes-painel,.mesa-acessibilidade-painel):focus-visible{scrollbar-color:#b59b70 transparent}
+html.mesa-scroll-dinamico:has(body.mesa-alto-contraste),html.mesa-scroll-dinamico body.mesa-alto-contraste :is(.topo,.solo-mensagens,.notificacoes-painel,.mesa-acessibilidade-painel){scrollbar-color:auto}
+@supports not (scrollbar-color:transparent transparent){
+ html.mesa-scroll-dinamico::-webkit-scrollbar,html.mesa-scroll-dinamico :is(.topo,.solo-mensagens,.notificacoes-painel,.mesa-acessibilidade-painel)::-webkit-scrollbar{width:10px;height:10px}
+ html.mesa-scroll-dinamico::-webkit-scrollbar-track,html.mesa-scroll-dinamico :is(.topo,.solo-mensagens,.notificacoes-painel,.mesa-acessibilidade-painel)::-webkit-scrollbar-track{background:transparent}
+ html.mesa-scroll-dinamico::-webkit-scrollbar-thumb,html.mesa-scroll-dinamico :is(.topo,.solo-mensagens,.notificacoes-painel,.mesa-acessibilidade-painel)::-webkit-scrollbar-thumb{background:transparent;border:2px solid transparent;border-radius:10px;background-clip:padding-box}
+ html.mesa-scroll-dinamico.mesa-rolando::-webkit-scrollbar-thumb,html.mesa-scroll-dinamico .mesa-rolando::-webkit-scrollbar-thumb,html.mesa-scroll-dinamico::-webkit-scrollbar-thumb:hover,html.mesa-scroll-dinamico :is(.topo,.solo-mensagens,.notificacoes-painel,.mesa-acessibilidade-painel)::-webkit-scrollbar-thumb:hover{background:#b59b70;background-clip:padding-box}
+ html.mesa-scroll-dinamico:has(body.mesa-alto-contraste)::-webkit-scrollbar-thumb,html.mesa-scroll-dinamico body.mesa-alto-contraste :is(.topo,.solo-mensagens,.notificacoes-painel,.mesa-acessibilidade-painel)::-webkit-scrollbar-thumb{background:#aaa;background-clip:padding-box}
+}
+@media(forced-colors:active){
+ html.mesa-scroll-dinamico,html.mesa-scroll-dinamico :is(.topo,.solo-mensagens,.notificacoes-painel,.mesa-acessibilidade-painel){scrollbar-color:auto}
+}
