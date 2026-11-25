@@ -1019,3 +1019,11 @@ html.mesa-scroll-dinamico:has(body.mesa-alto-contraste),html.mesa-scroll-dinamic
 @media(forced-colors:active){
  html.mesa-scroll-dinamico,html.mesa-scroll-dinamico :is(.topo,.solo-mensagens,.notificacoes-painel,.mesa-acessibilidade-painel){scrollbar-color:auto}
 }
+
+/* Feedback de e-mail: texto além da cor, compatível com alto contraste. */
+.mesa-email-feedback{font-size:.85rem;line-height:1.5;margin:4px 0 12px;min-height:0}
+.mesa-email-feedback:empty{display:none}
+.mesa-email-feedback.email-ok{color:#236143;font-weight:650}
+.mesa-email-feedback.email-erro{color:#982a29;font-weight:650}
+#v-conta input[aria-invalid="true"]{border:2px solid #982a29}
+body.mesa-alto-contraste .mesa-email-feedback{color:#111!important}
