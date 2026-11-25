@@ -32,9 +32,15 @@ let eu = { logado: false };
   }
   intro.appendChild(centro);
   document.body.appendChild(intro);
-  const fechar=()=>intro.remove();
+  let limite;
+  const fechar=()=>{
+    window.clearTimeout(limite);
+    document.removeEventListener('pointerdown',fechar);
+    document.removeEventListener('keydown',fechar);
+    intro.remove();
+  };
   intro.addEventListener('animationend',e=>{if(e.target===intro)fechar();});
-  window.setTimeout(fechar,2300);
+  limite=window.setTimeout(fechar,2300);
   document.addEventListener('pointerdown',fechar,{once:true});
   document.addEventListener('keydown',fechar,{once:true});
 })();
