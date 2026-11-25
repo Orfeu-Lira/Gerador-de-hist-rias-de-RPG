@@ -949,3 +949,18 @@ body.menu-compacto .musica-ambiente{left:calc(var(--mesa-menu-compacto) + 16px)}
 @keyframes mesa-intro-texto{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.mesa-intro{display:none!important}}
 html.mesa-movimento-reduzido .mesa-intro{display:none!important}
+
+/* Música é uma página independente. Acessibilidade continua disponível em qualquer tela. */
+#v-musica .musica-ambiente,body.menu-compacto #v-musica .musica-ambiente{position:static;inset:auto;width:100%;max-width:760px;margin:0 auto;padding:0;z-index:auto}
+#v-musica .musica-painel{position:static;inset:auto;width:100%;max-width:none;max-height:none;overflow:visible;padding:clamp(16px,3vw,28px);animation:none}
+#v-musica .musica-ambiente-controles{grid-template-columns:minmax(0,1fr)}
+#v-musica .musica-ambiente .musica-painel .musica-ambiente-controles{grid-template-columns:minmax(0,1fr)}
+#v-musica .musica-ambiente .musica-painel .musica-ambiente-controles #musica-volume{grid-column:1}
+#v-musica .musica-ambiente-controles button{min-height:44px}
+#v-musica .musica-painel-topo h2{font-size:1.2rem}
+#v-musica .musica-youtube iframe{width:100%;aspect-ratio:16/9;height:auto}
+#v-musica .musica-painel .suave{font-size:.9rem}
+#v-musica .musica-fechar{min-height:44px;min-width:44px;padding:8px 12px;font-size:.85rem}
+#v-musica .musica-indicador{display:inline-block;margin-left:8px;vertical-align:middle}
+body.mesa-alto-contraste #v-musica .musica-painel{background:#080808;color:#fff;border:2px solid #fff}
+body.mesa-alto-contraste #v-musica .musica-painel :is(p,label,span,h2,a){color:#fff}
