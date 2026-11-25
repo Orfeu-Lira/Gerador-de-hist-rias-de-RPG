@@ -67,6 +67,7 @@ app.use((req,res,next) => {
   next();
 });
 // Só o upload de avatar aceita payload maior; demais rotas continuam limitadas a 10kb.
+app.use('/api/conta/perfil/foto',express.json({limit:'550kb'}));
 app.use(/^\/api\/personagens\/\d+\/avatar$/, express.json({limit:'650kb'}));
 // Fichas com inventário, habilidades e diário precisam de um limite próprio.
 app.use(/^\/api\/personagens(?:\/\d+)?$/,express.json({limit:'32kb'}));
@@ -287,6 +288,38 @@ app.get('/api/eu',asyncHandler(async(req,res) => {
   const u = await atual(req);
   res.json({logado:!!u,email:u?.email||null,papel:u?.papel||null,restantes:await restantes(req,u)});
 }));
+// Perfil privado: sempre derivado da sessão, nunca de um ID enviado pelo cliente.
+app.get('/api/conta/perfil',asyncHandler(async(req,res)=>{
+ const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
+ const r=await query('SELECT nome, foto IS NOT NULL AS tem_foto FROM public.mesa_perfis WHERE usuario_id=$1',[u.id]);
+ res.json({nome:r.rows[0]?.nome||'',temFoto:!!r.rows[0]?.tem_foto,email:u.email,restantes:await restantes(req,u),limite:u.papel==='admin'?null:5});
+}));
+app.post('/api/conta/perfil',asyncHandler(async(req,res)=>{
+ const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
+ const nome=req.body?.nome;
+ if(typeof nome!=='string'||nome.trim().length>80)return res.status(400).json({erro:'Use um nome de até 80 caracteres.'});
+ await query('INSERT INTO public.mesa_perfis(usuario_id,nome) VALUES($1,$2) ON CONFLICT(usuario_id) DO UPDATE SET nome=EXCLUDED.nome,atualizado_em=now()',[u.id,nome.trim()]);
+ res.json({ok:true});
+}));
+app.post('/api/conta/perfil/foto',asyncHandler(async(req,res)=>{
+ const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
+ const s=req.body?.imagem;
+ if(typeof s!=='string'||s.length>510000||!/^[A-Za-z0-9+/]+={0,2}$/.test(s))return res.status(400).json({erro:'Imagem inválida.'});
+ const b=Buffer.from(s,'base64');
+ if(b.length<16||b.length>382500||b.toString('ascii',0,4)!=='RIFF'||b.toString('ascii',8,12)!=='WEBP'||b.readUInt32LE(4)!==b.length-8||!['VP8 ','VP8L','VP8X'].includes(b.toString('ascii',12,16)))return res.status(400).json({erro:'Envie uma imagem WebP válida.'});
+ await query('INSERT INTO public.mesa_perfis(usuario_id,foto) VALUES($1,$2) ON CONFLICT(usuario_id) DO UPDATE SET foto=EXCLUDED.foto,atualizado_em=now()',[u.id,b]);
+ res.json({ok:true});
+}));
+app.get('/api/conta/perfil/foto',asyncHandler(async(req,res)=>{
+ const u=await atual(req);if(!u)return res.status(401).end();
+ const r=await query('SELECT foto FROM public.mesa_perfis WHERE usuario_id=$1',[u.id]);
+ if(!r.rows[0]?.foto)return res.status(404).end();
+ res.set('Cache-Control','private, no-store');res.type('image/webp').send(r.rows[0].foto);
+}));
+app.delete('/api/conta/perfil/foto',asyncHandler(async(req,res)=>{
+ const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
+ await query('UPDATE public.mesa_perfis SET foto=NULL,atualizado_em=now() WHERE usuario_id=$1',[u.id]);res.json({ok:true});
+}));
 // Exportação informativa dos dados de uso pertencentes ao titular autenticado.
 // Não entrega senhas, hashes, cookies, tokens, auditoria ou informações de outras contas.
 // Cada coleção tem limite de 1000 itens; dados adicionais podem ser solicitados pelo suporte.
@@ -294,7 +327,7 @@ app.get('/api/conta/meus-dados',asyncHandler(async(req,res)=>{
  const u=await atual(req);
  if(!u)return res.status(401).json({erro:'Entre na sua conta para exportar seus dados.'});
  const [perfil,aventuras,personagens,npcs,campanhas,mensagens,suporte]=await Promise.all([
-  query('SELECT email,papel,criado_em,ultimo_login_em,termos_aceitos_em,termos_versao FROM public.usuarios WHERE id=$1',[u.id]),
+  query('SELECT u.email,u.papel,u.criado_em,u.ultimo_login_em,u.termos_aceitos_em,u.termos_versao,p.nome AS nome_exibicao FROM public.usuarios u LEFT JOIN public.mesa_perfis p ON p.usuario_id=u.id WHERE u.id=$1',[u.id]),
   query('SELECT id,genero,tom,jogadores,conteudo,criado_em FROM public.aventuras WHERE usuario_id=$1 ORDER BY id DESC LIMIT 1000',[u.id]),
   query('SELECT id,nome,dados,criado_em,atualizado_em FROM public.personagens_dnd WHERE usuario_id=$1 ORDER BY id DESC LIMIT 1000',[u.id]),
   query('SELECT id,aventura_id,conteudo,criado_em FROM public.mesa_npcs WHERE usuario_id=$1 ORDER BY id DESC LIMIT 1000',[u.id]),
