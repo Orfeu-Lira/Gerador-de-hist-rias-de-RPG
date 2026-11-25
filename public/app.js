@@ -31,7 +31,26 @@ async function api(url, metodo = 'GET', corpo) {
 function aviso(texto, bom) { const a = $('aviso'); a.textContent = texto || ''; a.className = bom ? 'bom' : ''; }
 
 // ---- Navegação entre telas ----
-const TELAS = ['gerador','solo','dados','historico','personagens','assistente','tutorial','novidades','suporte','instalar','conta','admin','privacidade','termos'];
+const TELAS = ['gerador','solo','dados','historico','personagens','assistente','tutorial','novidades','suporte','instalar','conta','admin','privacidade','termos','musica'];
+// Mantém o player no mesmo documento e fora das configurações de acessibilidade.
+(function separarMusica(){
+  const player=$('musica-ambiente');
+  const pagina=document.createElement('section');
+  pagina.id='v-musica';pagina.hidden=true;pagina.setAttribute('aria-labelledby','mesa-musica-titulo');
+  const cabecalho=el('div','','pagina-intro');
+  const titulo=el('h1','Música');titulo.id='mesa-musica-titulo';
+  cabecalho.append(el('span','AMBIENTE DA AVENTURA','sobretitulo'),titulo,el('p','Escolha a trilha sonora da sua mesa. A música é opcional e independente da acessibilidade.'));
+  player.before(pagina);pagina.append(cabecalho,player);
+  $('musica-abrir').hidden=true;
+  $('musica-painel').hidden=false;
+  $('musica-abrir').setAttribute('aria-expanded','true');
+  $('musica-fechar').textContent='Voltar';
+  $('musica-fechar').setAttribute('aria-label','Voltar à tela anterior');
+  $('musica-painel').querySelector('.musica-painel-topo h2').appendChild($('musica-indicador'));
+  const nota=el('p','Os recursos de acessibilidade são gratuitos e disponíveis para todos, inclusive sem conta.','suave');
+  $('mesa-acessibilidade-painel').insertBefore(nota,$('mesa-acessibilidade-painel').children[1]);
+})();
+let mesaAntesDaMusica='gerador';
 const estadoNavegacao={
   ler(chave){try{return sessionStorage.getItem('mesa:'+chave);}catch{return null;}},
   gravar(chave,valor){try{if(valor===null)sessionStorage.removeItem('mesa:'+chave);else sessionStorage.setItem('mesa:'+chave,String(valor));}catch{}}
@@ -52,7 +71,7 @@ const tutorialEtapas = [
  {titulo:'Peça ajuda ao tutor',sub:'Tutor D&D',texto:'O Tutor D&D responde dúvidas sobre conceitos e regras, com base de referência na SRD 5.2.1. Abra a ferramenta, descreva a dúvida e examine a resposta. Existem limites de perguntas por conta.',dicas:['Uma pergunta específica costuma render uma explicação mais útil.','O tutor não substitui a decisão do mestre.'],tela:'assistente',rotulo:'Abrir tutor',requerLogin:true},
  {titulo:'Entenda as regras de D&D do zero',sub:'Material gratuito oficial',texto:'No Tutor D&D você encontra o guia oficial para começar a jogar e o livro eletrônico gratuito das regras de 2024. Aprenda testes, rolagens, atributos, combate, classes, espécies, antecedentes, magias, equipamentos e progressão. Depois, use o Tutor para dúvidas específicas.',dicas:['Comece pelo guia introdutório e avance para o compêndio de regras.','O conteúdo do D&D Beyond está em inglês e pode ser traduzido pelo navegador.'],tela:'assistente',rotulo:'Ver trilha oficial de D&D',requerLogin:true},
  {titulo:'Administração do Mesa',sub:'Painel do administrador',texto:'Quando a conta tem perfil de administrador, o menu inclui Painel, onde é possível consultar informações gerais como número de usuários e aventuras geradas. Usuários comuns não têm acesso a essa área.',dicas:['O painel não dá acesso às fichas privadas de outras pessoas.','Se você não for administrador, essa área não aparecerá no seu menu.'],tela:'admin',rotulo:'Abrir painel (administrador)',requerAdmin:true},
- {titulo:'Crie a atmosfera da mesa',sub:'Música e ajustes finais',texto:'O botão ♫ Música fica no canto inferior direito, inclusive no login. Abra-o para escolher entre três gravações medievais licenciadas, controlar volume e pausar. A reprodução começa somente quando você solicitar.',dicas:['O player mostra autor, licença e fonte das gravações.','Se preferir silêncio, deixe o player pausado. Pronto: sua aventura pode começar!'],tela:'gerador',rotulo:'Começar aventura'},
+ {titulo:'Crie a atmosfera da mesa',sub:'Música e ajustes finais',texto:'A aba Música fica no menu lateral, inclusive sem login. Abra-a para escolher a trilha sonora, controlar volume e pausar. A reprodução começa somente quando você solicitar.',dicas:['O player mostra autor, licença e fonte das gravações.','Se preferir silêncio, deixe o player pausado. Pronto: sua aventura pode começar!'],tela:'gerador',rotulo:'Começar aventura'},
  {
    titulo:'Comece sua campanha solo',sub:'RPG Solo · Mestre IA',
    texto:'Entre na sua conta e, no Gerador, abra RPG Solo · Mestre IA. Dê um nome à campanha. Em História inicial, escolha uma aventura salva ou escreva uma ideia sua. Por exemplo: “Toda noite, o sino de uma torre submersa toca três vezes.” Escolha o gênero e o tom.',
@@ -167,6 +186,7 @@ function mostrar(tela) {
   pararJornada();
   if(!eu.logado&&['historico','personagens','assistente','admin'].includes(tela))tela='conta';
   if(tela==='admin'&&eu.papel!=='admin')tela='gerador';
+  if(tela==='musica'&&mesaTelaVisivel&&mesaTelaVisivel!=='musica')mesaAntesDaMusica=mesaTelaVisivel;
   estadoNavegacao.gravar('tela',tela);
   document.body.classList.toggle('tela-acesso', tela === 'conta');
   TELAS.forEach((t) => { $('v-' + t).hidden = t !== tela; });
@@ -267,7 +287,7 @@ function montarNav() {
   nav.replaceChildren();
   const itens = [['gerador', '✦', 'Gerador'], ['solo', '✧', 'RPG Solo · IA'], ['dados', '◇', 'Dados']];
   if (eu.logado) itens.push(['historico', '▤', 'Histórico'], ['personagens', '♙', 'Personagens'], ['assistente', '✧', 'Tutor D&D']);
-  itens.push(['tutorial','❖','Tutorial'],['novidades','✦','Novidades'],['instalar','⬇','Instalar Mesa']);
+  itens.push(['musica','♫','Música'],['tutorial','❖','Tutorial'],['novidades','✦','Novidades'],['instalar','⬇','Instalar Mesa']);
   if(eu.logado)itens.push(['suporte','✉','Suporte']);
   if (eu.papel === 'admin') itens.push(['admin', '⚙', 'Painel']);
   if (!eu.logado) itens.push(['conta', '↪', 'Entrar']);
@@ -278,6 +298,11 @@ function montarNav() {
     botao.append(icone,el('span',nome,'menu-item-texto'));
     botao.onclick=()=>navegarMesa(t);nav.appendChild(botao);
   });
+  const acesso=el('button','','menu-item');acesso.type='button';acesso.title='Acessibilidade gratuita';acesso.setAttribute('aria-label','Abrir acessibilidade');acesso.setAttribute('aria-controls','mesa-acessibilidade-painel');
+  const simboloAcesso=el('span','♿','menu-item-icone');simboloAcesso.setAttribute('aria-hidden','true');
+  acesso.append(simboloAcesso,el('span','Acessibilidade','menu-item-texto'));
+  acesso.onclick=()=>{menuMobile(false);if($('mesa-acessibilidade-painel').hidden)$('mesa-acessibilidade-abrir').click();else $('mesa-acessibilidade-fechar').focus({preventScroll:true});};
+  nav.appendChild(acesso);
   if(eu.logado){
     const sair=el('button','','menu-item');sair.type='button';sair.title='Sair';sair.setAttribute('aria-label','Sair');
     const icone=el('span','↪','menu-item-icone');icone.setAttribute('aria-hidden','true');
@@ -1109,13 +1134,7 @@ function musicaParar(){
  $('musica-indicador').classList.remove('tocando');
 }
 musicaGlobal.onended=musicaParar;
-function musicaAtualizarPainel(aberto){
- $('musica-painel').hidden=!aberto;
- $('musica-abrir').setAttribute('aria-expanded',String(aberto));
- if(aberto)$('musica-fechar').focus();
-}
-$('musica-abrir').onclick=()=>musicaAtualizarPainel($('musica-painel').hidden);
-$('musica-fechar').onclick=()=>{musicaAtualizarPainel(false);$('musica-abrir').focus();};
+$('musica-fechar').onclick=()=>navegarMesa(mesaAntesDaMusica);
 musicaSelecionada.onchange=()=>{
  musicaParar();musicaGlobal.removeAttribute('src');musicaGlobal.load();
  musicaAtualizarFonte();musicaStatus.textContent='Faixa selecionada. Toque em Reproduzir.';
@@ -1146,7 +1165,7 @@ musicaBotao.onclick=async()=>{
  }finally{musicaBotao.disabled=false;}
 };
 musicaAtualizarFonte();
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('musica-painel').hidden){musicaAtualizarPainel(false);$('musica-abrir').focus();}});
+// O botão Voltar e o menu controlam a página de música; Escape permanece reservado aos painéis.
 const audioJornada=new Audio();audioJornada.loop=true;let tocadorJornada=null;
 function pararJornada(){audioJornada.pause();audioJornada.removeAttribute('src');if(tocadorJornada){tocadorJornada.b.textContent='▶ Tocar';tocadorJornada.s.textContent='Pausado';}tocadorJornada=null;}
 function playerDaHistoria(alvo,genero='',tom='',sugestao=''){
