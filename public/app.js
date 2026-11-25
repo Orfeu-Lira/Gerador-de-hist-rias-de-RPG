@@ -2289,3 +2289,20 @@ atualizarEu().then(() => {
   }
   aviso('Não foi possível verificar a sessão com o servidor agora. Sua conta pode continuar conectada. Atualize a página e tente novamente. Detalhes: '+e.message);
 });
+
+
+// Mantém a barra nativa; altera apenas sua aparência durante a rolagem.
+(function mesaBarrasDinamicas(){
+ const raiz=document.documentElement;
+ const seletor='.topo,.solo-mensagens,.notificacoes-painel,.mesa-acessibilidade-painel';
+ const temporizadores=new WeakMap();
+ function mostrarBarra(alvo){
+  if(alvo===document || alvo===window || alvo===document.body || alvo===raiz)alvo=raiz;
+  if(!(alvo instanceof Element)|| (alvo!==raiz&&!alvo.matches(seletor)))return;
+  alvo.classList.add('mesa-rolando');
+  clearTimeout(temporizadores.get(alvo));
+  temporizadores.set(alvo,setTimeout(()=>{alvo.classList.remove('mesa-rolando');temporizadores.delete(alvo);},1000));
+ }
+ document.addEventListener('scroll',e=>mostrarBarra(e.target),{capture:true,passive:true});
+ raiz.classList.add('mesa-scroll-dinamico');
+})();
