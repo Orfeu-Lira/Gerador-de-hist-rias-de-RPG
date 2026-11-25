@@ -933,3 +933,19 @@ body.menu-compacto .musica-ambiente{left:calc(var(--mesa-menu-compacto) + 16px)}
 .dados-defesas .suave{margin:0}
 #dados-preparar-dano{max-width:100%;min-height:44px;margin:12px 0;border:1px solid #b98b56;background:#f6e6c3;color:#51321e;font-weight:800}
 #dados-preparar-dano:focus-visible{outline:3px solid #a95b32;outline-offset:3px}
+
+/* Abertura cinematográfica do Mesa — decorativa, não bloqueia a navegação. */
+.mesa-intro{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;overflow:hidden;pointer-events:none;background:radial-gradient(ellipse at center,#23483b 0%,#102928 44%,#081719 85%);color:#f7e6bf;animation:mesa-intro-saida 2.15s ease both}
+.mesa-intro-centro{position:relative;display:grid;justify-items:center;text-align:center;padding:24px;gap:14px}
+.mesa-intro-selo{display:grid;place-items:center;position:relative;width:clamp(92px,24vw,132px);aspect-ratio:1;border:1px solid #d6ae68;border-radius:50%;box-shadow:0 0 38px #d5aa6640,inset 0 0 35px #d5aa661a;color:#f5d18a;font:clamp(48px,12vw,76px) Georgia,serif;animation:mesa-intro-selo .85s cubic-bezier(.2,.7,.2,1) both}
+.mesa-intro-selo::before,.mesa-intro-selo::after{content:"";position:absolute;inset:-12px;border:1px solid #d6ae6855;border-radius:50%;transform:rotate(45deg)}
+.mesa-intro-selo::after{inset:-24px;border-style:dashed;opacity:.55;animation:mesa-intro-orbita 2s ease-out both}
+.mesa-intro-nome{font:700 clamp(42px,12vw,76px)/1.1 Cinzel,Georgia,serif;letter-spacing:.22em;padding-left:.22em;margin:13px 0 0;animation:mesa-intro-texto .65s .25s both}
+.mesa-intro-legenda{font:500 clamp(10px,2.8vw,13px)/1.5 "DM Sans",system-ui,sans-serif;letter-spacing:.24em;text-transform:uppercase;color:#d6bd92;animation:mesa-intro-texto .6s .5s both}
+.mesa-intro-linha{height:1px;width:min(180px,55vw);background:linear-gradient(90deg,transparent,#d6ae68,transparent);animation:mesa-intro-texto .6s .65s both}
+@keyframes mesa-intro-saida{0%,70%{opacity:1;visibility:visible}100%{opacity:0;visibility:hidden}}
+@keyframes mesa-intro-selo{from{opacity:0;transform:scale(.72) rotate(-18deg)}to{opacity:1;transform:scale(1) rotate(0)}}
+@keyframes mesa-intro-orbita{from{transform:rotate(-40deg)}to{transform:rotate(45deg)}}
+@keyframes mesa-intro-texto{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.mesa-intro{display:none!important}}
+html.mesa-movimento-reduzido .mesa-intro{display:none!important}
