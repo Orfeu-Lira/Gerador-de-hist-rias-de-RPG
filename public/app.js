@@ -31,7 +31,7 @@ async function api(url, metodo = 'GET', corpo) {
 function aviso(texto, bom) { const a = $('aviso'); a.textContent = texto || ''; a.className = bom ? 'bom' : ''; }
 
 // ---- Navegação entre telas ----
-const TELAS = ['gerador','solo','dados','historico','personagens','assistente','tutorial','novidades','suporte','instalar','conta','admin','privacidade','termos','musica','inicio'];
+const TELAS = ['gerador','solo','dados','historico','personagens','assistente','tutorial','novidades','suporte','instalar','conta','admin','privacidade','termos','musica','inicio','perfil','opcoes'];
 // Mantém o player no mesmo documento e fora das configurações de acessibilidade.
 (function separarMusica(){
   const player=$('musica-ambiente');
@@ -227,7 +227,8 @@ function navegarMesa(tela, depois){
 function mostrar(tela) {
   if(!TELAS.includes(tela))return;
   pararJornada();
-  if(!eu.logado&&['historico','personagens','assistente','admin'].includes(tela))tela='conta';
+  if(tela!=='perfil'&&mesaTelaVisivel==='perfil'){perfilRequisicao++;limparFotoPerfil();$('perfil-nome').value='';$('perfil-email').value='';}
+  if(!eu.logado&&['historico','personagens','assistente','admin','perfil'].includes(tela))tela='conta';
   if(tela==='admin'&&eu.papel!=='admin')tela='gerador';
   if(tela==='musica'&&mesaTelaVisivel&&mesaTelaVisivel!=='musica')mesaAntesDaMusica=mesaTelaVisivel;
   estadoNavegacao.gravar('tela',tela);
@@ -248,6 +249,7 @@ function mostrar(tela) {
   if (tela === 'admin') {carregarResumo();notificacoesAtualizar();}
   if (tela === 'suporte') suporteListar();
   if (tela === 'novidades') noticiasMesa();
+  if (tela === 'perfil') carregarMeuPerfil();
 }
 $('abrir-tutorial-menu').onclick=()=>navegarMesa('tutorial');
 $('solo-ir-gerador')?.addEventListener('click',()=>navegarMesa('gerador'));
@@ -345,7 +347,7 @@ function montarNav() {
   grupo('Aventuras',[['gerador','✦','Gerador de histórias',false],['gerador','♙','Gerador de NPCs',true],['solo','✧','RPG Solo'],...(eu.logado?[['historico','▤','Minhas aventuras']]:[])]);
   grupo('Ferramentas',[...(eu.logado?[['personagens','♙','Personagens'],['assistente','✧','Tutor D&D']]:[]),['dados','◇','Oráculo dos dados'],['musica','♫','Música']]);
   grupo('Comunidade',[['novidades','✦','Novidades'],['tutorial','❖','Tutorial'],...(eu.logado?[['suporte','✉','Suporte']]:[])]);
-  grupo('Minha conta',[...(!eu.logado?[['conta','↪','Entrar']]:[]),['instalar','⬇','Instalar Mesa']]);
+  grupo('Minha conta',[...(eu.logado?[['perfil','♙','Meu perfil']]:[['conta','↪','Entrar']]),['opcoes','⚙','Opções'],['instalar','⬇','Instalar Mesa']]);
   if(eu.papel==='admin')grupo('Administração',[['admin','⚙','Painel']]);
   const acesso=el('button','','menu-item');acesso.type='button';acesso.title='Acessibilidade';acesso.setAttribute('aria-label','Abrir acessibilidade');acesso.setAttribute('aria-controls','mesa-acessibilidade-painel');
   const simbolo=el('span','♿','menu-item-icone');simbolo.setAttribute('aria-hidden','true');
@@ -1797,6 +1799,63 @@ $('f-ajuda-dnd').onsubmit=async ev=>{
   finally{botao.disabled=false;}
 };
 
+// Perfil privado, com cota consultada diretamente no servidor.
+let perfilFotoUrl=null,perfilRequisicao=0;
+function limparFotoPerfil(){
+ if(perfilFotoUrl)URL.revokeObjectURL(perfilFotoUrl);
+ perfilFotoUrl=null;$('perfil-foto').removeAttribute('src');$('perfil-foto').hidden=true;$('perfil-foto-vazio').hidden=false;$('perfil-remover').disabled=true;
+}
+async function carregarMeuPerfil(){
+ const token=++perfilRequisicao;
+ limparFotoPerfil();$('perfil-nome').value='';$('perfil-email').value='';$('perfil-cota').textContent='Consultando limite diário...';$('perfil-progresso').hidden=true;$('perfil-status').textContent='';
+ try{
+  const p=await api('/api/conta/perfil');
+  if(token!==perfilRequisicao||!eu.logado||mesaTelaVisivel!=='perfil')return;
+  $('perfil-nome').value=p.nome;$('perfil-email').value=p.email;
+  $('perfil-cota').textContent=p.limite===null?'Acesso administrativo sem limite de geração.':p.restantes+' de '+p.limite+' gerações disponíveis hoje.';
+  if(p.limite!==null){$('perfil-progresso').max=p.limite;$('perfil-progresso').value=p.restantes;$('perfil-progresso').hidden=false;}
+  if(p.temFoto){
+   const resp=await fetch(API_BASE_URL+'/api/conta/perfil/foto',{credentials:'include',cache:'no-store'});
+   if(!resp.ok)throw Error('Não foi possível carregar a foto.');
+   const blob=await resp.blob();if(token!==perfilRequisicao||!eu.logado||mesaTelaVisivel!=='perfil')return;
+   perfilFotoUrl=URL.createObjectURL(blob);$('perfil-foto').src=perfilFotoUrl;$('perfil-foto').hidden=false;$('perfil-foto-vazio').hidden=true;$('perfil-remover').disabled=false;
+  }
+ }catch(e){if(token===perfilRequisicao)$('perfil-status').textContent=e.message;}
+}
+$('perfil-form').onsubmit=async ev=>{
+ ev.preventDefault();const b=ev.currentTarget.querySelector('button');b.disabled=true;
+ try{await api('/api/conta/perfil','POST',{nome:$('perfil-nome').value});$('perfil-status').textContent='Perfil salvo.';}
+ catch(e){$('perfil-status').textContent=e.message;}finally{b.disabled=false;}
+};
+$('perfil-arquivo').onchange=async()=>{
+ const campo=$('perfil-arquivo'),arquivo=campo.files?.[0];if(!arquivo)return;
+ campo.disabled=true;$('perfil-status').textContent='Otimizando e enviando foto...';
+ try{if(!['image/jpeg','image/png','image/webp'].includes(arquivo.type))throw Error('Escolha JPG, PNG ou WebP.');
+ const imagem=await prepararWebpAvatar(arquivo);await api('/api/conta/perfil/foto','POST',{imagem});await carregarMeuPerfil();$('perfil-status').textContent='Foto salva.';}
+ catch(e){$('perfil-status').textContent=e.message;}finally{campo.value='';campo.disabled=false;}
+};
+$('perfil-remover').onclick=async()=>{const b=$('perfil-remover');b.disabled=true;try{await api('/api/conta/perfil/foto','DELETE');limparFotoPerfil();$('perfil-status').textContent='Foto removida.';}catch(e){b.disabled=false;$('perfil-status').textContent=e.message;}};
+$('perfil-opcoes').onclick=()=>navegarMesa('opcoes');
+// Preferências locais, sem alterar ou restringir as opções assistivas.
+const mesaPreferencias={ortografia:true,fonte:'padrao'};
+const fontesMesa=['padrao','serifada','simples','mono'];
+try{const p=JSON.parse(localStorage.getItem('mesa-preferencias-v1')||'{}');mesaPreferencias.ortografia=p.ortografia!==false;if(fontesMesa.includes(p.fonte))mesaPreferencias.fonte=p.fonte;}catch{}
+function mesaAplicarOrtografia(raiz=document){
+ const seletor='textarea,input:not([type]),input[type="text"],input[type="search"],[contenteditable="true"]';
+ const campos=raiz.matches?.(seletor)?[raiz]:[...raiz.querySelectorAll(seletor)];
+ for(const campo of campos){if(campo.closest('#v-conta')||campo.id==='perfil-nome')continue;campo.spellcheck=mesaPreferencias.ortografia;campo.lang='pt-BR';}
+}
+function mesaAplicarPreferencias(salvar=false){
+ document.body.dataset.mesaFonte=mesaPreferencias.fonte;
+ $('opcoes-ortografia').checked=mesaPreferencias.ortografia;$('opcoes-fonte').value=mesaPreferencias.fonte;
+ mesaAplicarOrtografia();
+ if(salvar){try{localStorage.setItem('mesa-preferencias-v1',JSON.stringify(mesaPreferencias));}catch{}$('opcoes-status').textContent='Preferências atualizadas neste navegador.';}
+}
+$('opcoes-ortografia').onchange=()=>{mesaPreferencias.ortografia=$('opcoes-ortografia').checked;mesaAplicarPreferencias(true);};
+$('opcoes-fonte').onchange=()=>{mesaPreferencias.fonte=$('opcoes-fonte').value;mesaAplicarPreferencias(true);};
+$('opcoes-restaurar').onclick=()=>{mesaPreferencias.ortografia=true;mesaPreferencias.fonte='padrao';mesaAplicarPreferencias(true);};
+document.addEventListener('focusin',e=>{if(e.target instanceof Element)mesaAplicarOrtografia(e.target);});
+mesaAplicarPreferencias();
 // ---- Conta e recuperação de acesso ----
 const formulariosConta = ['f-login','f-cadastro','f-recuperar','f-redefinir'];
 // Feedback de formato local, sem enviar o endereço enquanto a pessoa digita.
