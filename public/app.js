@@ -31,7 +31,7 @@ async function api(url, metodo = 'GET', corpo) {
 function aviso(texto, bom) { const a = $('aviso'); a.textContent = texto || ''; a.className = bom ? 'bom' : ''; }
 
 // ---- Navegação entre telas ----
-const TELAS = ['gerador','solo','dados','historico','personagens','assistente','tutorial','novidades','suporte','instalar','conta','admin','privacidade','termos','musica'];
+const TELAS = ['gerador','solo','dados','historico','personagens','assistente','tutorial','novidades','suporte','instalar','conta','admin','privacidade','termos','musica','inicio'];
 // Mantém o player no mesmo documento e fora das configurações de acessibilidade.
 (function separarMusica(){
   const player=$('musica-ambiente');
@@ -50,7 +50,50 @@ const TELAS = ['gerador','solo','dados','historico','personagens','assistente','
   const nota=el('p','Os recursos de acessibilidade são gratuitos e disponíveis para todos, inclusive sem conta.','suave');
   $('mesa-acessibilidade-painel').insertBefore(nota,$('mesa-acessibilidade-painel').children[1]);
 })();
-let mesaAntesDaMusica='gerador';
+let mesaAntesDaMusica='inicio';
+// Dashboard: atalhos para ferramentas existentes, sem duplicar formulários.
+(function criarInicio(){
+ const pagina=el('section');pagina.id='v-inicio';pagina.hidden=true;pagina.setAttribute('aria-labelledby','mesa-inicio-titulo');
+ const hero=el('div','','hero mesa-home-hero'),copia=el('div','','hero-copia');
+ const titulo=el('h1','Sua próxima aventura começa aqui.');titulo.id='mesa-inicio-titulo';
+ copia.append(el('span','✦ SEU PORTAL DE AVENTURAS','sobretitulo'),titulo,el('p','Crie mundos, explore histórias e reúna suas ferramentas de RPG em um único lugar.'));
+ const arte=el('div','','hero-arte');arte.setAttribute('aria-hidden','true');arte.append(el('span','✧'));hero.append(copia,arte);
+ const grade=el('div','','mesa-home-grade');
+ const atalhos=[
+ ['✦','Criar aventura','Prepare histórias completas para sua mesa.','gerador',false],
+ ['♙','Criar NPC','Dê vida aos personagens do seu mundo.','gerador',true],
+ ['✧','Jogar RPG Solo','Explore uma campanha com o Mestre IA.','solo'],
+ ['▤','Minhas aventuras','Consulte suas histórias salvas.','historico'],
+ ['♙','Meus personagens','Crie e organize suas fichas.','personagens'],
+ ['◇','Oráculo dos dados','Role dados e calcule seus resultados.','dados']
+ ];
+ for(const [simbolo,nome,descricao,tela,npc] of atalhos){
+  const b=el('button','','mesa-home-card');b.type='button';
+  const icone=el('span',simbolo,'mesa-home-icone');icone.setAttribute('aria-hidden','true');
+  b.append(icone,el('strong',nome),el('span',descricao,'mesa-home-descricao'));
+  b.onclick=()=>navegarMesa(tela,typeof npc==='boolean'?()=>modoGeradorNPC(npc):undefined);
+  grade.append(b);
+ }
+ pagina.append(hero,grade);$('v-gerador').before(pagina);
+})();
+function mesaMenuAtualizar(tela){
+ document.querySelectorAll('#nav button[data-tela],#mesa-mobile-nav button[data-tela]').forEach(b=>{
+  const ativo=b.dataset.tela===tela && (!b.hasAttribute('data-modo-gerador') || b.dataset.modoGerador===String(!$('f-gerar-npc').hidden));
+  if(ativo)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');
+  if(ativo){const grupo=b.closest('.mesa-nav-grupo');if(grupo)grupo.open=true;}
+ });
+}
+(function criarBarraMobile(){
+ const nav=el('nav','','mesa-mobile-nav');nav.id='mesa-mobile-nav';nav.setAttribute('aria-label','Atalhos principais');
+ for(const [t,simbolo,nome] of [['inicio','⌂','Início'],['solo','✧','Solo'],['personagens','♙','Fichas'],['dados','◇','Dados'],['mais','☰','Mais']]){
+  const b=el('button');b.type='button';b.setAttribute('aria-label',nome);
+  if(t!=='mais')b.dataset.tela=t;else b.setAttribute('aria-controls','menu-lateral');
+  const i=el('span',simbolo);i.setAttribute('aria-hidden','true');b.append(i,el('small',nome));
+  b.onclick=()=>t==='mais'?menuMobile(!document.body.classList.contains('menu-mobile-aberto')):navegarMesa(t);
+  nav.append(b);
+ }
+ document.body.append(nav);
+})();
 const estadoNavegacao={
   ler(chave){try{return sessionStorage.getItem('mesa:'+chave);}catch{return null;}},
   gravar(chave,valor){try{if(valor===null)sessionStorage.removeItem('mesa:'+chave);else sessionStorage.setItem('mesa:'+chave,String(valor));}catch{}}
@@ -190,7 +233,7 @@ function mostrar(tela) {
   estadoNavegacao.gravar('tela',tela);
   document.body.classList.toggle('tela-acesso', tela === 'conta');
   TELAS.forEach((t) => { $('v-' + t).hidden = t !== tela; });
-  document.querySelectorAll('#nav button[data-tela]').forEach((b) => b.setAttribute('aria-current', b.dataset.tela === tela?'page':'false'));
+  mesaMenuAtualizar(tela);
   if(tela==='tutorial')tutorialMostrarPasso(tutorialPasso);
   menuMobile(false);
   const primeira=mesaTelaVisivel===null;
@@ -283,40 +326,40 @@ function notificacoesSessao(){
 window.setInterval(()=>{if(!document.hidden)notificacoesAtualizar();},60000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&eu.papel==='admin')notificacoesAtualizar();});
 function montarNav() {
-  const nav = $('nav');
-  nav.replaceChildren();
-  const itens = [['gerador', '✦', 'Gerador'], ['solo', '✧', 'RPG Solo · IA'], ['dados', '◇', 'Dados']];
-  if (eu.logado) itens.push(['historico', '▤', 'Histórico'], ['personagens', '♙', 'Personagens'], ['assistente', '✧', 'Tutor D&D']);
-  itens.push(['musica','♫','Música'],['tutorial','❖','Tutorial'],['novidades','✦','Novidades'],['instalar','⬇','Instalar Mesa']);
-  if(eu.logado)itens.push(['suporte','✉','Suporte']);
-  if (eu.papel === 'admin') itens.push(['admin', '⚙', 'Painel']);
-  if (!eu.logado) itens.push(['conta', '↪', 'Entrar']);
-  itens.forEach(([t,simbolo,nome])=>{
-    const botao=el('button','','menu-item');botao.dataset.tela=t;botao.type='button';
-    botao.title=nome;botao.setAttribute('aria-label',nome);
-    const icone=el('span',simbolo,'menu-item-icone');icone.setAttribute('aria-hidden','true');
-    botao.append(icone,el('span',nome,'menu-item-texto'));
-    botao.onclick=()=>navegarMesa(t);nav.appendChild(botao);
-  });
-  const acesso=el('button','','menu-item');acesso.type='button';acesso.title='Acessibilidade gratuita';acesso.setAttribute('aria-label','Abrir acessibilidade');acesso.setAttribute('aria-controls','mesa-acessibilidade-painel');
-  const simboloAcesso=el('span','♿','menu-item-icone');simboloAcesso.setAttribute('aria-hidden','true');
-  acesso.append(simboloAcesso,el('span','Acessibilidade','menu-item-texto'));
-  acesso.onclick=()=>{menuMobile(false);if($('mesa-acessibilidade-painel').hidden)$('mesa-acessibilidade-abrir').click();else $('mesa-acessibilidade-fechar').focus({preventScroll:true});};
-  nav.appendChild(acesso);
-  if(eu.logado){
-    const sair=el('button','','menu-item');sair.type='button';sair.title='Sair';sair.setAttribute('aria-label','Sair');
-    const icone=el('span','↪','menu-item-icone');icone.setAttribute('aria-hidden','true');
-    sair.append(icone,el('span','Sair','menu-item-texto'));
-    sair.onclick=async()=>{
-      await api('/api/logout','POST');
-      estadoNavegacao.gravar('personagem',null);
-      estadoNavegacao.gravar('aba-ficha',null);
-      estadoNavegacao.gravar('tela',null);
-      fichaAbertaId=null;
-      await atualizarEu();mostrar('gerador');
-    };
-    nav.appendChild(sair);
+  const nav=$('nav');nav.replaceChildren();
+  function item(t,simbolo,nome,modo){
+   const botao=el('button','','menu-item');botao.dataset.tela=t;botao.type='button';
+   botao.title=nome;botao.setAttribute('aria-label',nome);
+   const icone=el('span',simbolo,'menu-item-icone');icone.setAttribute('aria-hidden','true');
+   botao.append(icone,el('span',nome,'menu-item-texto'));
+   if(typeof modo==='boolean')botao.dataset.modoGerador=String(modo);
+   botao.onclick=()=>navegarMesa(t,typeof modo==='boolean'?()=>modoGeradorNPC(modo):undefined);
+   return botao;
   }
+  function grupo(nome,itens){
+   const d=el('details','','mesa-nav-grupo');d.open=true;
+   const s=el('summary',nome,'mesa-nav-titulo');d.append(s);
+   const corpo=el('div','','mesa-nav-itens');for(const x of itens)corpo.append(item(...x));d.append(corpo);nav.append(d);
+  }
+  nav.append(item('inicio','⌂','Início'));
+  grupo('Aventuras',[['gerador','✦','Gerador de histórias',false],['gerador','♙','Gerador de NPCs',true],['solo','✧','RPG Solo'],...(eu.logado?[['historico','▤','Minhas aventuras']]:[])]);
+  grupo('Ferramentas',[...(eu.logado?[['personagens','♙','Personagens'],['assistente','✧','Tutor D&D']]:[]),['dados','◇','Oráculo dos dados'],['musica','♫','Música']]);
+  grupo('Comunidade',[['novidades','✦','Novidades'],['tutorial','❖','Tutorial'],...(eu.logado?[['suporte','✉','Suporte']]:[])]);
+  grupo('Minha conta',[...(!eu.logado?[['conta','↪','Entrar']]:[]),['instalar','⬇','Instalar Mesa']]);
+  if(eu.papel==='admin')grupo('Administração',[['admin','⚙','Painel']]);
+  const acesso=el('button','','menu-item');acesso.type='button';acesso.title='Acessibilidade';acesso.setAttribute('aria-label','Abrir acessibilidade');acesso.setAttribute('aria-controls','mesa-acessibilidade-painel');
+  const simbolo=el('span','♿','menu-item-icone');simbolo.setAttribute('aria-hidden','true');
+  acesso.append(simbolo,el('span','Acessibilidade','menu-item-texto'));
+  acesso.onclick=()=>{menuMobile(false);if($('mesa-acessibilidade-painel').hidden)$('mesa-acessibilidade-abrir').click();else $('mesa-acessibilidade-fechar').focus({preventScroll:true});};nav.append(acesso);
+  if(eu.logado){
+   const sair=el('button','','menu-item');sair.type='button';sair.title='Sair';sair.setAttribute('aria-label','Sair');
+   const i=el('span','↪','menu-item-icone');i.setAttribute('aria-hidden','true');sair.append(i,el('span','Sair','menu-item-texto'));
+   sair.onclick=async()=>{
+    await api('/api/logout','POST');estadoNavegacao.gravar('personagem',null);estadoNavegacao.gravar('aba-ficha',null);estadoNavegacao.gravar('tela',null);fichaAbertaId=null;
+    await atualizarEu();mostrar('inicio');
+   };nav.append(sair);
+  }
+  mesaMenuAtualizar(mesaTelaVisivel||'inicio');
 }
 function textoInfo() {
   if (!eu.logado) return eu.restantes > 0 ? 'Teste grátis: ' + eu.restantes + ' geração. Crie uma conta para ter mais.' : 'O teste grátis acabou. Crie uma conta para continuar.';
@@ -383,6 +426,8 @@ function modoGeradorNPC(ativar){
  $('modo-npc').classList.toggle('ativo',ativar);
  $('saida').replaceChildren();
  $('npc-biblioteca').hidden=!ativar||!eu.logado;
+ estadoNavegacao.gravar('modo-gerador',ativar?'npc':'historia');
+ mesaMenuAtualizar(mesaTelaVisivel);
  if(ativar){carregarOrigensNPC();if(eu.logado)carregarBibliotecaNPC();}
 }
 $('modo-solo').onclick=()=>navegarMesa('solo');
@@ -1796,7 +1841,7 @@ $('f-redefinir').onsubmit = async ev => {
 async function entrar(url, email, senha, tokenBootstrap, manterConectado = false, aceiteTermos = false) {
   try {
     await api(url, 'POST', { email, senha, manterConectado, aceiteTermos, ...(tokenBootstrap ? { tokenBootstrap } : {}) });
-    await atualizarEu(); mostrar('gerador'); aviso('Tudo certo!', true);
+    await atualizarEu(); mostrar('inicio'); aviso('Tudo certo!', true);
   }
   catch (e) { aviso(e.message); }
   finally { if (tokenBootstrap) $('c-token-bootstrap').value = ''; }
@@ -2228,7 +2273,8 @@ atualizarEu().then(() => {
   } else {
     const pedida=new URL(location.href).searchParams.get('tela');
     const anterior=estadoNavegacao.ler('tela');
-    mostrar(TELAS.includes(pedida)?pedida:TELAS.includes(anterior)?anterior:'gerador');
+    mostrar(TELAS.includes(pedida)?pedida:TELAS.includes(anterior)?anterior:'inicio');
+    if(mesaTelaVisivel==='gerador'&&estadoNavegacao.ler('modo-gerador')==='npc')modoGeradorNPC(true);
   }
 }).catch((e) => {
   // Um erro de rede/banco na inicialização não significa que o usuário saiu.
@@ -2238,7 +2284,7 @@ atualizarEu().then(() => {
     abrirFormularioConta('f-redefinir'); mostrar('conta');
   } else {
     const ultima=estadoNavegacao.ler('tela');
-    const pagina=TELAS.includes(ultima) && !['historico','personagens','assistente','admin','suporte'].includes(ultima)?ultima:'gerador';
+    const pagina=TELAS.includes(ultima) && !['historico','personagens','assistente','admin','suporte'].includes(ultima)?ultima:'inicio';
     mostrar(pagina);
   }
   aviso('Não foi possível verificar a sessão com o servidor agora. Sua conta pode continuar conectada. Atualize a página e tente novamente. Detalhes: '+e.message);
