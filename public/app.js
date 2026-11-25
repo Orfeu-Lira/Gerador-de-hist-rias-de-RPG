@@ -37,7 +37,7 @@ const estadoNavegacao={
   gravar(chave,valor){try{if(valor===null)sessionStorage.removeItem('mesa:'+chave);else sessionStorage.setItem('mesa:'+chave,String(valor));}catch{}}
 };
 
-$('dnd-tutorial-mesa').onclick=()=>{mostrar('tutorial');tutorialMostrarPasso(0);};
+$('dnd-tutorial-mesa').onclick=()=>navegarMesa('tutorial',()=>tutorialMostrarPasso(0));
 const tutorialEtapas = [
  {titulo:'Bem-vindo ao Mesa',sub:'Seu espaço de histórias',texto:'Use o Gerador para preparar uma aventura ou escolha RPG Solo · Mestre IA para jogar no seu ritmo. Os dois últimos capítulos deste guia ensinam a começar e retomar uma campanha solo. Use o menu lateral para alternar de ferramenta. Você pode deixá-lo expandido ou compacto, e no celular basta tocar em Menu.',dicas:['O tutorial fica disponível sempre no menu lateral.','Sua conta guarda o histórico e as fichas privadas.'],tela:'gerador',rotulo:'Conhecer o gerador'},
  {titulo:'Crie sua primeira aventura',sub:'Gerador de histórias',texto:'Escolha o gênero, defina o tom e o número de jogadores. Escreva uma ideia opcional, como uma vila cercada por névoa, e clique em Gerar minha aventura. O Mesa usa IA e aplica limites de uso.',dicas:['Uma ideia curta pode orientar toda a aventura.','Leia a história gerada e adapte-a livremente à sua mesa.'],tela:'gerador',rotulo:'Ir ao gerador'},
@@ -82,13 +82,13 @@ function tutorialMostrarPasso(indice){
   try{localStorage.setItem('mesa-tutorial-etapa',String(tutorialPasso));}catch{}
 }
 $('tutorial-anterior').onclick=()=>tutorialMostrarPasso(tutorialPasso-1);
-$('tutorial-proximo').onclick=()=>{if(tutorialPasso===tutorialEtapas.length-1){mostrar('gerador');return;}tutorialMostrarPasso(tutorialPasso+1);};
+$('tutorial-proximo').onclick=()=>{if(tutorialPasso===tutorialEtapas.length-1){navegarMesa('gerador');return;}tutorialMostrarPasso(tutorialPasso+1);};
 $('tutorial-recomecar').onclick=()=>tutorialMostrarPasso(0);
 $('tutorial-ir').onclick=()=>{
   const etapa=tutorialEtapas[tutorialPasso];
-  if(etapa.requerLogin&&!eu.logado){mostrar('conta');aviso('Entre na sua conta primeiro para usar essa ferramenta.');return;}
+  if(etapa.requerLogin&&!eu.logado){navegarMesa('conta',()=>aviso('Entre na sua conta primeiro para usar essa ferramenta.'));return;}
   if(etapa.requerAdmin&&eu.papel!=='admin'){aviso('O painel é exclusivo para administradores.');return;}
-  mostrar(etapa.tela);
+  navegarMesa(etapa.tela);
 };
 try{const guardado=Number(localStorage.getItem('mesa-tutorial-etapa'));if(Number.isInteger(guardado))tutorialPasso=Math.max(0,Math.min(tutorialEtapas.length-1,guardado));}catch{}
 if(new URL(location.href).searchParams.get('capitulo')==='solo'){
@@ -140,6 +140,28 @@ function mesaTransicaoTela(tela, primeira){
     {duration:primeira?420:220,easing:'cubic-bezier(.2,.75,.25,1)'}
   );
 }
+// Ações de navegação interativas usam a mesma transição, inclusive atalhos internos.
+// A lógica dependente da tela roda junto da troca, nunca antes do snapshot.
+function navegarMesa(tela, depois){
+  const aplicar=()=>{mostrar(tela);depois?.();};
+  if(mesaTransicaoAtiva){
+    const anterior=mesaTransicaoAtiva;
+    mesaTransicaoAtiva=null;
+    anterior.skipTransition();
+  }
+  if(!mesaTelaVisivel || tela===mesaTelaVisivel || mesaMovimentoReduzido() ||
+     typeof document.startViewTransition!=='function'){
+    aplicar();return;
+  }
+  const transicao=document.startViewTransition(()=>{
+    if(mesaTransicaoAtiva===transicao)aplicar();
+  });
+  mesaTransicaoAtiva=transicao;
+  transicao.ready.catch(()=>{});
+  transicao.finished.catch(()=>{}).finally(()=>{
+    if(mesaTransicaoAtiva===transicao)mesaTransicaoAtiva=null;
+  });
+}
 function mostrar(tela) {
   if(!TELAS.includes(tela))return;
   pararJornada();
@@ -164,8 +186,8 @@ function mostrar(tela) {
   if (tela === 'suporte') suporteListar();
   if (tela === 'novidades') noticiasMesa();
 }
-$('abrir-tutorial-menu').onclick=()=>mostrar('tutorial');
-$('solo-ir-gerador')?.addEventListener('click',()=>mostrar('gerador'));
+$('abrir-tutorial-menu').onclick=()=>navegarMesa('tutorial');
+$('solo-ir-gerador')?.addEventListener('click',()=>navegarMesa('gerador'));
 // Notificações internas do administrador: novos chamados de suporte e feedback.
 let notificacoesAberto=false;
 let notificacoesUltimoCarregamento=0;
@@ -254,13 +276,7 @@ function montarNav() {
     botao.title=nome;botao.setAttribute('aria-label',nome);
     const icone=el('span',simbolo,'menu-item-icone');icone.setAttribute('aria-hidden','true');
     botao.append(icone,el('span',nome,'menu-item-texto'));
-    botao.onclick=()=>{
-      if(t===mesaTelaVisivel || mesaMovimentoReduzido() || typeof document.startViewTransition!=='function'){mostrar(t);return;}
-      mesaTransicaoAtiva?.skipTransition();
-      const transicao=document.startViewTransition(()=>{if(mesaTransicaoAtiva===transicao)mostrar(t);});
-      mesaTransicaoAtiva=transicao;
-      transicao.finished.catch(()=>{}).finally(()=>{if(mesaTransicaoAtiva===transicao)mesaTransicaoAtiva=null;});
-    };nav.appendChild(botao);
+    botao.onclick=()=>navegarMesa(t);nav.appendChild(botao);
   });
   if(eu.logado){
     const sair=el('button','','menu-item');sair.type='button';sair.title='Sair';sair.setAttribute('aria-label','Sair');
@@ -303,7 +319,7 @@ function desenharAventura(a, alvo, aventuraId=null, genero='', tom='') {
   if (a.vilao) { f.appendChild(el('h3', 'Vilão')); f.appendChild(el('p', a.vilao)); }
   playerDaHistoria(f,genero,tom,a.trilha||'');
   if(eu.logado){const b=el('button','✦ Iniciar jornada com personagem','principal');b.type='button';
-    b.onclick=()=>{soloOrigemPreferida=Number(aventuraId)||null;soloTituloPreferido=a.titulo||'';mostrar('solo');};
+    b.onclick=()=>{soloOrigemPreferida=Number(aventuraId)||null;soloTituloPreferido=a.titulo||'';navegarMesa('solo');};
     const area=el('div','','jornada-inicio');area.append(b);f.append(area);
   }else f.append(el('p','Entre na sua conta para iniciar uma campanha com personagem e progresso salvo.','suave'));
   alvo.appendChild(f);
@@ -344,7 +360,7 @@ function modoGeradorNPC(ativar){
  $('npc-biblioteca').hidden=!ativar||!eu.logado;
  if(ativar){carregarOrigensNPC();if(eu.logado)carregarBibliotecaNPC();}
 }
-$('modo-solo').onclick=()=>mostrar('solo');
+$('modo-solo').onclick=()=>navegarMesa('solo');
 $('modo-aventura').onclick=()=>modoGeradorNPC(false);
 $('modo-npc').onclick=()=>modoGeradorNPC(true);
 let aventurasNpcSalvas=[];
@@ -447,11 +463,13 @@ let soloOcupado=false;
 let soloOrigemPreferida=null,soloTituloPreferido='',soloPersonagemPreferido=null,soloRetomarFicha=false,soloPersonagens=[];
 $('solo-personagem').onchange=()=>{$('solo-personagem-info').textContent=$('solo-personagem').value?'A ficha orienta o Mestre IA, que não decide as ações do protagonista.':'Use uma ficha já criada ou faça outra.';};
 $('solo-criar-personagem').onclick=()=>{
- if(!eu.logado){mostrar('conta');return;}
+ if(!eu.logado){navegarMesa('conta');return;}
  soloOrigemPreferida=Number($('solo-aventura').value)||soloOrigemPreferida;
  soloTituloPreferido=$('solo-titulo-campanha').value;
- soloRetomarFicha=true;mostrar('personagens');limparFicha();
+ soloRetomarFicha=true;navegarMesa('personagens',()=>{
+ limparFicha();
  aviso('Salve a nova ficha para voltar à preparação da jornada.');
+ });
 };
 function soloEstado(mensagem,erro=false){
  const e=$('solo-alerta');e.textContent=mensagem||'';e.classList.toggle('erro',erro);
@@ -1690,7 +1708,7 @@ $('f-personagem').onsubmit=async ev=>{
     abrirAbaFicha(abaAtual);
     aviso('Ficha salva com sucesso! O personagem continua selecionado.',true);
     if(fotoAEnviar&&fichaAbertaId)await enviarAvatar(fotoAEnviar,fichaAbertaId);
-    if(soloRetomarFicha){soloRetomarFicha=false;soloPersonagemPreferido=fichaAbertaId;mostrar('solo');}
+    if(soloRetomarFicha){soloRetomarFicha=false;soloPersonagemPreferido=fichaAbertaId;navegarMesa('solo');}
   }catch(e){aviso(e.message);}
   finally{botao.disabled=false;}
 };
@@ -1727,7 +1745,7 @@ function limparTokenDaUrl() {
     history.replaceState(null, '', u.pathname + u.search + u.hash);
   }
 }
-$('voltar-inicio').onclick = () => { limparTokenDaUrl(); abrirFormularioConta('f-login'); mostrar('gerador'); };
+$('voltar-inicio').onclick = () => { limparTokenDaUrl(); abrirFormularioConta('f-login'); navegarMesa('gerador'); };
 $('ir-cadastro').onclick = () => abrirFormularioConta('f-cadastro');
 $('ir-login').onclick = () => abrirFormularioConta('f-login');
 $('ir-recuperar').onclick = () => { $('r-email').value = $('l-email').value; abrirFormularioConta('f-recuperar'); aviso(''); };
