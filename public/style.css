@@ -1027,3 +1027,23 @@ html.mesa-scroll-dinamico:has(body.mesa-alto-contraste),html.mesa-scroll-dinamic
 .mesa-email-feedback.email-erro{color:#982a29;font-weight:650}
 #v-conta input[aria-invalid="true"]{border:2px solid #982a29}
 body.mesa-alto-contraste .mesa-email-feedback{color:#111!important}
+
+/* Perfil e opções do portal. Fontes são preferências, nunca substituem acessibilidade. */
+.mesa-perfil-card{max-width:850px;margin:0 auto 20px;display:grid;gap:14px}
+.mesa-perfil-card h2,.mesa-perfil-card p{margin:0}
+.mesa-perfil-card .formulario{display:grid;gap:10px}
+.mesa-perfil-identidade{display:grid;grid-template-columns:110px minmax(0,1fr);gap:20px;align-items:start}
+.mesa-perfil-identidade .avatar-moldura{width:104px;height:104px;aspect-ratio:1;border-radius:50%;overflow:hidden}
+.mesa-perfil-identidade .avatar-moldura img{width:100%;height:100%;object-fit:cover}
+.mesa-perfil-identidade input[type=file]{display:block;width:100%;max-width:100%;margin:10px 0}
+.mesa-perfil-card button:not(.principal){min-height:44px;border:1px solid #a78c60;border-radius:9px;background:#fff8e8;color:#4b3428;padding:8px 12px;cursor:pointer;font-weight:700}
+.mesa-perfil-card button:disabled{opacity:.5;cursor:not-allowed}
+#perfil-progresso{width:100%;height:15px;accent-color:#286551}
+.mesa-fonte-amostra{border:1px solid #c8ae7d;background:#fff8e8;padding:18px;border-radius:10px}
+body[data-mesa-fonte=serifada]{--mesa-fonte-preferida:Georgia,'Times New Roman',serif}
+body[data-mesa-fonte=simples]{--mesa-fonte-preferida:Arial,system-ui,sans-serif}
+body[data-mesa-fonte=mono]{--mesa-fonte-preferida:ui-monospace,Consolas,monospace}
+body[data-mesa-fonte]:not([data-mesa-fonte=padrao]),body[data-mesa-fonte]:not([data-mesa-fonte=padrao]) :is(p,li,label,input,textarea,select,button,.solo-mensagem,.mesa-home-descricao,.mesa-fonte-amostra){font-family:var(--mesa-fonte-preferida)}
+body[data-mesa-fonte]:not([data-mesa-fonte=padrao]) :is(h1,h2,h3){font-family:var(--mesa-fonte-preferida)}
+body.mesa-alto-contraste .mesa-fonte-amostra{background:#fff;color:#000;border-color:#000}
+@media(max-width:480px){.mesa-perfil-identidade{grid-template-columns:1fr}.mesa-perfil-identidade .avatar-moldura{width:90px;height:90px}}
