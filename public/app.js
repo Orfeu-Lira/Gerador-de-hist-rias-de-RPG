@@ -1799,6 +1799,33 @@ $('f-ajuda-dnd').onsubmit=async ev=>{
 
 // ---- Conta e recuperação de acesso ----
 const formulariosConta = ['f-login','f-cadastro','f-recuperar','f-redefinir'];
+// Feedback de formato local, sem enviar o endereço enquanto a pessoa digita.
+for(const id of ['l-email','c-email','r-email']){
+ const campo=$(id),status=el('p','','mesa-email-feedback');
+ status.id=id+'-feedback';status.setAttribute('aria-live','polite');status.setAttribute('aria-atomic','true');
+ campo.maxLength=254;campo.setAttribute('aria-describedby',status.id);
+ campo.after(status);
+ let timer;
+ function validar(exibir){
+  const valor=campo.value.trim();
+  const valido=valor!==''&&campo.validity.typeMismatch===false&&
+   (typeof window.mesaEmailValido==='function'?window.mesaEmailValido(valor):/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor));
+  const mensagem=valor&&!valido?'Informe um endereço completo, como nome@exemplo.com.':'';
+  campo.setCustomValidity(mensagem);
+  campo.setAttribute('aria-invalid',String(Boolean(mensagem)));
+  if(exibir){
+   status.textContent=valor?(valido?'Formato de e-mail válido.':mensagem):'';
+   status.classList.toggle('email-erro',Boolean(mensagem));
+   status.classList.toggle('email-ok',valido);
+  }
+ }
+ campo.addEventListener('input',()=>{validar(false);clearTimeout(timer);timer=setTimeout(()=>validar(true),450);});
+ campo.addEventListener('blur',()=>{clearTimeout(timer);validar(true);});
+ campo.addEventListener('change',()=>validar(true));
+ campo.addEventListener('invalid',()=>validar(true));
+ campo.form?.addEventListener('submit',ev=>{validar(true);if(!campo.checkValidity()){ev.preventDefault();ev.stopImmediatePropagation();campo.reportValidity();}},{capture:true});
+}
+
 function abrirFormularioConta(id) {
   formulariosConta.forEach(chave => { $(chave).hidden = chave !== id; });
 }
