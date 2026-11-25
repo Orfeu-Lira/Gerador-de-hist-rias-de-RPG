@@ -5,6 +5,40 @@ const API_BASE_URL = (window.MESA_CONFIG && window.MESA_CONFIG.apiBaseUrl || '')
 const GENEROS = ['Fantasia sombria', 'Fantasia épica', 'D&D clássico', 'Ficção científica', 'Terror', 'Investigação', 'Piratas e mares'];
 const TONS = ['Misterioso', 'Aventureiro', 'Sombrio', 'Leve e bem-humorado', 'Tenso'];
 let eu = { logado: false };
+ 
+// Abertura apenas no primeiro acesso de cada sessão de navegação.
+// Sem áudio automático, sem aguardar rede e sem bloquear teclado ou cliques.
+(function mesaAbertura(){
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  if(new URL(location.href).searchParams.has('reset_token'))return;
+  try{
+    if(JSON.parse(localStorage.getItem('mesa-a11y-v1')||'{}').movimento===true)return;
+  }catch{}
+  try{
+    if(sessionStorage.getItem('mesa:intro-v1'))return;
+    sessionStorage.setItem('mesa:intro-v1','1');
+  }catch{}
+  const intro=document.createElement('div');
+  intro.className='mesa-intro';
+  intro.setAttribute('aria-hidden','true');
+  intro.inert=true;
+  const centro=document.createElement('div');
+  centro.className='mesa-intro-centro';
+  for(const [classe,texto] of [['mesa-intro-selo','✦'],['mesa-intro-nome','MESA'],['mesa-intro-legenda','Seu portal de aventuras'],['mesa-intro-linha','']]){
+    const parte=document.createElement('div');
+    parte.className=classe;
+    parte.textContent=texto;
+    centro.appendChild(parte);
+  }
+  intro.appendChild(centro);
+  document.body.appendChild(intro);
+  const fechar=()=>intro.remove();
+  intro.addEventListener('animationend',e=>{if(e.target===intro)fechar();});
+  window.setTimeout(fechar,2300);
+  document.addEventListener('pointerdown',fechar,{once:true});
+  document.addEventListener('keydown',fechar,{once:true});
+})();
+
 
 // Cria um elemento com texto. Usar textContent (e não innerHTML) impede que
 // um texto malicioso vire código na página (XSS).
