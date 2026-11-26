@@ -351,6 +351,38 @@ app.post('/api/comunidade/amizade',asyncHandler(async(req,res)=>{
  if(!r.rowCount){await client.query('ROLLBACK');return res.status(404).json({erro:'Solicitação indisponível.'});}
  }else await client.query('DELETE FROM public.mesa_amizades WHERE a=least($1::bigint,$2::bigint) AND b=greatest($1::bigint,$2::bigint)',par);
  }
+ if(acao==='bloquear'||acao==='remover')await client.query('DELETE FROM public.mesa_fichas_compartilhadas f USING public.personagens_dnd p WHERE p.id=f.personagem_id AND ((p.usuario_id=$1 AND f.destinatario=$2) OR(p.usuario_id=$2 AND f.destinatario=$1))',par);
+ await client.query('COMMIT');res.json({ok:true});
+ }catch(e){await client.query('ROLLBACK').catch(()=>{});throw e;}finally{client.release();}
+}));
+// Compartilhamento de fichas: somente amigos escolhidos, leitura limitada.
+app.get('/api/comunidade/fichas',asyncHandler(async(req,res)=>{
+ const u=await socialUsuario(req,res);if(!u)return;
+ const enviadas=await query(`SELECT f.personagem_id AS id,p.nome AS personagem,d.apelido FROM public.mesa_fichas_compartilhadas f JOIN public.personagens_dnd p ON p.id=f.personagem_id JOIN public.mesa_perfis d ON d.usuario_id=f.destinatario WHERE p.usuario_id=$1 ORDER BY f.criado_em DESC LIMIT 200`,[u.id]);
+ const recebidas=await query(`SELECT p.id,p.nome AS personagem,d.apelido,jsonb_build_object('classe',p.dados->'classe','raca',p.dados->'raca','nivel',p.dados->'nivel','cenario',p.dados->'cenario','especialidade',p.dados->'especialidade') AS ficha
+ FROM public.mesa_fichas_compartilhadas f JOIN public.personagens_dnd p ON p.id=f.personagem_id JOIN public.mesa_perfis d ON d.usuario_id=p.usuario_id
+ JOIN public.mesa_amizades a ON a.a=least(p.usuario_id,$1::bigint) AND a.b=greatest(p.usuario_id,$1::bigint) AND a.estado='aceita'
+ WHERE f.destinatario=$1 AND NOT EXISTS(SELECT 1 FROM public.mesa_bloqueios b WHERE (b.autor=$1 AND b.alvo=p.usuario_id) OR(b.alvo=$1 AND b.autor=p.usuario_id)) ORDER BY f.criado_em DESC LIMIT 200`,[u.id]);
+ res.json({enviadas:enviadas.rows,recebidas:recebidas.rows});
+}));
+app.post('/api/comunidade/fichas',asyncHandler(async(req,res)=>{
+ const u=await socialUsuario(req,res);if(!u)return;
+ const {id,apelido,acao}=req.body||{};
+ if(!/^[1-9][0-9]{0,18}$/.test(String(id))||!apelidoValido(apelido)||!['compartilhar','revogar'].includes(acao))return res.status(400).json({erro:'Dados inválidos.'});
+ const {pool}=require('./postgres');const client=await pool.connect();
+ try{
+ await client.query('BEGIN');
+ const d=(await client.query('SELECT usuario_id FROM public.mesa_perfis WHERE lower(apelido)=lower($1)',[apelido])).rows[0];
+ const f=await client.query('SELECT id FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2',[id,u.id]);
+ if(!d||!f.rowCount||String(d.usuario_id)===String(u.id)){await client.query('ROLLBACK');return res.status(404).json({erro:'Ficha ou destinatário indisponível.'});}
+ const v=d.usuario_id;
+ await client.query("SELECT pg_advisory_xact_lock(hashtextextended('mesa-social:'||least($1::bigint,$2::bigint)::text||':'||greatest($1::bigint,$2::bigint)::text,0))",[u.id,v]);
+ if(acao==='revogar')await client.query('DELETE FROM public.mesa_fichas_compartilhadas WHERE personagem_id=$1 AND destinatario=$2',[id,v]);
+ else{
+ const a=await client.query(`SELECT 1 FROM public.mesa_amizades WHERE a=least($1::bigint,$2::bigint) AND b=greatest($1::bigint,$2::bigint) AND estado='aceita' AND NOT EXISTS(SELECT 1 FROM public.mesa_bloqueios WHERE (autor=$1 AND alvo=$2) OR(autor=$2 AND alvo=$1))`,[u.id,v]);
+ if(!a.rowCount){await client.query('ROLLBACK');return res.status(403).json({erro:'Compartilhe apenas com amigos aceitos.'});}
+ await client.query('INSERT INTO public.mesa_fichas_compartilhadas(personagem_id,destinatario) VALUES($1,$2) ON CONFLICT DO NOTHING',[id,v]);
+ }
  await client.query('COMMIT');res.json({ok:true});
  }catch(e){await client.query('ROLLBACK').catch(()=>{});throw e;}finally{client.release();}
 }));
