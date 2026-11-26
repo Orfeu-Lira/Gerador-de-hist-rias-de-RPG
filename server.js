@@ -8,6 +8,7 @@ const { query } = require('./postgres');
 const xpMesa=require('./xp');
 const recursosRpg=require('./recursos-rpg');
 const { gerarAventura, gerarNpc, narrarSolo } = require('./ia');
+const companheirosSolo=require('./companheiros');
 const {rolar: calcularDadosRpg}=require('./public/dice-rules.js');
 
 const PRODUCAO = process.env.NODE_ENV === 'production';
@@ -973,7 +974,7 @@ app.get('/api/solo/campanhas/:id',asyncHandler(async(req,res)=>{
  const c=r.rows[0],p=c.personagem_id?(await query('SELECT id,nome,dados,xp,aquisicoes_rpg FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2',[c.personagem_id,u.id])).rows[0]:null;
  const ganhos=p?(await query("SELECT chave,quantidade,categoria FROM public.mesa_xp_historico WHERE origem='solo' AND campanha_id=$1 AND personagem_id=$2 ORDER BY id",[id,p.id])).rows:[];
  const recursos=recursosRpg.estado(p,c.recursos,c.modo_recursos);
- res.set('Cache-Control','private, no-store').json({campanha:c,mensagens:m.rows,recursos,fichaSolo:recursosRpg.fichaSolo(p,recursos),xp:xpMesa.estado(p),ganhos:ganhos.map(g=>({...g,categoria:xpMesa.nomes[g.categoria]}))});
+ res.set('Cache-Control','private, no-store').json({campanha:c,mensagens:m.rows,recursos,companheiros:companheirosSolo.estado(c.recursos),fichaSolo:recursosRpg.fichaSolo(p,recursos),xp:xpMesa.estado(p),ganhos:ganhos.map(g=>({...g,categoria:xpMesa.nomes[g.categoria]}))});
 }));
 app.post('/api/solo/campanhas',asyncHandler(async(req,res)=>{
  const u=await soloRequerConta(req,res);if(!u)return;
@@ -1001,16 +1002,17 @@ app.post('/api/solo/campanhas',asyncHandler(async(req,res)=>{
  try{quota=await soloCota(u);}catch(e){return res.status(e.status||500).json({erro:e.message});}
  try{
   const resposta=await narrarSolo({genero,tom,premissa,resumo:'',historico:[],acao:'',tipo:'inicio',inicio:true,recursos:recursosIniciais});
+  const aliados=companheirosSolo.aplicar({},resposta.efeitos,{turno:0,tipo:'inicio',teste:Boolean(resposta.teste),dnd:personagem?.dados?.edicao==='2024',mana:modoRecursos==='mana'});
   const {pool}=require('./postgres'),client=await pool.connect();
   let campanha;
   try{
    await client.query('BEGIN');
-   const r=await client.query('INSERT INTO public.mesa_solo_campanhas(usuario_id,aventura_id,titulo,genero,tom,premissa,resumo,personagem_id,progressao,modo_recursos,recursos) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb) RETURNING id,titulo,turno_atual,personagem_id,progressao,modo_recursos',[u.id,aventuraId,titulo.trim(),genero,tom,premissa,resposta.resumo,personagemId,progressao,modoRecursos,JSON.stringify(recursosIniciais?recursosRpg.persistir(recursosIniciais):{})]);
+   const r=await client.query('INSERT INTO public.mesa_solo_campanhas(usuario_id,aventura_id,titulo,genero,tom,premissa,resumo,personagem_id,progressao,modo_recursos,recursos) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb) RETURNING id,titulo,turno_atual,personagem_id,progressao,modo_recursos',[u.id,aventuraId,titulo.trim(),genero,tom,premissa,resposta.resumo,personagemId,progressao,modoRecursos,JSON.stringify({...(recursosIniciais?recursosRpg.persistir(recursosIniciais):{}),companheiros:aliados.lista})]);
    campanha=r.rows[0];
    await client.query("INSERT INTO public.mesa_solo_mensagens(campanha_id,numero,papel,tipo,texto,teste) VALUES($1,0,'mestre','inicio',$2,$3::jsonb)",[campanha.id,resposta.narracao,JSON.stringify(resposta.teste)]);
    await client.query('COMMIT');
   }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
-  res.status(201).json({campanha,mestre:resposta.narracao,teste:resposta.teste,xp:xpMesa.estado(personagem),recursos:recursosIniciais,fichaSolo:recursosRpg.fichaSolo(personagem,recursosIniciais)});
+  res.status(201).json({campanha,mestre:resposta.narracao,teste:resposta.teste,xp:xpMesa.estado(personagem),recursos:recursosIniciais,companheiros:aliados.lista,fichaSolo:recursosRpg.fichaSolo(personagem,recursosIniciais)});
  }catch(e){await soloDevolver(quota);console.error('Falha ao iniciar solo',e.name);soloErroIA(res,e);}
 }));
 app.post('/api/solo/campanhas/:id/turnos',asyncHandler(async(req,res)=>{
@@ -1078,7 +1080,7 @@ app.post('/api/solo/campanhas/:id/turnos',asyncHandler(async(req,res)=>{
   quota=await soloCota(u);
   const h=await query('SELECT papel,tipo,texto FROM public.mesa_solo_mensagens WHERE campanha_id=$1 ORDER BY numero DESC,CASE WHEN papel=\'mestre\' THEN 0 ELSE 1 END ASC LIMIT 16',[id]);
   const historico=h.rows.reverse();
-  const resposta=await narrarSolo({genero:c.genero,tom:c.tom,premissa:c.premissa,resumo:c.resumo,historico,acao:textoAcao,tipo:rolando?'rolagem':tipo,inicio:false,recursos,uso});
+  const resposta=await narrarSolo({genero:c.genero,tom:c.tom,premissa:c.premissa,resumo:c.resumo,historico,acao:textoAcao,tipo:rolando?'rolagem':tipo,inicio:false,recursos,uso,companheiros:companheirosSolo.estado(c.recursos)});
   const {pool}=require('./postgres'),client=await pool.connect();
   try{
    await client.query('BEGIN');
@@ -1089,18 +1091,20 @@ app.post('/api/solo/campanhas/:id/turnos',asyncHandler(async(req,res)=>{
    let xp=null;const categoria=xpMesa.sugestao(resposta.conquista,tipo,rolagem,resposta.teste);
    if(c.personagem_id&&c.progressao==='xp'&&categoria)xp=await xpMesa.conceder(client,{personagemId:c.personagem_id,usuarioId:u.id,origem:'solo',campanhaId:id,chave:String(n),categoria});
    let resultado=null,xpAtual=null,fichaSolo=null;
+   const aliados=companheirosSolo.aplicar(c.recursos,resposta.efeitos,{turno:n,tipo,teste:Boolean(resposta.teste),dnd:personagem?.dados?.edicao==='2024',mana:c.modo_recursos==='mana'});
    if(personagem){
     const p=(await client.query('SELECT id,nome,dados,xp,aquisicoes_rpg FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2 FOR UPDATE',[personagem.id,u.id])).rows[0];
     if(!p){const e=Error('A ficha não está mais disponível.');e.status=409;throw e;}
     xpAtual=xpMesa.estado(p);
     resultado=recursosRpg.aplicar(p,c.recursos,c.modo_recursos,uso,resposta.teste?null:resposta.efeitos,categoria,tipo,n,id,{testePendente:Boolean(resposta.teste),falhou:rolagem?.passou===false,ativa:c.progressao!=='nenhuma'});
     fichaSolo=recursosRpg.fichaSolo(p,resultado.estado);
-    await client.query('UPDATE public.mesa_solo_campanhas SET recursos=$2::jsonb WHERE id=$1',[id,JSON.stringify(recursosRpg.persistir(resultado.estado))]);
     await client.query('UPDATE public.personagens_dnd SET aquisicoes_rpg=$2::jsonb WHERE id=$1',[p.id,JSON.stringify(recursosRpg.armazenamento(resultado.aquisicoes))]);
-    await client.query("UPDATE public.mesa_solo_mensagens SET recursos_evento=$3::jsonb WHERE campanha_id=$1 AND numero=$2 AND papel='mestre'",[id,n,JSON.stringify(resultado.eventos)]);
    }
+   const eventosRecursos=[...(resultado?.eventos||[]),...aliados.eventos];
+   await client.query('UPDATE public.mesa_solo_campanhas SET recursos=$2::jsonb WHERE id=$1',[id,JSON.stringify({...c.recursos,...(resultado?recursosRpg.persistir(resultado.estado):{}),companheiros:aliados.lista})]);
+   await client.query("UPDATE public.mesa_solo_mensagens SET recursos_evento=$3::jsonb WHERE campanha_id=$1 AND numero=$2 AND papel='mestre'",[id,n,JSON.stringify(eventosRecursos)]);
    await client.query('COMMIT');
-   res.json({numero:n,narracao:resposta.narracao,teste:resposta.teste,rolagem,xp,xpAtual,fichaSolo,recursos:resultado?.estado??null,eventosRecursos:resultado?.eventos??[]});
+   res.json({numero:n,narracao:resposta.narracao,teste:resposta.teste,rolagem,xp,xpAtual,fichaSolo,recursos:resultado?.estado??null,companheiros:aliados.lista,eventosRecursos});
   }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
  }catch(e){await soloDevolver(quota);if(e.status===429||e.status===409)return res.status(e.status).json({erro:e.message});console.error('Falha em turno solo',e.name);soloErroIA(res,e);}
  finally{await query('UPDATE public.mesa_solo_campanhas SET processando=false WHERE id=$1 AND usuario_id=$2 AND turno_atual=$3',[id,u.id,c.turno_atual]).catch(()=>{});}
@@ -1117,7 +1121,7 @@ app.post('/api/solo/campanhas/:id/preparar-magias',asyncHandler(async(req,res)=>
   if(!p){await client.query('ROLLBACK');return res.status(404).json({erro:'Ficha não encontrada.'});}
   const recursos=recursosRpg.estado(p,c.recursos,c.modo_recursos);
   recursos.grimorio=require('./grimorio').preparar(recursos.grimorio,ids);
-  await client.query('UPDATE public.mesa_solo_campanhas SET recursos=$2::jsonb WHERE id=$1',[id,JSON.stringify(recursosRpg.persistir(recursos))]);
+  await client.query('UPDATE public.mesa_solo_campanhas SET recursos=$2::jsonb WHERE id=$1',[id,JSON.stringify({...c.recursos,...recursosRpg.persistir(recursos)})]);
   await client.query('COMMIT');res.json({recursos,fichaSolo:recursosRpg.fichaSolo(p,recursos),xpAtual:xpMesa.estado(p)});
  }catch(e){await client.query('ROLLBACK');if(e.status===409)return res.status(409).json({erro:e.message});throw e;}finally{client.release();}
 }));

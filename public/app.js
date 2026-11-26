@@ -637,7 +637,7 @@ function soloEstado(mensagem,erro=false){
  if(jogo&&erro&&$('solo-personagem-dialog').open){$('solo-personagem-dialog').close();}
 }
 async function soloAtualizarInicio(){
- soloLimparAvatar();soloFecharPaineis();$('solo-entrada').hidden=false;$('solo-jogo').hidden=true;soloCampanhaId=null;soloResumoXP=null;soloResumoEstado=null;soloResumoModo='xp';$('solo-progressao').value='xp';$('solo-modo-recursos').value='mana';soloEstado('');
+ soloLimparAvatar();soloPintarAliados([]);soloFecharPaineis();$('solo-entrada').hidden=false;$('solo-jogo').hidden=true;soloCampanhaId=null;soloResumoXP=null;soloResumoEstado=null;soloResumoModo='xp';$('solo-progressao').value='xp';$('solo-modo-recursos').value='mana';soloEstado('');
  const lista=$('solo-lista');lista.replaceChildren();
  const select=$('solo-aventura'),anterior=select.value;select.replaceChildren(new Option('Criar com uma ideia minha',''));
  if(!eu.logado){
@@ -759,16 +759,17 @@ function soloPintarColecao(){
 }
 for(const b of document.querySelectorAll('[data-solo-colecao]'))b.onclick=()=>{soloFichaAba=b.dataset.soloColecao;soloPintarColecao();};
 function soloRecursos(r,art){
+ if(Array.isArray(r.companheiros))soloPintarAliados(r.companheiros);
  if(r.xpAtual){soloResumoXP=r.xpAtual;pintarXP($('solo-xp'),r.xpAtual,soloResumoModo);}
  soloResumoEstado=r.recursos;soloFichaDados=r.fichaSolo??null;soloAtualizarResumo();
- const e=r.recursos,alvo=$('solo-recursos'),sel=$('solo-uso');alvo.hidden=!e;$('solo-uso-campo').hidden=!e;alvo.replaceChildren();sel.replaceChildren(new Option('Ação livre',''));if(!e){soloPintarColecao();soloAtualizarCompositor();return;}
+ const e=r.recursos,alvo=$('solo-recursos'),sel=$('solo-uso');alvo.hidden=!e;$('solo-uso-campo').hidden=!e;alvo.replaceChildren();sel.replaceChildren(new Option('Ação livre',''));if(!e){soloPintarColecao();soloAtualizarCompositor();if(art&&r.eventosRecursos?.length)for(const ev of r.eventosRecursos)art.append(el('p',ev,'mesa-xp-recompensa'));return;}
  barraRecurso(alvo,'PV',e.pv,e.pvMax,'mesa-pv');if(e.manaMax)barraRecurso(alvo,'Mana',e.mana,e.manaMax,'mesa-mana');else{const ativar=el('button','Ativar mana (regra alternativa)','guia-abrir');ativar.type='button';ativar.onclick=async()=>{if(soloOcupado||!soloCampanhaId||!confirm('Ativar mana nesta campanha? Esta escolha é permanente e não faz parte das regras padrão de D&D.'))return;const id=soloCampanhaId;ativar.disabled=true;try{await api('/api/solo/campanhas/'+id+'/mana','POST',{});await soloAbrir(id);}catch(err){soloEstado(err.message,true);}finally{ativar.disabled=false;}};alvo.append(ativar);}if(!e.dnd)alvo.append(el('p','Nível narrativo Mesa: '+e.nivel,'suave'));
  if(e.pv===0)alvo.append(el('p','Sem PV: escolha pedir socorro ou descansar.','erro'));sel.add(new Option('Pedir socorro / descansar','socorro'));
  for(const [tipo,lista] of [['item',e.itens],['habilidade',e.habilidades]])for(const x of lista){if(tipo==='habilidade'&&e.grimorio&&x.tipo==='Magia'&&!soloFichaDados?.feiticos.some(h=>h.id===x.id&&!h.grimorio))continue;const custo=tipo==='habilidade'&&e.manaMax?dominioHabilidade(x).custo:0;const o=new Option(x.nome+(tipo==='item'?' · ×'+x.quantidade:' · '+dominioHabilidade(x).grau+(custo?' · '+custo+' mana':''))+(e.nivel<x.nivelMin?' · requer nível '+x.nivelMin:''),tipo+':'+x.id);o.disabled=e.pv===0||e.nivel<x.nivelMin||(tipo==='item'&&x.quantidade<1)||custo>e.mana;sel.add(o);}
  if(e.grimorio){const g=e.grimorio;for(const m of g.conhecidas.filter(m=>g.preparadas.includes(m.id)))for(let c=m.circulo;c<=g.max.length;c++){const o=new Option(m.nome+' · '+c+'º círculo'+(g.modo==='mana'?' · '+c+' MP':' · '+(g.max[c-1]-g.gastos[c-1])+' espaços'),'magia:'+m.id+':'+c);o.disabled=e.pv===0||(g.modo==='mana'?e.mana<c:g.gastos[c-1]>=g.max[c-1]);sel.add(o);}}
  if(e.pv===0)sel.value='socorro';soloAtualizarCompositor();soloPintarColecao();if(art&&r.eventosRecursos?.length)for(const ev of r.eventosRecursos)art.append(el('p',ev,'mesa-xp-recompensa'));
 }
-function soloXPInicio(r){soloFichaAba='inventario';soloResumoModo=r.campanha.progressao;soloResumoXP=r.xp;soloRecursos(r);soloCarregarAvatar(r.campanha.personagem_id,r.xp?.personagem);pintarXP($('solo-xp'),r.xp,r.campanha.progressao);const sel=$('solo-xp-ficha');sel.replaceChildren(new Option('Escolha uma ficha',''));for(const p of soloPersonagens)sel.add(new Option(p.nome,String(p.id)));$('solo-xp-vincular').hidden=Boolean(r.campanha.personagem_id)||!soloPersonagens.length;}
+function soloXPInicio(r){soloPintarAliados(r.companheiros||[]);soloFichaAba='inventario';soloResumoModo=r.campanha.progressao;soloResumoXP=r.xp;soloRecursos(r);soloCarregarAvatar(r.campanha.personagem_id,r.xp?.personagem);pintarXP($('solo-xp'),r.xp,r.campanha.progressao);const sel=$('solo-xp-ficha');sel.replaceChildren(new Option('Escolha uma ficha',''));for(const p of soloPersonagens)sel.add(new Option(p.nome,String(p.id)));$('solo-xp-vincular').hidden=Boolean(r.campanha.personagem_id)||!soloPersonagens.length;}
 $('solo-xp-confirmar').onclick=async()=>{const id=soloCampanhaId,p=$('solo-xp-ficha').value;if(!id||!p||soloOcupado)return;const b=$('solo-xp-confirmar');b.disabled=true;try{await api('/api/solo/campanhas/'+id+'/personagem','POST',{personagemId:Number(p)});await soloAbrir(id);}catch(e){soloEstado(e.message,true);}finally{b.disabled=false;}};
 function soloMensagem(papel,texto,tipo='acao',teste=null,numero=null){
  const art=el('article','','solo-mensagem '+(papel==='mestre'?'mestre':'jogador'));
@@ -851,6 +852,49 @@ async function soloCarregarAvatar(id,nome){
  }catch(e){if(e.name!=='AbortError')console.warn('Mesa: retrato do Solo indisponível');}
  finally{if(soloAvatarPedido===pedido)soloAvatarPedido=null;}
 }
+// Retrato procedural sem serviços externos: somente formas e cores autorizadas.
+const soloCoresAliado={preto:'#34313e',branco:'#e5e3d7',cinza:'#838995',marrom:'#99704f',vermelho:'#b75036',dourado:'#d8ae62',verde:'#558b64',azul:'#527faf',roxo:'#8b67a8'};
+function soloRetratoAliado(a){
+ const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg'),v=a.visual||{},cor=soloCoresAliado[v.cor]||soloCoresAliado.marrom,olhos=soloCoresAliado[v.olhos]||'#d8ae62';
+ svg.setAttribute('viewBox','0 0 96 96');svg.setAttribute('aria-hidden','true');svg.setAttribute('class','solo-retrato-aliado');
+ const add=(tag,attrs)=>{const n=document.createElementNS(ns,tag);for(const [k,x] of Object.entries(attrs))n.setAttribute(k,x);svg.append(n);};
+ const path=(d,fill,stroke='#25272c')=>add('path',{d,fill,stroke,'stroke-width':1.5,'stroke-linejoin':'round'});
+ const circ=(cx,cy,r,fill)=>add('circle',{cx,cy,r,fill});
+ const oval=(cx,cy,rx,ry,fill)=>add('ellipse',{cx,cy,rx,ry,fill});
+ add('rect',{width:96,height:96,rx:12,fill:'#213934'});circ(48,44,37,'#39564b');circ(48,44,30,'#496256');
+ if(v.forma==='humanoide'){
+  path('M10 96 Q15 70 37 67 L59 67 Q83 70 87 96Z','#495a6c');path('M25 47 Q17 19 48 13 Q79 16 72 49 L67 68 29 68Z',cor);
+  oval(48,46,19,25,'#c89577');path('M26 34 Q30 10 48 12 Q70 12 73 37 Q51 34 39 25 L29 47Z',cor);path('M38 67 L48 78 58 67 63 79 48 92 33 79Z','#bfa46c');
+  oval(40,46,3,2,olhos);oval(56,46,3,2,olhos);path('M44 57 Q48 59 52 57','none');
+ }else if(v.forma==='ave'){
+  path('M12 87 Q17 44 45 48 Q80 43 86 88Z',cor);path('M22 45 Q21 18 48 14 Q75 18 74 45 L61 65 37 65Z',cor);path('M34 44 L48 64 62 44 48 47Z','#c9a25c');circ(35,39,7,'#e5d6ac');circ(61,39,7,'#e5d6ac');circ(35,39,4,olhos);circ(61,39,4,olhos);
+ }else if(v.forma==='serpente'){
+  path('M20 75 Q9 47 38 48 Q81 45 76 72 Q68 96 31 88 Q17 82 37 76 Q58 83 62 68 Q61 61 45 64 Q30 65 35 77Z',cor);oval(48,30,24,19,cor);oval(37,29,4,3,olhos);oval(59,29,4,3,olhos);path('M48 46 L48 56 44 59 M48 56 L52 59','none','#d86d70');
+ }else{
+  const gato=v.forma==='gato',raposa=v.forma==='raposa',dragao=v.forma==='dragao',cavalo=v.forma==='cavalo';
+  path('M12 96 Q18 71 48 68 Q78 71 84 96Z',cor);
+  if(dragao){path('M19 51 L6 24 30 36 34 17 44 37Z','#7b694f');path('M77 51 L90 24 66 36 62 17 52 37Z','#7b694f');}
+  else if(v.forma!=='criatura'){path('M23 43 L'+(raposa?13:20)+' 12 43 31Z',cor);path('M73 43 L'+(raposa?83:76)+' 12 53 31Z',cor);path('M25 32 L23 20 37 33Z','#c7a397');path('M71 32 L73 20 59 33Z','#c7a397');}
+  path(cavalo?'M25 37 Q48 17 71 37 L66 69 Q48 89 30 69Z':'M20 48 Q20 26 48 26 Q76 26 76 48 Q70 78 48 82 Q26 78 20 48Z',cor);
+  if(raposa||gato)path('M22 52 L48 63 74 52 Q68 79 48 82 Q28 79 22 52Z','#e6d4b9');
+  oval(35,48,6,4,olhos);oval(61,48,6,4,olhos);circ(35,48,2,'#161923');circ(61,48,2,'#161923');
+  oval(48,65,cavalo?11:7,5,'#25272c');path('M48 69 L48 74 Q42 77 38 72 M48 74 Q54 77 58 72','none');
+ }
+ return svg;
+}
+function soloPintarAliados(lista){
+ const painel=$('solo-aliados'),mini=$('solo-aliados-lista'),detalhes=$('solo-aliados-detalhe-lista');mini.replaceChildren();detalhes.replaceChildren();
+ painel.hidden=!lista.length;$('solo-aliados-titulo').textContent='Companheiros · '+lista.filter(a=>a.ativo).length;
+ const status=a=>!a.ativo?(a.status==='morto'?'Falecido':'Fora do grupo'):a.pv===0?'0 PV · fora de combate':a.pv<a.pvMax?'Ferido':'Ativo';
+ const barra=(alvo,nome,v,max,classe)=>{const linha=el('div','','solo-aliado-recurso '+classe),p=el('progress');p.max=max;p.value=v;p.setAttribute('aria-label',nome+' '+v+' de '+max);linha.append(el('span',nome+' '+v+'/'+max),p);if(classe==='pv')linha.dataset.vida=v/max<=.25?'critica':v/max<=.5?'baixa':'normal';alvo.append(linha);};
+ for(const a of lista){
+  const card=el('article','','solo-aliado-card'+(!a.ativo?' inativo':'')),info=el('div','','solo-aliado-info');card.append(soloRetratoAliado(a),info);
+  info.append(el('strong',a.nome),el('small',a.tipo+' · '+status(a)));barra(info,'PV',a.pv,a.pvMax,'pv');if(a.manaMax)barra(info,'MP',a.mana,a.manaMax,'mana');if(a.ativo)mini.append(card);
+  const d=el('article','','solo-ficha-item solo-aliado-detalhe'),topo=el('div','','solo-aliado-detalhe-topo');topo.append(soloRetratoAliado(a),el('strong',a.nome+' · '+a.tipo));d.append(topo,el('p',a.descricao),el('p',status(a),'suave'));barra(d,'PV',a.pv,a.pvMax,'pv');if(a.manaMax)barra(d,'MP',a.mana,a.manaMax,'mana');detalhes.append(d);
+ }
+ if(!mini.children.length)mini.append(el('p','Nenhum companheiro ativo.','suave'));
+}
+$('solo-aliados-detalhes').onclick=()=>{soloFecharPaineis();$('solo-aliados-dialog').showModal();};
 function soloAtualizarResumo(){
  const alvo=$('solo-resumo-recursos'),e=soloResumoEstado,x=soloResumoXP,barras=$('solo-hud-barras'),xp=$('solo-hud-xp');
  alvo.hidden=!x&&!e;barras.replaceChildren();xp.replaceChildren();if(alvo.hidden)return;
@@ -868,12 +912,12 @@ function soloAtualizarResumo(){
  barras.hidden=!e;
 }
 $('solo-avatar-botao').onclick=()=>{soloFecharPaineis();$('solo-personagem-dialog').showModal();};
-function soloFecharPaineis(){for(const id of ['solo-personagem-dialog','solo-ajustes-dialog']){const d=$(id);if(d?.open)d.close();}}
+function soloFecharPaineis(){for(const id of ['solo-personagem-dialog','solo-ajustes-dialog','solo-aliados-dialog']){const d=$(id);if(d?.open)d.close();}}
 for(const [botao,painel] of [['solo-personagem-abrir','solo-personagem-dialog'],['solo-ajustes-abrir','solo-ajustes-dialog']]){
  $(botao).onclick=()=>{soloFecharPaineis();$(painel).showModal();};
 }
 for(const b of document.querySelectorAll('[data-solo-fechar]'))b.onclick=()=>$(b.dataset.soloFechar).close();
-for(const id of ['solo-personagem-dialog','solo-ajustes-dialog'])$(id).addEventListener('click',ev=>{const d=$(id);if(ev.target!==d)return;const b=d.getBoundingClientRect();if(ev.clientX<b.left||ev.clientX>b.right||ev.clientY<b.top||ev.clientY>b.bottom)d.close();});
+for(const id of ['solo-personagem-dialog','solo-ajustes-dialog','solo-aliados-dialog'])$(id).addEventListener('click',ev=>{const d=$(id);if(ev.target!==d)return;const b=d.getBoundingClientRect();if(ev.clientX<b.left||ev.clientX>b.right||ev.clientY<b.top||ev.clientY>b.bottom)d.close();});
 function soloAtualizarCompositor(){
  const ajuste=$('solo-tipo').value==='ajuste',campo=$('solo-acao'),recurso=$('solo-uso');
  recurso.disabled=ajuste;

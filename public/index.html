@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./style.css?v=portal32">
+<link rel="stylesheet" href="./style.css?v=portal33">
 </head>
 <body class="mesa-sem-sessao tela-acesso">
 <div id="mesa-abertura" class="mesa-intro" aria-hidden="true" inert>
@@ -173,6 +173,7 @@
         </div>
         <div id="solo-hud-barras" class="solo-hud-barras" aria-live="polite"></div>
       </div>
+      <section id="solo-aliados" class="solo-aliados" hidden aria-label="Companheiros da aventura"><div class="solo-aliados-topo"><strong id="solo-aliados-titulo">Companheiros</strong><button id="solo-aliados-detalhes" type="button">Ver grupo</button></div><div id="solo-aliados-lista" class="solo-aliados-lista"></div></section>
       <div class="solo-conversa">
         <div id="solo-mensagens" class="solo-mensagens" role="log" aria-label="Narração e ações da campanha" aria-live="polite" tabindex="0"></div>
         <button id="solo-ultima-mensagem" class="solo-ultima-mensagem" type="button" hidden>↓ Mensagem mais recente</button>
@@ -193,6 +194,7 @@
         </div>
         <div class="solo-compositor-rodape"><span id="solo-modo-dica">Descreva sua ação.</span><span id="solo-teclado-dica">Enter: enviar · Shift+Enter: linha</span><span id="solo-contagem" aria-hidden="true">0/1600</span></div>
       </form>
+      <dialog id="solo-aliados-dialog" class="solo-dialog" aria-labelledby="solo-aliados-dialog-titulo"><div class="solo-dialog-topo"><h2 id="solo-aliados-dialog-titulo">Companheiros</h2><button type="button" class="solo-fechar-dialog" data-solo-fechar="solo-aliados-dialog" aria-label="Fechar companheiros">×</button></div><p class="suave">Aliados confirmados pelo Mestre IA. Os retratos são ilustrações locais baseadas nos traços descritos.</p><div id="solo-aliados-detalhe-lista"></div></dialog>
       <dialog id="solo-personagem-dialog" class="solo-dialog" aria-labelledby="solo-personagem-titulo">
         <div class="solo-dialog-topo"><h2 id="solo-personagem-titulo">Seu personagem</h2><button type="button" class="solo-fechar-dialog" data-solo-fechar="solo-personagem-dialog" aria-label="Fechar ficha">×</button></div>
         <div id="solo-xp" class="mesa-xp folha" aria-live="polite"></div>
@@ -656,7 +658,7 @@
 <script src="./email-validation.js"></script>
 <dialog id="mesa-denuncia-dialog" aria-labelledby="mesa-denuncia-titulo"><form id="mesa-denuncia-form" class="formulario"><h2 id="mesa-denuncia-titulo">Enviar denúncia</h2><p id="mesa-denuncia-alvo"></p><label for="mesa-denuncia-motivo">Motivo</label><select id="mesa-denuncia-motivo" required><option value="assedio">Assédio</option><option value="ameaca">Ameaça</option><option value="spam">Spam</option><option value="discriminacao">Discriminação</option><option value="outro">Outro</option></select><label for="mesa-denuncia-detalhes">Detalhes (opcional)</label><textarea id="mesa-denuncia-detalhes" maxlength="1000" rows="4"></textarea><p class="suave">A denúncia e, se selecionada, a mensagem denunciada serão encaminhadas à moderação. Nenhuma punição é automática.</p><p id="mesa-denuncia-status" role="status" aria-live="polite"></p><button type="submit" class="principal">Enviar denúncia</button><button id="mesa-denuncia-cancelar" type="button">Cancelar</button></form></dialog>
   <div id="campanha-cinema" class="mesa-cinema" hidden role="region" aria-label="Evento cinematográfico"><h2 id="campanha-cinema-titulo"></h2><div id="campanha-cinema-arte" aria-hidden="true"></div><p id="campanha-cinema-texto"></p><div class="cinema-tempo" aria-hidden="true"><span></span></div><div class="cinema-botoes"><button id="campanha-cinema-fechar" type="button">Pular efeito</button><button id="campanha-cinema-pular-todos" type="button" hidden>Pular todos</button></div></div>
-<script src="./app.js?v=portal32"></script>
+<script src="./app.js?v=portal33"></script>
 
 </body>
 </html>
