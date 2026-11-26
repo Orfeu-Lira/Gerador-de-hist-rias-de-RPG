@@ -1841,7 +1841,7 @@ async function carregarMeuPerfil(){
  try{
   const p=await api('/api/conta/perfil');
   if(token!==perfilRequisicao||!eu.logado||mesaTelaVisivel!=='perfil')return;
-  $('perfil-nome').value=p.nome;$('perfil-email').value=p.email;$('perfil-tratamento').value=p.tratamento||'neutro';
+  $('perfil-nome').value=p.nome;$('perfil-email').value=p.email;$('perfil-tratamento').value=p.tratamento||'neutro';$('perfil-apelido').value=p.apelido||'';$('perfil-bio').value=p.bio||'';$('perfil-encontravel').checked=!!p.encontravel;
   $('perfil-cota').textContent=p.limite===null?'Acesso administrativo sem limite de geração.':p.restantes+' de '+p.limite+' gerações disponíveis hoje.';
   if(p.limite!==null){$('perfil-progresso').max=p.limite;$('perfil-progresso').value=p.restantes;$('perfil-progresso').hidden=false;}
   if(p.temFoto){
@@ -1854,7 +1854,7 @@ async function carregarMeuPerfil(){
 }
 $('perfil-form').onsubmit=async ev=>{
  ev.preventDefault();const b=ev.currentTarget.querySelector('button');b.disabled=true;
- try{await api('/api/conta/perfil','POST',{nome:$('perfil-nome').value,tratamento:$('perfil-tratamento').value});await atualizarEu();$('perfil-status').textContent='Perfil salvo.';}
+ try{await api('/api/conta/perfil','POST',{nome:$('perfil-nome').value,tratamento:$('perfil-tratamento').value,...($('perfil-apelido').value?{apelido:$('perfil-apelido').value.trim()}:{}),bio:$('perfil-bio').value,encontravel:$('perfil-encontravel').checked});await atualizarEu();$('perfil-status').textContent='Perfil salvo.';}
  catch(e){$('perfil-status').textContent=e.message;}finally{b.disabled=false;}
 };
 $('perfil-arquivo').onchange=async()=>{
@@ -1957,11 +1957,12 @@ $('f-redefinir').onsubmit = async ev => {
 function mesaSaudacao(){
  const t=$('mesa-inicio-titulo');if(!t)return;
  const frases={masculino:'Bem-vindo, aventureiro!',feminino:'Bem-vinda, aventureira!',nao_binario:'Boas-vindas, aventureire!',neutro:'Que bom ter você aqui!'};
- t.textContent=eu.logado?(frases[eu.tratamento]||frases.neutro):'Sua próxima aventura começa aqui.';
+ const nomes={masculino:'Bem-vindo',feminino:'Bem-vinda',nao_binario:'Boas-vindas',neutro:'Que bom ter você aqui'};
+ t.textContent=eu.logado?(eu.nome?((nomes[eu.tratamento]||nomes.neutro)+', '+eu.nome+'!'):(frases[eu.tratamento]||frases.neutro)):'Sua próxima aventura começa aqui.';
 }
 async function entrar(url, email, senha, tokenBootstrap, manterConectado = false, aceiteTermos = false) {
   try {
-    await api(url, 'POST', { email, senha, manterConectado, aceiteTermos, ...(url==='/api/cadastro'?{tratamento:$('c-tratamento').value}:{}), ...(tokenBootstrap ? { tokenBootstrap } : {}) });
+    await api(url, 'POST', { email, senha, manterConectado, aceiteTermos, ...(url==='/api/cadastro'?{tratamento:$('c-tratamento').value,nome:$('c-nome').value.trim(),apelido:$('c-apelido').value.trim()}:{}), ...(tokenBootstrap ? { tokenBootstrap } : {}) });
     await atualizarEu(); mostrar('inicio'); aviso('Sua próxima aventura começa agora.', true);
   }
   catch (e) { aviso(e.message); }
