@@ -441,6 +441,25 @@ app.post('/api/comunidade/mensagens/lidas',asyncHandler(async(req,res)=>{
  await client.query('UPDATE public.mesa_mensagens_privadas SET lida_em=now() WHERE destinatario=$1 AND remetente=$2 AND id<=$3 AND lida_em IS NULL',[...par,ate]);return {dados:{ok:true}};
  });
 }));
+// Denúncias: somente destinatário da mensagem pode encaminhá-la à moderação.
+app.post('/api/comunidade/denuncias',asyncHandler(async(req,res)=>{
+ const u=await socialUsuario(req,res);if(!u)return;
+ const {apelido,mensagemId,motivo,detalhes=''}=req.body||{};
+ if(!apelidoValido(apelido)||!['assedio','ameaca','spam','discriminacao','outro'].includes(motivo)||typeof detalhes!=='string'||detalhes.length>1000||(mensagemId!=null&&!/^[1-9][0-9]{0,17}$/.test(String(mensagemId))))return res.status(400).json({erro:'Denúncia inválida.'});
+ const {pool}=require('./postgres');const client=await pool.connect();
+ try{
+ await client.query('BEGIN');
+ await client.query("SELECT pg_advisory_xact_lock(hashtextextended('mesa-denuncia:'||$1::text,0))",[u.id]);
+ const r=await client.query(`SELECT p.usuario_id FROM public.mesa_perfis p WHERE lower(p.apelido)=lower($2) AND p.usuario_id<>$1 AND (
+ ($3::bigint IS NOT NULL AND EXISTS(SELECT 1 FROM public.mesa_mensagens_privadas m WHERE m.id=$3 AND m.remetente=p.usuario_id AND m.destinatario=$1))
+ OR ($3::bigint IS NULL AND (p.encontravel OR EXISTS(SELECT 1 FROM public.mesa_amizades a WHERE a.a=least(p.usuario_id,$1::bigint) AND a.b=greatest(p.usuario_id,$1::bigint)) OR EXISTS(SELECT 1 FROM public.mesa_bloqueios b WHERE b.autor=$1 AND b.alvo=p.usuario_id))))`,[u.id,apelido,mensagemId??null]);
+ if(!r.rowCount){await client.query('ROLLBACK');return res.status(404).json({erro:'Conteúdo indisponível para denúncia.'});}
+ const limite=await client.query("SELECT count(*)::int AS n FROM public.mesa_denuncias WHERE autor=$1 AND criado_em>now()-interval '1 day'",[u.id]);
+ if(limite.rows[0].n>=10){await client.query('ROLLBACK');return res.status(429).json({erro:'Limite diário de denúncias atingido. Use o suporte se necessário.'});}
+ const ins=await client.query('INSERT INTO public.mesa_denuncias(autor,alvo,mensagem_id,motivo,detalhes) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING id',[u.id,r.rows[0].usuario_id,mensagemId??null,motivo,detalhes.trim()]);
+ await client.query('COMMIT');res.json({ok:true,repetida:!ins.rowCount});
+ }catch(e){await client.query('ROLLBACK').catch(()=>{});throw e;}finally{client.release();}
+}));
 app.get('/api/conta/perfil',asyncHandler(async(req,res)=>{
  const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
  const r=await query('SELECT nome, tratamento, apelido,bio,encontravel, foto IS NOT NULL AS tem_foto FROM public.mesa_perfis WHERE usuario_id=$1',[u.id]);
@@ -1152,6 +1171,22 @@ async function auditoriaAdmin(u,acao,tipo,id,detalhes={}){
 const adminLeituras=require('express-rate-limit').rateLimit({windowMs:60000,limit:120,standardHeaders:'draft-7',legacyHeaders:false,message:{erro:'Muitas consultas. Aguarde um minuto.'}});
 app.use('/api/admin',exigeAdmin,adminLeituras);
 // Reprocessamento manual autorizado de exclusões pendentes; não retorna caminhos privados.
+app.get('/api/admin/denuncias',asyncHandler(async(req,res)=>{
+ const r=await query(`SELECT d.id::text AS id,d.estado,d.motivo,d.detalhes,d.criado_em,d.revisado_em,pa.apelido AS denunciante,pb.apelido AS denunciado,m.texto AS mensagem,d.alvo::text AS alvo_id FROM public.mesa_denuncias d LEFT JOIN public.mesa_perfis pa ON pa.usuario_id=d.autor LEFT JOIN public.mesa_perfis pb ON pb.usuario_id=d.alvo LEFT JOIN public.mesa_mensagens_privadas m ON m.id=d.mensagem_id AND m.remetente=d.alvo AND m.destinatario=d.autor ORDER BY (d.estado='pendente') DESC,d.id DESC LIMIT 100`);
+ res.json(r.rows);
+}));
+app.patch('/api/admin/denuncias/:id',asyncHandler(async(req,res)=>{
+ const id=idPositivo(req.params.id),estado=req.body?.estado;
+ if(!id||!['procedente','improcedente'].includes(estado))return res.status(400).json({erro:'Decisão inválida.'});
+ const {pool}=require('./postgres');const client=await pool.connect();
+ try{
+ await client.query('BEGIN');
+ const r=await client.query("UPDATE public.mesa_denuncias SET estado=$1,revisado_em=now() WHERE id=$2 AND estado='pendente' RETURNING id",[estado,id]);
+ if(!r.rowCount){await client.query('ROLLBACK');return res.status(409).json({erro:'Denúncia indisponível ou já analisada.'});}
+ await client.query('INSERT INTO public.mesa_auditoria(admin_id,acao,alvo_tipo,alvo_id,detalhes) VALUES($1,$2,$3,$4,$5::jsonb)',[req.admin.id,'denuncia.'+estado,'denuncia',id,JSON.stringify({estado})]);
+ await client.query('COMMIT');res.json({ok:true});
+ }catch(e){await client.query('ROLLBACK').catch(()=>{});throw e;}finally{client.release();}
+}));
 app.get('/api/admin/manutencao/avatares-pendentes',asyncHandler(async(req,res)=>{
  const r=await query('SELECT COUNT(*)::int AS pendentes FROM public.mesa_storage_exclusoes_pendentes');
  res.json({pendentes:r.rows[0].pendentes});
