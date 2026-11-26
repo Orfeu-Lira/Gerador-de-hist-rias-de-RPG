@@ -1107,7 +1107,7 @@ app.post('/api/solo/campanhas/:id/turnos',asyncHandler(async(req,res)=>{
 }));
 app.post('/api/solo/campanhas/:id/recompensa-nivel',asyncHandler(async(req,res)=>{
  const u=await soloRequerConta(req,res);if(!u)return;const id=soloId(req.params.id),nivel=req.body?.nivel,opcao=req.body?.opcao;
- if(!id||!Number.isInteger(nivel)||nivel<2||nivel>20||typeof opcao!=='string'||opcao.length>100)return res.status(400).json({erro:'Escolha inválida.'});
+ if(!id||!Number.isInteger(nivel)||nivel<1||nivel>20||typeof opcao!=='string'||opcao.length>100)return res.status(400).json({erro:'Escolha inválida.'});
  const {pool}=require('./postgres'),client=await pool.connect();
  try{
   await client.query('BEGIN');

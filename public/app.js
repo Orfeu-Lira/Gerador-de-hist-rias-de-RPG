@@ -700,23 +700,41 @@ function listarAquisicoes(alvo,a,nivel){
 }
 let soloFichaDados=null,soloFichaAba='inventario',soloEscolhendoNivel=false;
 function soloPintarEvolucao(lista,registros){
- if(!registros.length){lista.append(el('p','As recompensas aparecem quando você sobe de nível por XP. Níveis anteriores não geram prêmios retroativos.','suave'));return;}
- for(const r of registros){const card=el('article','','solo-ficha-item');card.append(el('strong','Nível '+r.nivel+' · '+(r.regra==='dnd'?'D&D 2024':'Regra Mesa')));
- for(const n of r.notas||[])card.append(el('p',n));
- if(r.regra==='dnd'){const link=el('a','Regras oficiais de classe ↗','guia-abrir');link.href='https://www.dndbeyond.com/sources/dnd/br-2024/character-classes';link.target='_blank';link.rel='noopener noreferrer';card.append(link);}
- for(const c of r.escolhas||[])card.append(el('p','✓ '+c.nome+(c.circulo?' · círculo '+c.circulo:''),'solo-ficha-escolha'));
- if(r.limite>0){card.append(el('p',(r.escolhas||[]).length+'/'+r.limite+' escolhas realizadas','suave'));
- if(r.disponiveis?.length){const sel=el('select');sel.setAttribute('aria-label','Recompensa do nível '+r.nivel);sel.add(new Option('Escolha uma recompensa',''));for(const op of r.disponiveis)sel.add(new Option(op.nome+(op.circulo?' · círculo '+op.circulo:''),op.id));const info=el('p','','suave');sel.onchange=()=>{const op=r.disponiveis.find(x=>x.id===sel.value);info.textContent=op?.descricao||(op?.circulo?'Adiciona ao grimório, não prepara automaticamente.':'');};
- const b=el('button','Aprender','principal');b.type='button';b.onclick=async()=>{if(!sel.value||soloOcupado||soloEscolhendoNivel||!soloCampanhaId)return;soloEscolhendoNivel=true;b.disabled=true;const id=soloCampanhaId;try{const v=await api('/api/solo/campanhas/'+id+'/recompensa-nivel','POST',{nivel:r.nivel,opcao:sel.value});if(id===soloCampanhaId){soloRecursos(v);aviso('Recompensa registrada: '+v.escolha.nome,true);}}catch(e){info.textContent=e.message;}finally{soloEscolhendoNivel=false;b.disabled=false;}};card.append(sel,info,b);
- }else if(r.escolhas.length<r.limite)card.append(el('p','Sem opções adicionais disponíveis no catálogo atual.','suave'));
- }
- lista.append(card);
+ if(!registros.length){lista.append(el('p','Vincule uma ficha para acompanhar a evolução.','suave'));return;}
+ const pendentes=registros.reduce((n,r)=>n+(r.pendentes||0),0);
+ lista.append(el('p',pendentes?pendentes+' escolha(s) disponível(is). Recompensas anteriores já recebidas podem ser contabilizadas sem criar duplicatas.':'Nenhuma escolha de recompensa pendente. Confira as revisões de cada nível.','suave'));
+ for(const r of registros){
+  const card=el('article','','solo-ficha-item');card.append(el('strong','Nível '+r.nivel+' · '+(r.regra==='dnd'?'D&D 2024':'Regra Mesa')));
+  if(r.retroativo)card.append(el('p','Nível já alcançado · revisão retroativa','suave'));
+  if(!r.valida){card.append(el('p','Registro de um perfil anterior; não há novas escolhas disponíveis para ele.','suave'));lista.append(card);continue;}
+  for(const n of r.notas||[])card.append(el('p',n));
+  if(r.regra==='dnd'){const link=el('a','Regras oficiais de classe ↗','guia-abrir');link.href='https://www.dndbeyond.com/sources/dnd/br-2024/character-classes';link.target='_blank';link.rel='noopener noreferrer';card.append(link);}
+  for(const c of r.escolhas||[])card.append(el('p','✓ '+c.nome+(c.circulo?' · círculo '+c.circulo:''),'solo-ficha-escolha'));
+  const info=el('p','','suave');
+  async function resgatar(opcao,botao){
+   if(!opcao||soloOcupado||soloEscolhendoNivel||!soloCampanhaId)return;
+   soloEscolhendoNivel=true;botao.disabled=true;const id=soloCampanhaId;
+   try{const v=await api('/api/solo/campanhas/'+id+'/recompensa-nivel','POST',{nivel:r.nivel,opcao});if(String(id)===String(soloCampanhaId)){soloRecursos(v);aviso(v.escolha.nome,true);}}
+   catch(e){info.textContent=e.message;}finally{soloEscolhendoNivel=false;botao.disabled=false;}
+  }
+  if(r.limite>0){
+   card.append(el('p',r.usadas+'/'+r.limite+' escolhas contabilizadas'+(r.jaAplicadas?' · '+r.jaAplicadas+' já aplicadas antes':''),'suave'));
+   if(r.disponiveis?.length){
+    const sel=el('select');sel.setAttribute('aria-label','Recompensa do nível '+r.nivel);sel.add(new Option('Escolha uma recompensa',''));
+    for(const op of r.disponiveis)sel.add(new Option(op.nome+(op.circulo?' · círculo '+op.circulo:''),op.id));
+    sel.onchange=()=>{const op=r.disponiveis.find(x=>x.id===sel.value);info.textContent=op?.descricao||(op?.circulo?'Adiciona ao grimório, não prepara automaticamente.':'');};
+    const b=el('button','Aprender','principal');b.type='button';b.onclick=()=>resgatar(sel.value,b);card.append(sel,b);
+   }else if(r.pendentes)card.append(el('p','Sem opções adicionais disponíveis no catálogo atual.','suave'));
+   if(r.retroativo&&r.pendentes){const b=el('button','Já recebi esta escolha','guia-abrir');b.type='button';b.onclick=()=>{if(confirm('Contabilizar uma escolha já recebida neste nível? Nenhum novo poder será concedido.'))resgatar('ja-aplicada',b);};card.append(b);}
+  }
+  if(r.revisado)card.append(el('p','✓ Revisão concluída','solo-ficha-escolha'));
+  else{const b=el('button','Marcar nível como revisado','guia-abrir');b.type='button';b.onclick=()=>resgatar('revisar',b);card.append(b);}
+  card.append(info);lista.append(card);
  }
 }
-
 function soloPintarColecao(){
  const box=$('solo-ficha-colecao'),lista=$('solo-ficha-lista'),dados=soloFichaDados,e=soloResumoEstado;
- box.hidden=!dados||!e;lista.replaceChildren();if(box.hidden)return;
+ box.hidden=!dados||!e;lista.replaceChildren();const pendentes=(dados?.evolucao||[]).reduce((n,r)=>n+(r.pendentes||0),0);$('solo-personagem-abrir').setAttribute('aria-label','Abrir ficha do personagem'+(pendentes?' · '+pendentes+' recompensas disponíveis':''));$('solo-personagem-abrir').classList.toggle('solo-ficha-pendente',pendentes>0);if(box.hidden)return;
  const nomes={inventario:'Inventário',feiticos:'Feitiços',habilidades:'Habilidades',evolucao:'Evolução'};
  for(const b of box.querySelectorAll('[data-solo-colecao]')){const k=b.dataset.soloColecao;b.textContent=nomes[k]+' ('+(dados[k]?.length||0)+')';b.setAttribute('aria-pressed',String(k===soloFichaAba));}
  if(soloFichaAba==='evolucao'){soloPintarEvolucao(lista,dados.evolucao||[]);return;}

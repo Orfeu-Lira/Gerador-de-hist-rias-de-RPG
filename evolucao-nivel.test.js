@@ -1,0 +1,9 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),e=require('./evolucao-nivel');
+const p=(classe='Mago',nivel=5)=>({dados:{edicao:'2024',classe,nivel,habilidades:[]},aquisicoes_rpg:{}});
+test('níveis retroativos aparecem sem conceder prêmios nem alterar XP',()=>{const x=p();assert.equal(e.painel(x).length,5);assert.equal(e.painel(x)[0].limite,0);assert.equal(e.painel(x)[4].pendentes,2);assert.equal(x.aquisicoes_rpg.evolucaoNivel,undefined);});
+test('mago só seleciona círculos permitidos e não duplica',()=>{const x=p();assert.throws(()=>e.escolher(x,2,'m-fireball'));x.aquisicoes_rpg=e.escolher(x,3,'m-misty-step').aquisicoes;assert.throws(()=>e.escolher(x,4,'m-misty-step'));x.aquisicoes_rpg=e.escolher(x,3,'ja-aplicada').aquisicoes;assert.throws(()=>e.escolher(x,3,'m-shield'));assert.equal(e.painel(x)[2].pendentes,0);});
+test('guerreiro recebe checklist mas não magias; revisão é única',()=>{const x=p('Guerreiro');assert.equal(e.painel(x)[3].disponiveis.length,0);x.aquisicoes_rpg=e.escolher(x,4,'revisar').aquisicoes;assert.throws(()=>e.escolher(x,4,'revisar'));assert.equal(e.painel(x)[3].revisado,true);});
+test('XP determina nível quando ativo; não resgata nível futuro',()=>{const x=p();x.xp=300;assert.equal(e.painel(x).length,2);assert.throws(()=>e.escolher(x,3,'m-shield'));});
+test('narrativo recebe uma técnica por nível, sem duplicar ou retroceder',()=>{const x={dados:{edicao:'narrativa'},xp:900,aquisicoes_rpg:{}};assert.equal(e.painel(x).length,4);x.aquisicoes_rpg=e.escolher(x,2,'analise').aquisicoes;assert.equal(x.aquisicoes_rpg.habilidades.length,1);assert.throws(()=>e.escolher(x,3,'analise'));assert.throws(()=>e.escolher(x,2,'defesa'));});
+test('recompensas novas preservam registro anterior e não são contabilizáveis como retroativas',()=>{const x=p();x.aquisicoes_rpg=e.registrar(x,4,5).aquisicoes;assert.equal(e.painel(x)[4].retroativo,false);assert.throws(()=>e.escolher(x,5,'ja-aplicada'));});

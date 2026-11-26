@@ -1274,3 +1274,5 @@ body.mesa-alto-contraste .solo-ficha-item{background:#fff;color:#000;border:2px 
 body.mesa-alto-contraste .solo-ficha-item :is(p,span,strong){color:#111}
 
 .solo-ficha-abas{grid-template-columns:repeat(4,minmax(0,1fr))}.solo-ficha-item select{width:100%;margin:8px 0}.solo-ficha-item .solo-ficha-escolha{color:#255d42;font-weight:700}.solo-ficha-item>a{display:inline-block;margin:5px 0}.solo-ficha-item .principal{min-height:40px}.solo-ficha-abas button{font-size:.72rem}
+
+.solo-ficha-pendente{position:relative}.solo-ficha-pendente::after{content:'';position:absolute;width:9px;height:9px;background:#e2bc62;border-radius:50%;top:3px;right:3px;border:1px solid #183e34}.solo-ficha-item button{margin:5px 5px 0 0}
