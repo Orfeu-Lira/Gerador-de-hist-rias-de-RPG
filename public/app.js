@@ -312,7 +312,7 @@ async function notificacoesAtualizar(force=false){
   if(!eu.logado||eu.email!==sessao||admin!==(eu.papel==='admin'))return;
   notificacoesUltimoCarregamento=Date.now();
   const totalSuporte=Number(data.naoLidas)||0;
-  const contador=$('notificacoes-contador'),quantidade=totalSuporte+['solicitacoes','mensagens','fichas','denuncias'].reduce((n,k)=>n+(Number(social[k])||0),0);
+  const contador=$('notificacoes-contador'),quantidade=totalSuporte+['solicitacoes','mensagens','fichas','convites','denuncias'].reduce((n,k)=>n+(Number(social[k])||0),0);
   contador.hidden=quantidade<1;
   contador.textContent=quantidade>99?'99+':String(quantidade);
   $('notificacoes-abrir').setAttribute('aria-label',quantidade?quantidade+' notificações pendentes':'Abrir notificações');
@@ -320,7 +320,7 @@ async function notificacoesAtualizar(force=false){
   const estado=$('notificacoes-estado');
   estado.textContent=quantidade?quantidade+' aviso(s) pendente(s).':'Tudo em dia! Nenhum aviso pendente.';
   const lista=$('notificacoes-lista');lista.replaceChildren();
-  for(const [k,n,tela] of [['solicitacoes','Solicitações de amizade','amigos'],['mensagens','Mensagens não lidas','mensagens'],['fichas','Fichas recebidas','compartilhadas'],['denuncias','Denúncias pendentes','admin']]){
+  for(const [k,n,tela] of [['solicitacoes','Solicitações de amizade','amigos'],['mensagens','Mensagens não lidas','mensagens'],['fichas','Fichas recebidas','compartilhadas'],['convites','Convites para campanhas','campanhas'],['denuncias','Denúncias pendentes','admin']]){
    if(!social[k])continue;
    const card=add('article',lista,'','notificacoes-item nao-lida');
    add('strong',card,n);add('p',card,String(social[k])+' pendente(s)','suave');
@@ -2086,6 +2086,8 @@ const campanhaBase='/api/comunidade/campanhas';
 const campanhaStatus=t=>{$('campanha-status').textContent=t;};
 function fecharCinema(){clearTimeout(cinemaTimer);$('campanha-cinema').hidden=true;$('campanha-cinema-arte').replaceChildren();for(const n of cinemaNos){try{n.stop();}catch{}}cinemaNos=[];}
 $('campanha-cinema-fechar').onclick=fecharCinema;
+$('campanha-visual').onchange=()=>{if(!$('campanha-visual').checked)fecharCinema();};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('campanha-cinema').hidden)fecharCinema();});
 $('campanha-som').onchange=async()=>{if(!$('campanha-som').checked){fecharCinema();return;}try{cinemaAudio=cinemaAudio||new(window.AudioContext||window.webkitAudioContext)();await cinemaAudio.resume();campanhaStatus('Sons cinematográficos ativados.');}catch{ $('campanha-som').checked=false;campanhaStatus('Não foi possível ativar o áudio.');}};
 function somCinema(efeito){
  if(!$('campanha-som').checked||!cinemaAudio||cinemaAudio.state!=='running')return;
@@ -2114,9 +2116,9 @@ function arteDragao(cor,fogo){
 function exibirCinema(e){
  if(e.efeito==='nenhum'||document.hidden)return;
  fecharCinema();somCinema(e.efeito);
- if(!$('campanha-visual').checked)return;
+ if(!$('campanha-visual').checked){cinemaTimer=setTimeout(fecharCinema,4200);return;}
  const painel=$('campanha-cinema'),arte=$('campanha-cinema-arte');
- painel.className='mesa-cinema efeito-'+e.efeito+(mesaMovimentoReduzido()?' sem-movimento':'');
+ painel.className='mesa-cinema efeito-'+e.efeito+((mesaMovimentoReduzido()||acessibilidadeMovimentoReduzido())?' sem-movimento':'');
  if(e.efeito.startsWith('dragao'))arte.append(arteDragao(e.cor,e.efeito==='dragao_fogo'));
  else {const simbolo=el('div',{trovao:'ϟ',explosao:'✹',magia:'✧',tempestade:'☁'}[e.efeito]||'✦','mesa-cinema-simbolo');arte.append(simbolo);}
  $('campanha-cinema-texto').textContent=e.texto.slice(0,300);painel.hidden=false;cinemaTimer=setTimeout(fecharCinema,4200);
@@ -2138,8 +2140,8 @@ async function carregarCampanhas(){
  const alvo=$('campanhas-lista');alvo.replaceChildren();
  if(!lista.length)alvo.append(el('p','Nenhuma mesa ou convite por enquanto.','suave'));
  for(const s of lista){const card=el('article','','mesa-amigo-linha');const info=el('div');info.append(el('strong',s.titulo),el('p','Mestre: '+s.mestre+(s.encerrada?' · Encerrada':s.estado==='convidado'?' · Convite pendente':''),'suave'));card.append(info);
- const b=el('button',s.estado==='convidado'?'Aceitar convite':'Abrir mesa');b.type='button';b.disabled=s.encerrada&&s.estado==='convidado';b.onclick=async()=>{try{if(s.estado==='convidado')await api(campanhaBase+'/'+s.id+'/membros','POST',{acao:'aceitar'});await abrirCampanha(s.id);}catch(e){campanhaStatus(e.message);}};card.append(b);
- if(s.estado==='convidado'){const rec=el('button','Recusar');rec.type='button';rec.onclick=async()=>{try{await api(campanhaBase+'/'+s.id+'/membros','POST',{acao:'sair'});await carregarCampanhas();}catch(e){campanhaStatus(e.message);}};card.append(rec);}
+ const b=el('button',s.estado==='convidado'?'Aceitar convite':'Abrir mesa');b.type='button';b.disabled=s.encerrada&&s.estado==='convidado';b.onclick=async()=>{try{if(s.estado==='convidado')await api(campanhaBase+'/'+s.id+'/membros','POST',{acao:'aceitar'});await abrirCampanha(s.id);notificacoesAtualizar(true);}catch(e){campanhaStatus(e.message);}};card.append(b);
+ if(s.estado==='convidado'){const rec=el('button','Recusar');rec.type='button';rec.onclick=async()=>{try{await api(campanhaBase+'/'+s.id+'/membros','POST',{acao:'sair'});await carregarCampanhas();notificacoesAtualizar(true);}catch(e){campanhaStatus(e.message);}};card.append(rec);}
  alvo.append(card);}
  }catch(e){if(v===campanhaVersao)campanhaStatus(e.message);}
 }
@@ -2176,7 +2178,7 @@ async function atualizarCampanha(){
  if(!campanhaCursor)campanhaCursor='0';
  if(cinema)exibirCinema(cinema);
  if(d.eventos.length){while(h.children.length>300)h.firstChild.remove();h.scrollTop=h.scrollHeight;}
- }catch(e){if(v===campanhaVersao){campanhaStatus(e.message);if([403,404].includes(e.status)){limparCampanha();campanhaStatus(e.message);await carregarCampanhas();}}}
+ }catch(e){if(v===campanhaVersao){campanhaStatus(e.message);if([403,404].includes(e.status)){limparCampanha();campanhaStatus(e.message);iniciarCampanhas();}}}
  finally{if(v===campanhaVersao)campanhaCarregando=false;}
 }
 async function acaoMembroCampanha(acao,apelido){
@@ -2196,7 +2198,7 @@ $('campanha-voltar').onclick=()=>{limparCampanha();iniciarCampanhas();};
 $('campanhas-atualizar').onclick=carregarCampanhas;
 $('campanha-evento').onsubmit=async ev=>{ev.preventDefault();const b=ev.currentTarget.querySelector('button');b.disabled=true;const tipo=$('campanha-tipo').value,texto=$('campanha-texto').value.trim(),det=detectarCinema(texto),efeito=tipo==='narracao'?($('campanha-efeito').value==='auto'?det.efeito:$('campanha-efeito').value):'nenhum',cor=$('campanha-cor').value==='auto'?det.cor:$('campanha-cor').value;try{await enviarEventoCampanha({tipo,texto,efeito,cor});}finally{b.disabled=false;}};
 $('campanha-rolar').onclick=async()=>{const b=$('campanha-rolar');b.disabled=true;try{await enviarEventoCampanha({tipo:'dado',faces:Number($('campanha-dado').value)});}finally{b.disabled=campanhaEncerrada;}};
-function iniciarCampanhas(){if(!campanhaTimer)campanhaTimer=setInterval(()=>{if(mesaTelaVisivel==='campanhas'&&!document.hidden&&campanhaId)atualizarCampanha();},5000);if(!campanhaId)carregarCampanhas();}
+function iniciarCampanhas(){if(!campanhaTimer)campanhaTimer=setInterval(()=>{if(mesaTelaVisivel!=='campanhas'||document.hidden||!navigator.onLine)return;if(campanhaId)atualizarCampanha();else carregarCampanhas();},5000);if(!campanhaId)carregarCampanhas();}
 // ---- Conta e recuperação de acesso ----
 const formulariosConta = ['f-login','f-cadastro','f-recuperar','f-redefinir'];
 // Feedback de formato local, sem enviar o endereço enquanto a pessoa digita.
