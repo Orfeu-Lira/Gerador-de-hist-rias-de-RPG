@@ -1121,3 +1121,5 @@ body.mesa-sem-sessao .mesa-sobre-vibe{margin-inline:auto;max-width:680px}
 .mesa-xp{margin:12px 0;padding:14px;border:1px solid #a6813b;border-radius:10px}.mesa-xp progress{width:100%;height:13px;accent-color:#b68c40}.mesa-xp-recompensa{padding:9px 12px;border-left:3px solid #b68c40;background:rgba(182,140,64,.12);font-weight:600}.mesa-xp details{margin-top:10px}.mesa-xp p{margin:6px 0}
 
 .mesa-recursos{margin:12px 0;padding:14px;border:1px solid var(--borda,#a6813b);border-radius:10px}.mesa-recurso-linha{display:grid;gap:5px;margin:8px 0}.mesa-recurso-linha progress{width:100%;height:14px}.mesa-pv{accent-color:#c35353}.mesa-mana{accent-color:#527cc9}.mesa-recursos details{margin:9px 0}.mesa-recursos p{overflow-wrap:anywhere;margin:7px 0}
+
+.mesa-proficiencia{accent-color:#b68c40}.mesa-dominio{padding:8px 0;border-bottom:1px solid rgba(182,140,64,.25)}.mesa-dominio:last-child{border-bottom:0}

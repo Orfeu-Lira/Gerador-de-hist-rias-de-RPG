@@ -1059,7 +1059,7 @@ app.post('/api/solo/campanhas/:id/turnos',asyncHandler(async(req,res)=>{
    if(personagem){
     const p=(await client.query('SELECT id,nome,dados,xp,aquisicoes_rpg FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2 FOR UPDATE',[personagem.id,u.id])).rows[0];
     if(!p){const e=Error('A ficha não está mais disponível.');e.status=409;throw e;}
-    resultado=recursosRpg.aplicar(p,c.recursos,c.modo_recursos,uso,resposta.teste?null:resposta.efeitos,categoria,tipo,n,id);
+    resultado=recursosRpg.aplicar(p,c.recursos,c.modo_recursos,uso,resposta.teste?null:resposta.efeitos,categoria,tipo,n,id,{testePendente:Boolean(resposta.teste),falhou:rolagem?.passou===false,ativa:c.progressao!=='nenhuma'});
     await client.query('UPDATE public.mesa_solo_campanhas SET recursos=$2::jsonb WHERE id=$1',[id,JSON.stringify(recursosRpg.persistir(resultado.estado))]);
     await client.query('UPDATE public.personagens_dnd SET aquisicoes_rpg=$2::jsonb WHERE id=$1',[p.id,JSON.stringify(resultado.aquisicoes)]);
     await client.query("UPDATE public.mesa_solo_mensagens SET recursos_evento=$3::jsonb WHERE campanha_id=$1 AND numero=$2 AND papel='mestre'",[id,n,JSON.stringify(resultado.eventos)]);
