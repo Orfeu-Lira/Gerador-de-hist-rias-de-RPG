@@ -398,6 +398,12 @@
     <div class="folha dnd-trilha-aprendizado"><span class="sobretitulo">COMECE DO ZERO</span><h2>Aprenda D&D do primeiro dado às regras avançadas</h2><p>Não sabe o que é RPG? Comece pela introdução oficial. Depois explore as regras gratuitas de D&D 2024: criação de personagens, testes, combate, classes, magias, equipamentos, condições e evolução.</p><div class="dnd-trilha-links"><a class="guia-abrir" href="https://www.dndbeyond.com/en/how-to-play-dnd" target="_blank" rel="noopener noreferrer">① Como jogar D&D — guia inicial ↗</a><a class="guia-abrir" href="https://www.dndbeyond.com/sources/dnd/br-2024" target="_blank" rel="noopener noreferrer">② Regras gratuitas 2024 — compêndio ↗</a><button type="button" class="guia-abrir" id="dnd-tutorial-mesa">③ Como usar o Mesa para jogar ↗</button></div><p class="suave">Os recursos oficiais são em inglês. Use a tradução do navegador caso prefira ler em português. O conteúdo gratuito é extenso, mas não inclui todas as opções dos livros pagos.</p></div>
     <div class="folha assistente-painel"><h2>O que você quer aprender?</h2><p>O assistente explica regras e dá exemplos. Ele não modifica personagens e pode cometer erros: confirme decisões importantes na fonte oficial.</p><form id="f-ajuda-dnd"><label for="pergunta-dnd">Sua pergunta</label><textarea id="pergunta-dnd" rows="4" maxlength="450" required placeholder="Ex.: Como funcionam os testes de habilidade e a dificuldade (CD)?"></textarea><div class="acoes"><button class="principal" id="ajuda-enviar" type="submit">✦ Pedir explicação</button></div></form><div id="resposta-dnd" class="assistente-resposta" role="status" aria-live="polite"></div><p class="suave">Base de referência: <a target="_blank" rel="noopener noreferrer" href="https://www.dndbeyond.com/srd">SRD 5.2.1 — D&D Beyond</a>. Limite inicial: seis consultas diárias por conta.</p></div>
   </section>
+  <section id="v-compartilhadas" hidden aria-labelledby="compartilhadas-titulo">
+ <div class="pagina-intro"><span class="sobretitulo">COMUNIDADE</span><h1 id="compartilhadas-titulo">Fichas compartilhadas</h1><p>Compartilhe personagens com amigos, exclusivamente para visualização.</p></div>
+ <div class="folha mesa-perfil-card"><h2>Compartilhar personagem</h2><form id="compartilhar-ficha-form" class="formulario"><label for="compartilhar-personagem">Minha ficha</label><select id="compartilhar-personagem" required></select><label for="compartilhar-amigo">Amigo</label><select id="compartilhar-amigo" required></select><p class="suave">Serão exibidos somente nome do personagem, classe, raça, nível, cenário e especialidade. Anotações, inventário e informações privadas ficam protegidos.</p><button class="principal" type="submit">Compartilhar para visualização</button></form></div>
+ <div class="folha mesa-perfil-card"><h2>Fichas que compartilhei</h2><div id="fichas-enviadas"></div><h2>Fichas que recebi</h2><div id="fichas-recebidas"></div><button id="fichas-compartilhadas-atualizar" type="button">Atualizar</button></div>
+ <p id="fichas-compartilhadas-status" role="status" aria-live="polite"></p>
+ </section>
   <section id="v-amigos" hidden aria-labelledby="amigos-titulo">
     <div class="pagina-intro"><span class="sobretitulo">COMUNIDADE</span><h1 id="amigos-titulo">Amigos</h1><p>Encontre outros aventureiros pelo apelido e gerencie suas amizades.</p></div>
     <div class="folha mesa-perfil-card"><h2>Encontrar jogadores</h2><form id="amigos-busca" class="formulario"><label for="amigos-termo">Apelido</label><input id="amigos-termo" minlength="3" maxlength="25" required placeholder="Digite um apelido"><button type="submit" class="principal">Pesquisar</button></form><p class="suave">Apenas jogadores que permitiram ser encontrados aparecem na pesquisa.</p><div id="amigos-resultados"></div></div>
@@ -605,6 +611,6 @@
 <script src="./mesa-dice-audio.js"></script>
 <script src="./dice-rules.js"></script>
 <script src="./email-validation.js"></script>
-<script src="./app.js?v=portal10"></script>
+<script src="./app.js?v=portal11"></script>
 </body>
 </html>
