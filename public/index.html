@@ -403,7 +403,7 @@
     <div class="folha mesa-perfil-card">
       <div class="mesa-perfil-identidade"><div class="avatar-moldura"><img id="perfil-foto" alt="Sua foto de perfil" hidden><span id="perfil-foto-vazio" aria-hidden="true">♙</span></div>
       <div><h2>Foto de perfil</h2><p class="suave">Imagem privada da sua conta. JPG, PNG ou WebP.</p><label for="perfil-arquivo">Escolher foto</label><input type="file" id="perfil-arquivo" accept="image/jpeg,image/png,image/webp"><button type="button" id="perfil-remover">Remover foto</button></div></div>
-      <form id="perfil-form" class="formulario"><label for="perfil-nome">Nome de exibição</label><input id="perfil-nome" maxlength="80" autocomplete="nickname"><label for="perfil-tratamento">Gênero / preferência de tratamento (opcional)</label><select id="perfil-tratamento"><option value="neutro">Prefiro não informar</option><option value="masculino">Masculino</option><option value="feminino">Feminino</option><option value="nao_binario">Não binário</option></select><p class="suave">Usado somente para personalizar a forma como o Mesa se dirige a você.</p><label for="perfil-email">E-mail da conta</label><input id="perfil-email" type="email" readonly><button type="submit" class="principal">Salvar perfil</button></form>
+      <form id="perfil-form" class="formulario"><label for="perfil-nome">Como deseja ser chamado? (privado)</label><input id="perfil-nome" maxlength="80" autocomplete="given-name"><label for="perfil-apelido">Apelido na comunidade</label><input id="perfil-apelido" minlength="3" maxlength="24" pattern="[A-Za-z0-9_]{3,24}" autocomplete="nickname" placeholder="Orfeu"><p class="suave">Aparece sem @. O símbolo é reservado para menções.</p><label for="perfil-bio">Biografia (privada por enquanto)</label><textarea id="perfil-bio" maxlength="500" rows="3"></textarea><label><input type="checkbox" id="perfil-encontravel"> Permitir que outros jogadores encontrem meu apelido na comunidade</label><label for="perfil-tratamento">Gênero / preferência de tratamento (opcional)</label><select id="perfil-tratamento"><option value="neutro">Prefiro não informar</option><option value="masculino">Masculino</option><option value="feminino">Feminino</option><option value="nao_binario">Não binário</option></select><p class="suave">Usado somente para personalizar a forma como o Mesa se dirige a você.</p><label for="perfil-email">E-mail da conta</label><input id="perfil-email" type="email" readonly><button type="submit" class="principal">Salvar perfil</button></form>
       <p id="perfil-status" role="status" aria-live="polite"></p>
     </div>
     <div class="folha mesa-perfil-card"><h2>Gerações disponíveis</h2><p id="perfil-cota">Consultando limite diário...</p><progress id="perfil-progresso" max="5" value="0" aria-label="Gerações disponíveis" hidden></progress><p class="suave">As histórias e os NPCs compartilham a cota diária de geração.</p><button type="button" class="principal" id="perfil-opcoes">Personalizar aparência e escrita</button></div>
@@ -431,6 +431,7 @@
       <h2>Criar conta</h2>
       <label for="c-email">E-mail</label>
       <input id="c-email" type="email" autocomplete="email" required>
+      <label for="c-nome">Como deseja ser chamado? (privado)</label><input id="c-nome" maxlength="80" autocomplete="given-name" required><label for="c-apelido">Apelido na comunidade</label><input id="c-apelido" minlength="3" maxlength="24" pattern="[A-Za-z0-9_]{3,24}" autocomplete="nickname" required placeholder="Orfeu"><p class="suave">Somente o apelido será exibido nas interações sociais. Use letras, números e _.</p>
       <label for="c-tratamento">Gênero / preferência de tratamento (opcional)</label><select id="c-tratamento"><option value="neutro">Prefiro não informar</option><option value="masculino">Masculino</option><option value="feminino">Feminino</option><option value="nao_binario">Não binário</option></select><p class="suave">Usado somente para personalizar a forma como o Mesa se dirige a você.</p>
       <label for="c-senha">Senha</label>
       <input id="c-senha" type="password" autocomplete="new-password" minlength="8" maxlength="72" required>
@@ -597,6 +598,6 @@
 <script src="./mesa-dice-audio.js"></script>
 <script src="./dice-rules.js"></script>
 <script src="./email-validation.js"></script>
-<script src="./app.js?v=portal8"></script>
+<script src="./app.js?v=portal9"></script>
 </body>
 </html>
