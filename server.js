@@ -1105,6 +1105,23 @@ app.post('/api/solo/campanhas/:id/turnos',asyncHandler(async(req,res)=>{
  }catch(e){await soloDevolver(quota);if(e.status===429||e.status===409)return res.status(e.status).json({erro:e.message});console.error('Falha em turno solo',e.name);soloErroIA(res,e);}
  finally{await query('UPDATE public.mesa_solo_campanhas SET processando=false WHERE id=$1 AND usuario_id=$2 AND turno_atual=$3',[id,u.id,c.turno_atual]).catch(()=>{});}
 }));
+app.post('/api/solo/campanhas/:id/recompensa-nivel',asyncHandler(async(req,res)=>{
+ const u=await soloRequerConta(req,res);if(!u)return;const id=soloId(req.params.id),nivel=req.body?.nivel,opcao=req.body?.opcao;
+ if(!id||!Number.isInteger(nivel)||nivel<2||nivel>20||typeof opcao!=='string'||opcao.length>100)return res.status(400).json({erro:'Escolha inválida.'});
+ const {pool}=require('./postgres'),client=await pool.connect();
+ try{
+  await client.query('BEGIN');
+  const c=(await client.query('SELECT personagem_id,recursos,modo_recursos,processando FROM public.mesa_solo_campanhas WHERE id=$1 AND usuario_id=$2 FOR UPDATE',[id,u.id])).rows[0];
+  if(!c||!c.personagem_id||c.processando){await client.query('ROLLBACK');return res.status(409).json({erro:'Vincule uma ficha e aguarde o término da narração.'});}
+  const p=(await client.query('SELECT id,nome,dados,xp,aquisicoes_rpg FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2 FOR UPDATE',[c.personagem_id,u.id])).rows[0];
+  if(!p){await client.query('ROLLBACK');return res.status(404).json({erro:'Ficha não encontrada.'});}
+  const recompensa=require('./evolucao-nivel').escolher(p,nivel,opcao);
+  await client.query('UPDATE public.personagens_dnd SET aquisicoes_rpg=$2::jsonb WHERE id=$1',[p.id,JSON.stringify(recompensa.aquisicoes)]);
+  p.aquisicoes_rpg=recompensa.aquisicoes;const recursos=recursosRpg.estado(p,c.recursos,c.modo_recursos);
+  await client.query('COMMIT');
+  res.json({escolha:recompensa.escolha,recursos,fichaSolo:recursosRpg.fichaSolo(p,recursos),xpAtual:xpMesa.estado(p)});
+ }catch(e){await client.query('ROLLBACK');if(e.status===409)return res.status(409).json({erro:e.message});throw e;}finally{client.release();}
+}));
 app.post('/api/solo/campanhas/:id/mana',asyncHandler(async(req,res)=>{
  const u=await soloRequerConta(req,res);if(!u)return;const id=soloId(req.params.id);if(!id)return res.status(400).json({erro:'Campanha inválida.'});
  const r=await query("UPDATE public.mesa_solo_campanhas SET modo_recursos='mana' WHERE id=$1 AND usuario_id=$2 AND personagem_id IS NOT NULL AND modo_recursos='padrao' AND NOT processando RETURNING id",[id,u.id]);

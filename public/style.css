@@ -1272,3 +1272,5 @@ body.mesa-alto-contraste .solo-hud :is(strong,span,small){color:white}
 @media(any-pointer:fine) and (min-width:850px){#solo-teclado-dica{display:inline;margin-left:auto;white-space:nowrap}}
 body.mesa-alto-contraste .solo-ficha-item{background:#fff;color:#000;border:2px solid #000}
 body.mesa-alto-contraste .solo-ficha-item :is(p,span,strong){color:#111}
+
+.solo-ficha-abas{grid-template-columns:repeat(4,minmax(0,1fr))}.solo-ficha-item select{width:100%;margin:8px 0}.solo-ficha-item .solo-ficha-escolha{color:#255d42;font-weight:700}.solo-ficha-item>a{display:inline-block;margin:5px 0}.solo-ficha-item .principal{min-height:40px}.solo-ficha-abas button{font-size:.72rem}

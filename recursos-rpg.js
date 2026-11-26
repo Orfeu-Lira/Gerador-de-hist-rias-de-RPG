@@ -1,5 +1,6 @@
 'use strict';
 const xp=require('./xp');
+const evolucao=require('./evolucao-nivel');
 const vida={Bárbaro:[12,7],Guerreiro:[10,6],Paladino:[10,6],Patrulheiro:[10,6],Bardo:[8,5],Clérigo:[8,5],Druida:[8,5],Monge:[8,5],Ladino:[8,5],Bruxo:[8,5],Feiticeiro:[6,4],Mago:[6,4]};
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v)),int=(v,a,b)=>Number.isInteger(v)&&v>=a&&v<=b,txt=(v,n)=>typeof v==='string'?v.trim().slice(0,n):'';
 const faixas=[{min:0,nome:'Iniciante',desconto:0},{min:20,nome:'Aprendiz',desconto:0},{min:50,nome:'Proficiente',desconto:1},{min:100,nome:'Especialista',desconto:2},{min:200,nome:'Mestre',desconto:3}];
@@ -16,7 +17,7 @@ function colecao(p){
    const id=manualId(h.nome),m=manual.find(x=>x.id===id)||{};
    habilidades.push({...m,id,nome:txt(h.nome,80),descricao:txt(h.descricao,200),nivelMin:int(h.nivelMin,1,20)?h.nivelMin:1,mana:int(h.mana,0,20)?h.mana:0,manual:true,tipo:txt(h.tipo,30)||'Narrativa'});
  }
- return {itens,habilidades,manual};
+ return {itens,habilidades,manual,evolucaoNivel:Array.isArray(a.evolucaoNivel)?a.evolucaoNivel:[]};
 }
 function armazenamento(a){
  const historico=new Map((a.manual||[]).map(x=>[x.id,x]));
@@ -26,7 +27,7 @@ function armazenamento(a){
  }
  const ativos=new Set(a.habilidades.filter(x=>x.manual===true).map(x=>x.id));
  const registros=[...historico.values()].sort((x,y)=>Number(ativos.has(y.id))-Number(ativos.has(x.id))).slice(0,100);
- return {itens:a.itens,habilidades:a.habilidades.filter(x=>!x.manual),manual:registros};
+ return {itens:a.itens,habilidades:a.habilidades.filter(x=>!x.manual),manual:registros,evolucaoNivel:a.evolucaoNivel||[]};
 }
 function premiar(h,{campanhaId,turno,origem='solo',agora=new Date().toISOString()}){
  const antes=proficiencia(h),dia=agora.slice(0,10),gasto=h.praticaDia===dia&&int(h.praticaHoje,0,25)?h.praticaHoje:0;
@@ -93,7 +94,9 @@ function fichaSolo(p,e){
  for(const h of cadastradas.slice(0,24))if(h&&txt(h.nome,80)&&!nomes.has(normalizarNome(h.nome))){
   nomes.add(normalizarNome(h.nome));habilidades.push({nome:txt(h.nome,80),tipo:txt(h.tipo,30)||'Narrativa',descricao:txt(h.descricao,200),origem:'ficha',utilizavel:false,nivelMin:int(h.nivelMin,1,20)?h.nivelMin:1,mana:int(h.mana,0,20)?h.mana:0});
  }
- return {inventario,feiticos:habilidades.filter(h=>h.tipo==='Magia'),habilidades:habilidades.filter(h=>h.tipo!=='Magia')};
+ const recompensas=evolucao.painel(p);
+ const grimorio=d.edicao==='2024'&&d.classe==='Mago'?recompensas.filter(r=>r.regra==='dnd'&&r.classe==='Mago').flatMap(r=>r.escolhas.map(m=>({nome:m.nome,tipo:'Magia',descricao:'Círculo '+m.circulo+' · Inscrita no grimório por evolução. Preparação e espaços de magia devem ser conferidos nas regras oficiais.',origem:'ficha',utilizavel:false,grimorio:true,nivelMin:r.nivel}))).filter(m=>!habilidades.some(h=>normalizarNome(h.nome)===normalizarNome(m.nome))):[];
+ return {inventario,feiticos:[...habilidades.filter(h=>h.tipo==='Magia'),...grimorio],habilidades:habilidades.filter(h=>h.tipo!=='Magia'),evolucao:recompensas};
 }
 function persistir(e){return {pv:e.pv,pvMax:e.pvMax,mana:e.mana,manaMax:e.manaMax,praticaPendente:e.praticaPendente??null};}
 module.exports={estado,preparar,aplicar,persistir,fichaSolo,colecao,armazenamento,premiar,manualId,proficiencia,custoMana,faixas};
