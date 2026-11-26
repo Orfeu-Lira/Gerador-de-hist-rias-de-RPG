@@ -478,6 +478,86 @@ app.post('/api/comunidade/fichas/vistas',asyncHandler(async(req,res)=>{
  await query('UPDATE public.mesa_fichas_compartilhadas SET vista_em=now() WHERE destinatario=$1 AND personagem_id=ANY($2::bigint[]) AND vista_em IS NULL',[u.id,ids]);
  res.json({ok:true});
 }));
+// Campanhas online privadas: mestre humano, convites e eventos cinematográficos.
+const campanhaEfeitos=['nenhum','dragao','dragao_fogo','trovao','explosao','magia','tempestade'];
+const campanhaCores=['vermelho','verde','azul','preto','branco','dourado'];
+app.get('/api/comunidade/campanhas',asyncHandler(async(req,res)=>{
+ const u=await socialUsuario(req,res);if(!u)return;
+ const r=await query(`SELECT c.id::text AS id,c.titulo,c.descricao,c.encerrada,p.apelido AS mestre,c.mestre=$1 AS minha,m.estado
+ FROM public.mesa_campanha_membros m JOIN public.mesa_campanhas_online c ON c.id=m.campanha_id JOIN public.mesa_perfis p ON p.usuario_id=c.mestre WHERE m.usuario_id=$1
+ AND NOT EXISTS(SELECT 1 FROM public.mesa_bloqueios b WHERE (b.autor=$1 AND b.alvo=c.mestre) OR(b.alvo=$1 AND b.autor=c.mestre)) ORDER BY c.id DESC LIMIT 100`,[u.id]);res.json(r.rows);
+}));
+app.post('/api/comunidade/campanhas',asyncHandler(async(req,res)=>{
+ const u=await socialUsuario(req,res);if(!u)return;
+ const {titulo,descricao=''}=req.body||{};
+ if(typeof titulo!=='string'||!titulo.trim()||titulo.length>100||typeof descricao!=='string'||descricao.length>1000)return res.status(400).json({erro:'Título ou descrição inválida.'});
+ const {pool}=require('./postgres');const client=await pool.connect();
+ try{await client.query('BEGIN');await client.query("SELECT pg_advisory_xact_lock(hashtextextended('mesa-campanhas:'||$1::text,0))",[u.id]);
+ const n=await client.query('SELECT count(*)::int AS n FROM public.mesa_campanhas_online WHERE mestre=$1 AND NOT encerrada',[u.id]);
+ if(n.rows[0].n>=5){await client.query('ROLLBACK');return res.status(409).json({erro:'Limite de cinco campanhas ativas.'});}
+ const r=await client.query('INSERT INTO public.mesa_campanhas_online(mestre,titulo,descricao) VALUES($1,$2,$3) RETURNING id::text AS id',[u.id,titulo.trim(),descricao.trim()]);
+ await client.query("INSERT INTO public.mesa_campanha_membros(campanha_id,usuario_id,estado) VALUES($1,$2,'ativo')",[r.rows[0].id,u.id]);await client.query('COMMIT');res.json(r.rows[0]);
+ }catch(e){await client.query('ROLLBACK').catch(()=>{});throw e;}finally{client.release();}
+}));
+async function comCampanha(req,res,fn){
+ const u=await socialUsuario(req,res);if(!u)return;
+ const id=String(req.params.id);if(!/^[1-9][0-9]{0,17}$/.test(id))return res.status(400).json({erro:'Campanha inválida.'});
+ const {pool}=require('./postgres');const client=await pool.connect();
+ try{await client.query('BEGIN');
+ const r=await client.query(`SELECT c.*,m.estado,c.mestre=$2 AS minha FROM public.mesa_campanhas_online c JOIN public.mesa_campanha_membros m ON m.campanha_id=c.id AND m.usuario_id=$2 WHERE c.id=$1 FOR UPDATE OF c`,[id,u.id]);
+ if(!r.rowCount){await client.query('ROLLBACK');return res.status(404).json({erro:'Campanha indisponível.'});}
+ const sala=r.rows[0];
+ const bloqueio=await client.query(`SELECT 1 FROM public.mesa_campanha_membros m JOIN public.mesa_bloqueios b ON (b.autor=$2 AND b.alvo=m.usuario_id) OR(b.alvo=$2 AND b.autor=m.usuario_id) WHERE m.campanha_id=$1 AND m.estado='ativo' LIMIT 1`,[id,u.id]);
+ const resultado=await fn(client,sala,u,!!bloqueio.rowCount);
+ await client.query('COMMIT');res.status(resultado.status||200).json(resultado.dados);
+ }catch(e){await client.query('ROLLBACK').catch(()=>{});throw e;}finally{client.release();}
+}
+const campanhaErro=(erro,status=403)=>({status,dados:{erro}});
+app.get('/api/comunidade/campanhas/:id',asyncHandler(async(req,res)=>{
+ const depois=req.query.depois;if(depois!==undefined&&!/^[1-9][0-9]{0,17}$/.test(String(depois)))return res.status(400).json({erro:'Cursor inválido.'});
+ await comCampanha(req,res,async(client,s,u,bloqueado)=>{
+ if(s.estado!=='ativo'||bloqueado)return campanhaErro('Acesso à campanha indisponível.');
+ const membros=await client.query(`SELECT p.apelido,m.estado,m.usuario_id=$2 AS eu,m.usuario_id=$3 AS mestre FROM public.mesa_campanha_membros m JOIN public.mesa_perfis p ON p.usuario_id=m.usuario_id WHERE m.campanha_id=$1 AND (m.estado='ativo' OR $4::boolean) ORDER BY mestre DESC,p.apelido`,[s.id,u.id,s.mestre,s.minha]);
+ const eventos=await client.query(`SELECT e.id::text AS id,e.tipo,e.texto,e.efeito,e.cor,e.criado_em,p.apelido FROM public.mesa_campanha_eventos e JOIN public.mesa_perfis p ON p.usuario_id=e.autor WHERE e.campanha_id=$1 AND ($2::bigint IS NULL OR e.id>$2::bigint) ORDER BY e.id ${depois?'ASC':'DESC'} LIMIT 80`,[s.id,depois??null]);
+ return {dados:{titulo:s.titulo,descricao:s.descricao,minha:s.minha,encerrada:s.encerrada,membros:membros.rows,eventos:depois?eventos.rows:eventos.rows.reverse()}};
+ });
+}));
+app.post('/api/comunidade/campanhas/:id/membros',asyncHandler(async(req,res)=>{
+ const {acao,apelido}=req.body||{};
+ if(!['convidar','aceitar','sair','remover','encerrar'].includes(acao))return res.status(400).json({erro:'Ação inválida.'});
+ await comCampanha(req,res,async(client,s,u,bloqueado)=>{
+ if(acao==='sair'&&!s.minha){await client.query('DELETE FROM public.mesa_campanha_membros WHERE campanha_id=$1 AND usuario_id=$2',[s.id,u.id]);return {dados:{ok:true}};}
+ if(acao==='encerrar'&&s.minha){await client.query('UPDATE public.mesa_campanhas_online SET encerrada=true WHERE id=$1',[s.id]);return {dados:{ok:true}};}
+ if(s.encerrada)return campanhaErro('Campanha encerrada.');
+ if(acao==='aceitar'&&s.estado==='convidado'&&!bloqueado){
+ const a=await client.query("SELECT 1 FROM public.mesa_amizades WHERE a=least($1::bigint,$2::bigint) AND b=greatest($1::bigint,$2::bigint) AND estado='aceita'",[u.id,s.mestre]);
+ if(!a.rowCount)return campanhaErro('Convite indisponível.');
+ await client.query("UPDATE public.mesa_campanha_membros SET estado='ativo' WHERE campanha_id=$1 AND usuario_id=$2",[s.id,u.id]);return {dados:{ok:true}};}
+ if(!s.minha||!apelidoValido(apelido)||!['convidar','remover'].includes(acao))return campanhaErro('Operação não autorizada.');
+ const p=(await client.query('SELECT usuario_id FROM public.mesa_perfis WHERE lower(apelido)=lower($1)',[apelido])).rows[0];
+ if(!p||String(p.usuario_id)===String(u.id))return campanhaErro('Jogador indisponível.',404);
+ if(acao==='remover'){await client.query('DELETE FROM public.mesa_campanha_membros WHERE campanha_id=$1 AND usuario_id=$2',[s.id,p.usuario_id]);return {dados:{ok:true}};}
+ if(bloqueado)return campanhaErro('Resolva o bloqueio de participantes antes de convidar.');
+ const a=await client.query("SELECT 1 FROM public.mesa_amizades WHERE a=least($1::bigint,$2::bigint) AND b=greatest($1::bigint,$2::bigint) AND estado='aceita' AND NOT EXISTS(SELECT 1 FROM public.mesa_bloqueios WHERE (autor=$1 AND alvo=$2) OR(autor=$2 AND alvo=$1))",[u.id,p.usuario_id]);
+ if(!a.rowCount)return campanhaErro('Convide somente amigos aceitos.');
+ const n=await client.query('SELECT count(*)::int AS n FROM public.mesa_campanha_membros WHERE campanha_id=$1',[s.id]);
+ if(n.rows[0].n>=8)return campanhaErro('Limite de oito participantes, incluindo o mestre.',409);
+ await client.query("INSERT INTO public.mesa_campanha_membros(campanha_id,usuario_id,estado) VALUES($1,$2,'convidado') ON CONFLICT DO NOTHING",[s.id,p.usuario_id]);return {dados:{ok:true}};
+ });
+}));
+app.post('/api/comunidade/campanhas/:id/eventos',asyncHandler(async(req,res)=>{
+ const {tipo,texto='',efeito='nenhum',cor='vermelho',chave,faces}=req.body||{};
+ if(!['narracao','acao','fala','dado'].includes(tipo)||typeof texto!=='string'||texto.length>2000||(tipo!=='dado'&&!texto.trim())||!campanhaEfeitos.includes(efeito)||!campanhaCores.includes(cor)||typeof chave!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(chave)||(tipo==='dado'&&![4,6,8,10,12,20,100].includes(faces)))return res.status(400).json({erro:'Evento inválido.'});
+ await comCampanha(req,res,async(client,s,u,bloqueado)=>{
+ if(s.estado!=='ativo'||s.encerrada||bloqueado||(!s.minha&&(tipo==='narracao'||efeito!=='nenhum'))||(tipo!=='narracao'&&efeito!=='nenhum'))return campanhaErro('Evento não autorizado.');
+ const antigo=await client.query('SELECT campanha_id,id::text AS id FROM public.mesa_campanha_eventos WHERE autor=$1 AND chave=$2',[u.id,chave]);
+ if(antigo.rowCount)return String(antigo.rows[0].campanha_id)===String(s.id)?{dados:{id:antigo.rows[0].id}}:campanhaErro('Identificador já utilizado.',409);
+ const n=await client.query("SELECT count(*)::int AS n FROM public.mesa_campanha_eventos WHERE autor=$1 AND criado_em>now()-interval '1 minute'",[u.id]);
+ if(n.rows[0].n>=20)return campanhaErro('Aguarde um minuto antes de enviar mais eventos.',429);
+ const conteudo=tipo==='dado'?'Rolou d'+faces+': '+require('crypto').randomInt(1,faces+1):texto.trim();
+ const r=await client.query('INSERT INTO public.mesa_campanha_eventos(campanha_id,autor,chave,tipo,texto,efeito,cor) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id::text AS id',[s.id,u.id,chave,tipo,conteudo,efeito,cor]);return {dados:r.rows[0]};
+ });
+}));
 app.get('/api/conta/perfil',asyncHandler(async(req,res)=>{
  const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
  const r=await query('SELECT nome, tratamento, apelido,bio,encontravel, foto IS NOT NULL AS tem_foto FROM public.mesa_perfis WHERE usuario_id=$1',[u.id]);
