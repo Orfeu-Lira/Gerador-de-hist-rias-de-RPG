@@ -43,16 +43,16 @@
   </header>
   <button id="menu-abrir-mobile" class="menu-abrir-mobile" type="button" aria-label="Abrir menu lateral" aria-expanded="false" aria-controls="menu-lateral">☰ <span>Menu</span></button>
   <button id="menu-fundo" class="menu-fundo" type="button" aria-label="Fechar menu lateral" hidden></button>
-  <!-- Notificações privadas de suporte: exibidas apenas após confirmar papel admin no servidor. -->
+  <!-- Central de notificações: comunidade para usuários autenticados, suporte apenas para administradores. -->
   <div class="mesa-notificacoes" id="mesa-notificacoes" hidden>
-    <button id="notificacoes-abrir" class="notificacoes-abrir" type="button" aria-label="Abrir notificações de suporte" aria-expanded="false" aria-controls="notificacoes-painel" title="Notificações de suporte">
+    <button id="notificacoes-abrir" class="notificacoes-abrir" type="button" aria-label="Abrir notificações" aria-expanded="false" aria-controls="notificacoes-painel" title="Notificações">
       <span aria-hidden="true">♧</span><span class="notificacoes-contador" id="notificacoes-contador" hidden>0</span>
     </button>
     <div class="notificacoes-painel" id="notificacoes-painel" hidden>
       <div class="notificacoes-cabecalho"><div><span class="sobretitulo">CENTRAL DO MESTRE</span><h2>Notificações</h2></div><button type="button" id="notificacoes-fechar" aria-label="Fechar notificações">×</button></div>
-      <p id="notificacoes-estado" role="status" class="suave">Consultando novos chamados...</p>
+      <p id="notificacoes-estado" role="status" class="suave">Consultando avisos...</p>
       <div id="notificacoes-lista" class="notificacoes-lista"></div>
-      <div class="notificacoes-acoes"><button type="button" id="notificacoes-ler-todas">Marcar todas como lidas</button><button type="button" id="notificacoes-ir-suporte">Abrir suporte ↗</button></div>
+      <div class="notificacoes-acoes"><button type="button" id="notificacoes-ler-todas" hidden>Marcar chamados como lidos</button><button type="button" id="notificacoes-ir-suporte" hidden>Abrir suporte ↗</button></div>
       <p class="notificacoes-legenda">Avisos dentro do Mesa enquanto você estiver conectado. E-mails e notificações do sistema ficam para uma próxima etapa.</p>
     </div>
   </div>
@@ -619,7 +619,7 @@
 <script src="./dice-rules.js"></script>
 <script src="./email-validation.js"></script>
 <dialog id="mesa-denuncia-dialog" aria-labelledby="mesa-denuncia-titulo"><form id="mesa-denuncia-form" class="formulario"><h2 id="mesa-denuncia-titulo">Enviar denúncia</h2><p id="mesa-denuncia-alvo"></p><label for="mesa-denuncia-motivo">Motivo</label><select id="mesa-denuncia-motivo" required><option value="assedio">Assédio</option><option value="ameaca">Ameaça</option><option value="spam">Spam</option><option value="discriminacao">Discriminação</option><option value="outro">Outro</option></select><label for="mesa-denuncia-detalhes">Detalhes (opcional)</label><textarea id="mesa-denuncia-detalhes" maxlength="1000" rows="4"></textarea><p class="suave">A denúncia e, se selecionada, a mensagem denunciada serão encaminhadas à moderação. Nenhuma punição é automática.</p><p id="mesa-denuncia-status" role="status" aria-live="polite"></p><button type="submit" class="principal">Enviar denúncia</button><button id="mesa-denuncia-cancelar" type="button">Cancelar</button></form></dialog>
-<script src="./app.js?v=portal14"></script>
+<script src="./app.js?v=portal15"></script>
 
 </body>
 </html>
