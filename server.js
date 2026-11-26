@@ -84,6 +84,7 @@ const GENEROS = ['Fantasia sombria','Fantasia épica','D&D clássico','Ficção 
 const TONS = ['Misterioso','Aventureiro','Sombrio','Leve e bem-humorado','Tenso'];
 const HASH_FALSO = bcrypt.hashSync('senha-falsa-para-proteger-tempo-de-resposta', 12);
 const emailValido = require('./public/email-validation.js');
+const tratamentosMesa=['masculino','feminino','nao_binario','neutro'];
 const senhaValida = s => typeof s === 'string' && s.length >= 8 && s.length <= 72;
 const asyncHandler = f => (req,res,next) => Promise.resolve(f(req,res,next)).catch(next);
 const atual = async req => {
@@ -148,7 +149,8 @@ const exigirLimiteAuth=async(req,res,classe,email='')=>{
 app.use('/api',(req,res,next)=>{res.set('Cache-Control','no-store');next();});
 app.post('/api/cadastro', asyncHandler(async(req,res) => {
   if(!await exigirLimiteAuth(req,res,'cadastro'))return;
-  const {email,senha,tokenBootstrap,aceiteTermos} = req.body || {};
+  const {email,senha,tokenBootstrap,aceiteTermos,tratamento='neutro'} = req.body || {};
+  if(!tratamentosMesa.includes(tratamento))return res.status(400).json({erro:'Preferência de tratamento inválida.'});
   if(aceiteTermos!==true)return res.status(400).json({erro:'Leia e aceite os Termos de Uso para criar sua conta.'});
   if (!emailValido(email) || !senhaValida(senha)) return res.status(400).json({erro:'Use um e-mail válido e senha de 8 a 72 caracteres.'});
   const hash = await bcrypt.hash(senha,12);
@@ -163,6 +165,7 @@ app.post('/api/cadastro', asyncHandler(async(req,res) => {
     const r = await client.query("INSERT INTO public.usuarios(email,senha_hash,papel,termos_aceitos_em,termos_versao) VALUES($1,$2,$3,now(),'2026-11-12') RETURNING id",
       [email.trim().toLowerCase(),hash,admin ? 'admin':'usuario']);
     id = Number(r.rows[0].id);
+    await client.query('INSERT INTO public.mesa_perfis(usuario_id,tratamento) VALUES($1,$2)',[id,tratamento]);
     await client.query('COMMIT');
   } catch(e) {
     await client.query('ROLLBACK');
@@ -286,19 +289,21 @@ app.post('/api/logout', (req,res,next) => {
 });
 app.get('/api/eu',asyncHandler(async(req,res) => {
   const u = await atual(req);
-  res.json({logado:!!u,email:u?.email||null,papel:u?.papel||null,restantes:await restantes(req,u)});
+  const perfil=u?(await query('SELECT nome,tratamento FROM public.mesa_perfis WHERE usuario_id=$1',[u.id])).rows[0]:null;
+  res.json({logado:!!u,email:u?.email||null,papel:u?.papel||null,restantes:await restantes(req,u),nome:perfil?.nome||'',tratamento:perfil?.tratamento||'neutro'});
 }));
 // Perfil privado: sempre derivado da sessão, nunca de um ID enviado pelo cliente.
 app.get('/api/conta/perfil',asyncHandler(async(req,res)=>{
  const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
- const r=await query('SELECT nome, foto IS NOT NULL AS tem_foto FROM public.mesa_perfis WHERE usuario_id=$1',[u.id]);
- res.json({nome:r.rows[0]?.nome||'',temFoto:!!r.rows[0]?.tem_foto,email:u.email,restantes:await restantes(req,u),limite:u.papel==='admin'?null:5});
+ const r=await query('SELECT nome, tratamento, foto IS NOT NULL AS tem_foto FROM public.mesa_perfis WHERE usuario_id=$1',[u.id]);
+ res.json({nome:r.rows[0]?.nome||'',tratamento:r.rows[0]?.tratamento||'neutro',temFoto:!!r.rows[0]?.tem_foto,email:u.email,restantes:await restantes(req,u),limite:u.papel==='admin'?null:5});
 }));
 app.post('/api/conta/perfil',asyncHandler(async(req,res)=>{
  const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
- const nome=req.body?.nome;
+ const nome=req.body?.nome,tratamento=req.body?.tratamento;
+ if(tratamento!==undefined&&!tratamentosMesa.includes(tratamento))return res.status(400).json({erro:'Preferência de tratamento inválida.'});
  if(typeof nome!=='string'||nome.trim().length>80)return res.status(400).json({erro:'Use um nome de até 80 caracteres.'});
- await query('INSERT INTO public.mesa_perfis(usuario_id,nome) VALUES($1,$2) ON CONFLICT(usuario_id) DO UPDATE SET nome=EXCLUDED.nome,atualizado_em=now()',[u.id,nome.trim()]);
+ await query("INSERT INTO public.mesa_perfis(usuario_id,nome,tratamento) VALUES($1,$2,COALESCE($3,'neutro')) ON CONFLICT(usuario_id) DO UPDATE SET nome=EXCLUDED.nome,tratamento=COALESCE($3,public.mesa_perfis.tratamento),atualizado_em=now()",[u.id,nome.trim(),tratamento??null]);
  res.json({ok:true});
 }));
 app.post('/api/conta/perfil/foto',asyncHandler(async(req,res)=>{
@@ -327,7 +332,7 @@ app.get('/api/conta/meus-dados',asyncHandler(async(req,res)=>{
  const u=await atual(req);
  if(!u)return res.status(401).json({erro:'Entre na sua conta para exportar seus dados.'});
  const [perfil,aventuras,personagens,npcs,campanhas,mensagens,suporte]=await Promise.all([
-  query('SELECT u.email,u.papel,u.criado_em,u.ultimo_login_em,u.termos_aceitos_em,u.termos_versao,p.nome AS nome_exibicao FROM public.usuarios u LEFT JOIN public.mesa_perfis p ON p.usuario_id=u.id WHERE u.id=$1',[u.id]),
+  query('SELECT u.email,u.papel,u.criado_em,u.ultimo_login_em,u.termos_aceitos_em,u.termos_versao,p.nome AS nome_exibicao,p.tratamento FROM public.usuarios u LEFT JOIN public.mesa_perfis p ON p.usuario_id=u.id WHERE u.id=$1',[u.id]),
   query('SELECT id,genero,tom,jogadores,conteudo,criado_em FROM public.aventuras WHERE usuario_id=$1 ORDER BY id DESC LIMIT 1000',[u.id]),
   query('SELECT id,nome,dados,criado_em,atualizado_em FROM public.personagens_dnd WHERE usuario_id=$1 ORDER BY id DESC LIMIT 1000',[u.id]),
   query('SELECT id,aventura_id,conteudo,criado_em FROM public.mesa_npcs WHERE usuario_id=$1 ORDER BY id DESC LIMIT 1000',[u.id]),
