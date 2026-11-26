@@ -1,6 +1,7 @@
 // Mesa — backend Express preparado para Vercel com PostgreSQL/Supabase.
 const crypto = require('crypto');
 const comunidadeUtil=require('./comunidade-util');
+const avisosSociais=require('./avisos-sociais');
 const perfilSessao=require('./perfil-sessao');
 const express = require('express');
 const session = require('express-session');
@@ -494,27 +495,41 @@ async function avisosCotas(u){
 }
 app.get('/api/comunidade/notificacoes',asyncHandler(async(req,res)=>{
  const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
- const r=await query(`WITH amigos AS (SELECT CASE WHEN a=$1 THEN b ELSE a END AS pessoa,estado,solicitante FROM public.mesa_amizades WHERE $1 IN(a,b)),
- permitidos AS (SELECT a.* FROM amigos a JOIN public.usuarios v ON v.id=a.pessoa WHERE (v.bloqueado_ate IS NULL OR v.bloqueado_ate<=now()) AND NOT EXISTS(SELECT 1 FROM public.mesa_bloqueios b WHERE (b.autor=$1 AND b.alvo=a.pessoa) OR(b.alvo=$1 AND b.autor=a.pessoa)))
- SELECT (SELECT count(*)::int FROM permitidos WHERE estado='pendente' AND solicitante<>$1) AS solicitacoes,
- (SELECT COALESCE(json_agg(p.apelido ORDER BY p.apelido),'[]'::json) FROM permitidos a JOIN public.mesa_perfis p ON p.usuario_id=a.pessoa WHERE a.estado='pendente' AND a.solicitante<>$1) AS solicitantes,
- (SELECT count(*)::int FROM public.mesa_mensagens_privadas m JOIN permitidos a ON a.pessoa=m.remetente AND a.estado='aceita' WHERE m.destinatario=$1 AND m.lida_em IS NULL) AS mensagens,
- (SELECT count(*)::int FROM public.mesa_fichas_compartilhadas f JOIN public.personagens_dnd p ON p.id=f.personagem_id JOIN permitidos a ON a.pessoa=p.usuario_id AND a.estado='aceita' WHERE f.destinatario=$1 AND f.vista_em IS NULL) AS fichas,
- (SELECT count(*)::int FROM public.mesa_campanha_membros m JOIN public.mesa_campanhas_online c ON c.id=m.campanha_id JOIN permitidos a ON a.pessoa=c.mestre AND a.estado='aceita' WHERE m.usuario_id=$1 AND m.estado='convidado' AND NOT c.encerrada) AS convites,
- (SELECT CASE WHEN $2::boolean THEN count(*)::int ELSE 0 END FROM public.mesa_denuncias WHERE estado='pendente') AS denuncias`,[u.id,u.papel==='admin']);
+ const r=await query(avisosSociais.listar,[u.id,u.papel==='admin']);
  await avisosCotas(u);
- const avisos=await query("SELECT id::text,tipo,dados,criado_em,lido_em IS NOT NULL AS lido FROM public.mesa_avisos_conta WHERE usuario_id=$1 ORDER BY (lido_em IS NULL) DESC,id DESC LIMIT 50",[u.id]);
- const total=(await query('SELECT count(*)::int AS n FROM public.mesa_avisos_conta WHERE usuario_id=$1 AND lido_em IS NULL',[u.id])).rows[0].n;
- res.json({...r.rows[0],avisos:avisos.rows,avisosNaoLidos:total,iaIlimitada:iaIlimitada(u),restantes:await restantes(req,u)});
+ const avisos=await query("SELECT id::text,tipo,dados,criado_em,lido_em IS NOT NULL AS lido FROM public.mesa_avisos_conta WHERE usuario_id=$1 AND dispensado_em IS NULL ORDER BY (lido_em IS NULL) DESC,id DESC LIMIT 50",[u.id]);
+ const total=(await query('SELECT count(*)::int AS n FROM public.mesa_avisos_conta WHERE usuario_id=$1 AND lido_em IS NULL AND dispensado_em IS NULL',[u.id])).rows[0].n;
+ const lidos=(await query('SELECT count(*)::int AS n FROM public.mesa_avisos_conta WHERE usuario_id=$1 AND lido_em IS NOT NULL AND dispensado_em IS NULL',[u.id])).rows[0].n;
+ res.json({...r.rows[0],avisos:avisos.rows,avisosNaoLidos:total,avisosLidos:lidos,iaIlimitada:iaIlimitada(u),restantes:await restantes(req,u)});
 }));
 app.post('/api/comunidade/notificacoes/ler-todas',asyncHandler(async(req,res)=>{
  const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
- await query('UPDATE public.mesa_avisos_conta SET lido_em=now() WHERE usuario_id=$1 AND lido_em IS NULL',[u.id]);res.json({ok:true});
+ await query('UPDATE public.mesa_avisos_conta SET lido_em=now() WHERE usuario_id=$1 AND lido_em IS NULL AND dispensado_em IS NULL',[u.id]);res.json({ok:true});
+}));
+app.post('/api/comunidade/notificacoes/limpar',asyncHandler(async(req,res)=>{
+ const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
+ const modo=req.body?.modo;if(!['lidas','todas'].includes(modo))return res.status(400).json({erro:'Escolha quais avisos remover.'});
+ const {pool}=require('./postgres'),client=await pool.connect();
+ try{await client.query('BEGIN');
+  await client.query('UPDATE public.mesa_avisos_conta SET dispensado_em=now() WHERE usuario_id=$1 AND dispensado_em IS NULL AND ($2::boolean OR lido_em IS NOT NULL)',[u.id,modo==='todas']);
+  if(modo==='todas')await client.query(avisosSociais.descartar,[u.id,u.papel==='admin',null]);
+  await client.query('COMMIT');res.json({ok:true});
+ }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
+}));
+app.post('/api/comunidade/notificacoes/social/dispensar',asyncHandler(async(req,res)=>{
+ const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
+ const categoria=req.body?.categoria;if(!avisosSociais.categorias.includes(categoria)||(categoria==='denuncias'&&u.papel!=='admin'))return res.status(400).json({erro:'Categoria inválida.'});
+ await query(avisosSociais.descartar,[u.id,u.papel==='admin',categoria]);res.json({ok:true});
+}));
+app.delete('/api/comunidade/notificacoes/:id',asyncHandler(async(req,res)=>{
+ const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
+ const id=String(req.params.id);if(!/^[1-9][0-9]{0,18}$/.test(id))return res.status(400).json({erro:'Aviso inválido.'});
+ const r=await query('UPDATE public.mesa_avisos_conta SET dispensado_em=COALESCE(dispensado_em,now()) WHERE id=$1 AND usuario_id=$2 RETURNING id',[id,u.id]);if(!r.rowCount)return res.status(404).json({erro:'Aviso não encontrado.'});res.json({ok:true});
 }));
 app.post('/api/comunidade/notificacoes/:id/ler',asyncHandler(async(req,res)=>{
  const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
  const id=String(req.params.id);if(!/^[1-9][0-9]{0,18}$/.test(id))return res.status(400).json({erro:'Aviso inválido.'});
- const r=await query('UPDATE public.mesa_avisos_conta SET lido_em=COALESCE(lido_em,now()) WHERE id=$1 AND usuario_id=$2 RETURNING id',[id,u.id]);if(!r.rowCount)return res.status(404).json({erro:'Aviso não encontrado.'});res.json({ok:true});
+ const r=await query('UPDATE public.mesa_avisos_conta SET lido_em=COALESCE(lido_em,now()) WHERE id=$1 AND usuario_id=$2 AND dispensado_em IS NULL RETURNING id',[id,u.id]);if(!r.rowCount)return res.status(404).json({erro:'Aviso não encontrado.'});res.json({ok:true});
 }));
 app.post('/api/comunidade/fichas/vistas',asyncHandler(async(req,res)=>{
  const u=await socialUsuario(req,res);if(!u)return;
@@ -1639,20 +1654,36 @@ app.patch('/api/admin/conteudos/:id',asyncHandler(async(req,res)=>{
 }));
 // Avisos administrativos de chamados: consulta derivada dos tickets, leitura por administrador.
 app.get('/api/admin/notificacoes',asyncHandler(async(req,res)=>{
- const [lista,total]=await Promise.all([
+ const [lista,total,lidos]=await Promise.all([
   query(`SELECT c.id,c.assunto,c.criado_em,u.email,
        (l.chamado_id IS NOT NULL) AS lido
        FROM public.mesa_chamados c
        JOIN public.usuarios u ON u.id=c.usuario_id
        LEFT JOIN public.mesa_notificacoes_lidas l ON l.chamado_id=c.id AND l.administrador_id=$1
-       ORDER BY c.criado_em DESC,c.id DESC LIMIT 50`,[req.admin.id]),
+       WHERE l.dispensado_em IS NULL ORDER BY c.criado_em DESC,c.id DESC LIMIT 50`,[req.admin.id]),
   query(`SELECT COUNT(*)::int AS total
          FROM public.mesa_chamados c
          LEFT JOIN public.mesa_notificacoes_lidas l ON l.chamado_id=c.id AND l.administrador_id=$1
-         WHERE l.chamado_id IS NULL`,[req.admin.id])
+         WHERE l.chamado_id IS NULL`,[req.admin.id]),
+  query('SELECT count(*)::int AS total FROM public.mesa_notificacoes_lidas WHERE administrador_id=$1 AND dispensado_em IS NULL',[req.admin.id])
  ]);
  res.set('Cache-Control','private, no-store');
- res.json({naoLidas:total.rows[0].total,itens:lista.rows});
+ res.json({naoLidas:total.rows[0].total,lidas:lidos.rows[0].total,itens:lista.rows});
+}));
+app.delete('/api/admin/notificacoes/:id',asyncHandler(async(req,res)=>{
+ const id=idPositivo(req.params.id);if(!id)return res.status(400).json({erro:'Notificação inválida.'});
+ const r=await query(`INSERT INTO public.mesa_notificacoes_lidas(administrador_id,chamado_id,dispensado_em)
+ SELECT $1,id,now() FROM public.mesa_chamados WHERE id=$2
+ ON CONFLICT(administrador_id,chamado_id) DO UPDATE SET dispensado_em=COALESCE(public.mesa_notificacoes_lidas.dispensado_em,now()) RETURNING chamado_id`,[req.admin.id,id]);
+ if(!r.rowCount)return res.status(404).json({erro:'Notificação não encontrada.'});res.json({ok:true});
+}));
+app.post('/api/admin/notificacoes/limpar',asyncHandler(async(req,res)=>{
+ const modo=req.body?.modo;if(!['lidas','todas'].includes(modo))return res.status(400).json({erro:'Escolha quais avisos remover.'});
+ if(modo==='lidas')await query('UPDATE public.mesa_notificacoes_lidas SET dispensado_em=now() WHERE administrador_id=$1 AND dispensado_em IS NULL',[req.admin.id]);
+ else await query(`INSERT INTO public.mesa_notificacoes_lidas(administrador_id,chamado_id,dispensado_em)
+ SELECT $1,id,now() FROM public.mesa_chamados
+ ON CONFLICT(administrador_id,chamado_id) DO UPDATE SET dispensado_em=COALESCE(public.mesa_notificacoes_lidas.dispensado_em,now())`,[req.admin.id]);
+ res.json({ok:true});
 }));
 app.post('/api/admin/notificacoes/:id/ler',asyncHandler(async(req,res)=>{
  const id=idPositivo(req.params.id);

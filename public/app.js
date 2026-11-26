@@ -344,15 +344,17 @@ function notificacoesFechar(devolverFoco=false){
  $('notificacoes-abrir').setAttribute('aria-expanded','false');
  if(devolverFoco)$('notificacoes-abrir').focus();
 }
+let notificacoesMutacao=false,notificacoesRecarregar=false;
+async function notificacoesAcao(fn){if(notificacoesMutacao||!eu.logado)return;const sessao=eu.perfilSessao;notificacoesMutacao=true;try{await fn();if(eu.perfilSessao===sessao){notificacoesUltimoCarregamento=0;notificacoesRecarregar=true;}}catch(e){if(eu.perfilSessao===sessao)$('notificacoes-estado').textContent=e.message;}finally{notificacoesMutacao=false;if(notificacoesRecarregar&&!notificacoesEmAndamento){notificacoesRecarregar=false;await notificacoesAtualizar(true);}}}
 async function notificacoesAtualizar(force=false){
  if(!eu.logado||!navigator.onLine)return;
- if(notificacoesEmAndamento)return;
+ if(notificacoesMutacao||notificacoesEmAndamento){if(force)notificacoesRecarregar=true;return;}
  if(!force&&Date.now()-notificacoesUltimoCarregamento<18000)return;
  notificacoesEmAndamento=true;
  try{
   const sessao=eu.perfilSessao,admin=eu.papel==='admin';
   const [social,data]=await Promise.all([api('/api/comunidade/notificacoes'),admin?api('/api/admin/notificacoes'):Promise.resolve({naoLidas:0,itens:[]})]);
-  if(!eu.logado||eu.perfilSessao!==sessao||admin!==(eu.papel==='admin'))return;
+  if(!eu.logado||eu.perfilSessao!==sessao||admin!==(eu.papel==='admin')||notificacoesMutacao)return;
   notificacoesUltimoCarregamento=Date.now();
   const totalSuporte=Number(data.naoLidas)||0,totalConta=Number(social.avisosNaoLidos)||0;
   eu.iaIlimitada=social.iaIlimitada===true;eu.restantes=social.restantes;$('info').textContent=textoInfo();
@@ -369,7 +371,8 @@ async function notificacoesAtualizar(force=false){
    const card=add('article',lista,'','notificacoes-item nao-lida');
    add('strong',card,n);add('p',card,String(social[k])+' pendente(s)','suave');
    if(k==='solicitacoes'&&Array.isArray(social.solicitantes))for(const apelido of social.solicitantes.slice(0,20))add('p',card,apelido+' enviou uma solicitação de amizade.');
-   botaoAdmin(card,'Abrir',()=>{notificacoesFechar();if(k==='denuncias')adminSecao='moderacao';navegarMesa(tela);});
+   const linha=add('div',card,'','notificacoes-item-acoes');botaoAdmin(linha,'Abrir',()=>{notificacoesFechar();if(k==='denuncias')adminSecao='moderacao';navegarMesa(tela);});
+   botaoAdmin(linha,'Remover avisos',()=>notificacoesAcao(()=>api('/api/comunidade/notificacoes/social/dispensar','POST',{categoria:k}))).classList.add('notificacoes-remover');
   }
   if(social.avisos?.length)add('h3',lista,'Avisos da sua conta');
   for(const item of social.avisos||[]){
@@ -381,6 +384,7 @@ async function notificacoesAtualizar(force=false){
    const linha=add('div',card,'','notificacoes-item-acoes');
    const ler=async()=>{if(!item.lido)await api('/api/comunidade/notificacoes/'+item.id+'/ler','POST',{});};
    if(!item.lido)botaoAdmin(linha,'Marcar como lida',async()=>{try{await ler();await notificacoesAtualizar(true);}catch(e){estado.textContent=e.message;}});
+   botaoAdmin(linha,'Remover',()=>notificacoesAcao(()=>api('/api/comunidade/notificacoes/'+item.id,'DELETE'))).classList.add('notificacoes-remover');
    botaoAdmin(linha,msg[3],async()=>{try{await ler();notificacoesFechar();navegarMesa(msg[2]);notificacoesAtualizar(true);}catch(e){estado.textContent=e.message;}});
   }
   if(admin&&data.itens.length)add('h3',lista,'Suporte administrativo');
@@ -393,6 +397,7 @@ async function notificacoesAtualizar(force=false){
     try{await api('/api/admin/notificacoes/'+item.id+'/ler','POST',{});notificacoesUltimoCarregamento=0;await notificacoesAtualizar(true);}
     catch(e){estado.textContent=e.message;}
    });
+   botaoAdmin(linha,'Remover',()=>notificacoesAcao(()=>api('/api/admin/notificacoes/'+item.id,'DELETE'))).classList.add('notificacoes-remover');
    botaoAdmin(linha,'Atender ↗',async()=>{
     try{
      if(!item.lido)await api('/api/admin/notificacoes/'+item.id+'/ler','POST',{});
@@ -400,10 +405,11 @@ async function notificacoesAtualizar(force=false){
     }catch(e){estado.textContent=e.message;}
    });
   }
+  const lidos=(Number(social.avisosLidos)||0)+(Number(data.lidas)||0);$('notificacoes-limpar-lidas').disabled=lidos===0;$('notificacoes-limpar-todas').disabled=quantidade+lidos===0;if(!lista.children.length)lista.append(el('p','Sua caixa de notificações está vazia.','suave'));
   $('notificacoes-ler-todas').disabled=totalSuporte+totalConta===0;$('notificacoes-ler-todas').textContent=admin?'Marcar avisos da conta e suporte como lidos':'Marcar avisos da conta como lidos';
  }catch(e){
   $('notificacoes-estado').textContent='Não foi possível atualizar os avisos. '+e.message;
- }finally{notificacoesEmAndamento=false;}
+ }finally{notificacoesEmAndamento=false;if(notificacoesRecarregar&&!notificacoesMutacao){notificacoesRecarregar=false;notificacoesAtualizar(true);}}
 }
 $('notificacoes-abrir').onclick=()=>{
  notificacoesAberto=!notificacoesAberto;
@@ -416,6 +422,7 @@ $('notificacoes-ler-todas').onclick=async()=>{
  try{await api('/api/comunidade/notificacoes/ler-todas','POST',{});if(eu.papel==='admin')await api('/api/admin/notificacoes/ler-todas','POST',{});notificacoesUltimoCarregamento=0;await notificacoesAtualizar(true);}
  catch(e){$('notificacoes-estado').textContent=e.message;}
 };
+for(const [id,modo] of [['notificacoes-limpar-lidas','lidas'],['notificacoes-limpar-todas','todas']])$(id).onclick=()=>{if(modo==='todas'&&!confirm('Remover todos os avisos atuais da caixa? Mensagens, solicitações, convites e chamados continuarão disponíveis nas respectivas abas.'))return;const sessao=eu.perfilSessao,admin=eu.papel==='admin';notificacoesAcao(async()=>{await api('/api/comunidade/notificacoes/limpar','POST',{modo});if(admin&&eu.perfilSessao===sessao)await api('/api/admin/notificacoes/limpar','POST',{modo});});};
 $('notificacoes-ir-suporte').onclick=()=>{notificacoesFechar();adminSecao='suporte';mostrar('admin');};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&notificacoesAberto)notificacoesFechar(true);});
 document.addEventListener('pointerdown',e=>{if(notificacoesAberto&&!e.target.closest('#mesa-notificacoes'))notificacoesFechar();});
@@ -425,7 +432,7 @@ function notificacoesSessao(){
  $('mesa-notificacoes').hidden=!ativo;
  if(!ativo){
   fecharAvatarAmpliado();notificacoesFechar();notificacoesUltimoCarregamento=0;
-  $('notificacoes-contador').hidden=true;$('notificacoes-lista').replaceChildren();
+  notificacoesRecarregar=false;$('notificacoes-limpar-lidas').disabled=true;$('notificacoes-limpar-todas').disabled=true;$('notificacoes-contador').hidden=true;$('notificacoes-lista').replaceChildren();
  }else notificacoesAtualizar(true);
 }
 // Consulta de 60 em 60 segundos enquanto o documento estiver visível e autenticado.
