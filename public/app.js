@@ -292,7 +292,7 @@ window.addEventListener('popstate',ev=>{
 function mostrar(tela, restaurando=false) {
   if(!TELAS.includes(tela))return;
   pararJornada();
-  if(mesaTelaVisivel==='solo'&&tela!=='solo')fecharCinema();
+  if(mesaTelaVisivel==='solo'&&tela!=='solo'){soloFecharPaineis();fecharCinema();}
   if(tela!=='amigos'&&mesaTelaVisivel==='amigos')amigosLimpar();
   if(tela!=='compartilhadas'&&mesaTelaVisivel==='compartilhadas')limparCompartilhadas();
   if(tela!=='mensagens'&&mesaTelaVisivel==='mensagens')limparMensagens();
@@ -632,10 +632,12 @@ $('solo-criar-personagem').onclick=()=>{
  });
 };
 function soloEstado(mensagem,erro=false){
- const e=$('solo-alerta');e.textContent=mensagem||'';e.classList.toggle('erro',erro);
+ const jogo=!$('solo-jogo').hidden;
+ for(const id of ['solo-alerta','solo-jogo-alerta']){const e=$(id),mostrar=(id==='solo-jogo-alerta')===jogo&&Boolean(mensagem);e.textContent=mostrar?mensagem:'';e.classList.toggle('erro',erro);if(id==='solo-jogo-alerta')e.hidden=!mostrar;}
+ if(jogo&&erro&&$('solo-personagem-dialog').open){$('solo-personagem-dialog').close();}
 }
 async function soloAtualizarInicio(){
- $('solo-entrada').hidden=false;$('solo-jogo').hidden=true;soloCampanhaId=null;
+ soloFecharPaineis();$('solo-entrada').hidden=false;$('solo-jogo').hidden=true;soloCampanhaId=null;soloEstado('');
  const lista=$('solo-lista');lista.replaceChildren();
  const select=$('solo-aventura'),anterior=select.value;select.replaceChildren(new Option('Criar com uma ideia minha',''));
  if(!eu.logado){
@@ -683,26 +685,28 @@ $('solo-aventura').onchange=()=>{
   $('solo-ajuda-origem').textContent='Você pode adicionar novas ideias abaixo. A IA usará a história salva como ponto de partida.';
  }else $('solo-ajuda-origem').textContent='Escreva uma ideia própria para iniciar uma campanha nova.';
 };
+let soloResumoXP=null,soloResumoEstado=null;
 function pintarXP(alvo,xp,modo='xp'){
  alvo.replaceChildren();if(!xp){alvo.append(el('p','Vincule uma ficha para registrar experiência.','suave'));return;}
  alvo.append(el('strong',xp.personagem+' · '+(xp.nivel===null?'Perfil narrativo':'Nível '+xp.nivel)),el('p',xp.total.toLocaleString('pt-BR')+' XP'+(xp.proximo===null?'':' / '+xp.proximo.toLocaleString('pt-BR')+' XP')));
  if(xp.proximo!==null){const p=el('progress');p.max=xp.proximo-xp.base;p.value=Math.max(0,xp.total-xp.base);p.setAttribute('aria-label','Experiência para o próximo nível');alvo.append(p);}
  if(modo!=='xp')alvo.append(el('p',modo==='marcos'?'Marcos narrativos: evolução manual.':'Progressão automática desativada.','suave'));
 }
-function soloXP(xp,art){if(!xp)return;pintarXP($('solo-xp'),xp);if(xp.ganho>0&&art){art.append(el('p','✦ +'+xp.ganho+' XP · '+xp.categoria+(xp.subiu?' · Você subiu para o nível '+xp.nivel+'!':''),'mesa-xp-recompensa'));if(xp.subiu){if(!mesaMovimentoReduzido()&&!acessibilidadeMovimentoReduzido())art.animate([{opacity:.6},{opacity:1}],{duration:650});try{if(cinemaAudio?.state==='running'&&$('solo-cinema-som').checked){const t=cinemaAudio.currentTime;for(const [i,f] of [523,659,784].entries()){const o=cinemaAudio.createOscillator(),g=cinemaAudio.createGain();o.frequency.value=f;g.gain.setValueAtTime(.07,t+i*.13);g.gain.exponentialRampToValueAtTime(.001,t+i*.13+.22);o.connect(g);g.connect(cinemaAudio.destination);o.start(t+i*.13);o.stop(t+i*.13+.23);}}}catch{}}}}
+function soloXP(xp,art){if(!xp)return;soloResumoXP=xp;soloAtualizarResumo();pintarXP($('solo-xp'),xp);if(xp.ganho>0&&art){art.append(el('p','✦ +'+xp.ganho+' XP · '+xp.categoria+(xp.subiu?' · Você subiu para o nível '+xp.nivel+'!':''),'mesa-xp-recompensa'));if(xp.subiu){if(!mesaMovimentoReduzido()&&!acessibilidadeMovimentoReduzido())art.animate([{opacity:.6},{opacity:1}],{duration:650});try{if(cinemaAudio?.state==='running'&&$('solo-cinema-som').checked){const t=cinemaAudio.currentTime;for(const [i,f] of [523,659,784].entries()){const o=cinemaAudio.createOscillator(),g=cinemaAudio.createGain();o.frequency.value=f;g.gain.setValueAtTime(.07,t+i*.13);g.gain.exponentialRampToValueAtTime(.001,t+i*.13+.22);o.connect(g);g.connect(cinemaAudio.destination);o.start(t+i*.13);o.stop(t+i*.13+.23);}}}catch{}}}}
 function barraRecurso(alvo,nome,atual,max,classe){const linha=el('div','','mesa-recurso-linha');linha.append(el('strong',nome+' · '+atual+' / '+max));const p=el('progress');p.max=max;p.value=atual;p.className=classe;p.setAttribute('aria-label',nome);linha.append(p);alvo.append(linha);}
 function dominioHabilidade(h){const pontos=Math.min(200,Math.max(0,Number(h.proficiencia)||0)),faixas=[[0,'Iniciante',0],[20,'Aprendiz',0],[50,'Proficiente',1],[100,'Especialista',2],[200,'Mestre',3]];let i=0;while(i+1<faixas.length&&pontos>=faixas[i+1][0])i++;const [base,grau,desconto]=faixas[i];const custo=Math.max(h.mana?1:0,(Number(h.mana)||0)-Math.min(Math.floor((Number(h.mana)||0)/2),desconto));return {pontos,base,grau,custo,proximo:faixas[i+1]?.[0]??null};}
 function listarAquisicoes(alvo,a,nivel){
  for(const [titulo,lista] of [['Itens conquistados',a?.itens||[]],['Habilidades e proficiência',a?.habilidades||[]]]){const d=el('details');d.append(el('summary',titulo+' ('+lista.length+')'));for(const x of lista){const item=x.quantidade!==undefined,h=item?null:dominioHabilidade(x),card=el('div','','mesa-dominio');card.append(el('p',x.nome+' · Nível mínimo '+x.nivelMin+(item?' · ×'+x.quantidade:' · '+h.grau+' · custo de mana '+h.custo)+(nivel<x.nivelMin?' · Bloqueado':'')+(x.manual?' · Cadastrada':'')+' — '+x.descricao));if(h){barraRecurso(card,'Proficiência',h.pontos,200,'mesa-proficiencia');if(h.proximo!==null)card.append(el('p','Próximo grau: '+h.proximo+' pontos','suave'));else card.append(el('p','Domínio máximo','suave'));}d.append(card);}if(!lista.length)d.append(el('p','Nenhum ainda.','suave'));alvo.append(d);}
 }
 function soloRecursos(r,art){
- const e=r.recursos,alvo=$('solo-recursos'),sel=$('solo-uso');alvo.hidden=!e;$('solo-uso-campo').hidden=!e;alvo.replaceChildren();sel.replaceChildren(new Option('Ação livre',''));if(!e)return;
+ soloResumoEstado=r.recursos;soloAtualizarResumo();
+ const e=r.recursos,alvo=$('solo-recursos'),sel=$('solo-uso');alvo.hidden=!e;$('solo-uso-campo').hidden=!e;alvo.replaceChildren();sel.replaceChildren(new Option('Ação livre',''));if(!e){soloAtualizarCompositor();return;}
  barraRecurso(alvo,'PV',e.pv,e.pvMax,'mesa-pv');if(e.manaMax)barraRecurso(alvo,'Mana',e.mana,e.manaMax,'mesa-mana');else{const ativar=el('button','Ativar mana (regra alternativa)','guia-abrir');ativar.type='button';ativar.onclick=async()=>{if(soloOcupado||!soloCampanhaId||!confirm('Ativar mana nesta campanha? Esta escolha é permanente e não faz parte das regras padrão de D&D.'))return;const id=soloCampanhaId;ativar.disabled=true;try{await api('/api/solo/campanhas/'+id+'/mana','POST',{});await soloAbrir(id);}catch(err){soloEstado(err.message,true);}finally{ativar.disabled=false;}};alvo.append(ativar);}if(!e.dnd)alvo.append(el('p','Nível narrativo Mesa: '+e.nivel,'suave'));
  if(e.pv===0)alvo.append(el('p','Sem PV: escolha pedir socorro ou descansar.','erro'));sel.add(new Option('Pedir socorro / descansar','socorro'));
  for(const [tipo,lista] of [['item',e.itens],['habilidade',e.habilidades]])for(const x of lista){const custo=tipo==='habilidade'&&e.manaMax?dominioHabilidade(x).custo:0;const o=new Option(x.nome+(tipo==='item'?' · ×'+x.quantidade:' · '+dominioHabilidade(x).grau+(custo?' · '+custo+' mana':''))+(e.nivel<x.nivelMin?' · requer nível '+x.nivelMin:''),tipo+':'+x.id);o.disabled=e.pv===0||e.nivel<x.nivelMin||(tipo==='item'&&x.quantidade<1)||custo>e.mana;sel.add(o);}
- if(e.pv===0)sel.value='socorro';listarAquisicoes(alvo,e,e.nivel);if(art&&r.eventosRecursos?.length)for(const ev of r.eventosRecursos)art.append(el('p',ev,'mesa-xp-recompensa'));
+ if(e.pv===0)sel.value='socorro';soloAtualizarCompositor();listarAquisicoes(alvo,e,e.nivel);if(art&&r.eventosRecursos?.length)for(const ev of r.eventosRecursos)art.append(el('p',ev,'mesa-xp-recompensa'));
 }
-function soloXPInicio(r){soloRecursos(r);pintarXP($('solo-xp'),r.xp,r.campanha.progressao);const sel=$('solo-xp-ficha');sel.replaceChildren(new Option('Escolha uma ficha',''));for(const p of soloPersonagens)sel.add(new Option(p.nome,String(p.id)));$('solo-xp-vincular').hidden=Boolean(r.campanha.personagem_id)||!soloPersonagens.length;}
+function soloXPInicio(r){soloResumoXP=r.xp;soloRecursos(r);pintarXP($('solo-xp'),r.xp,r.campanha.progressao);const sel=$('solo-xp-ficha');sel.replaceChildren(new Option('Escolha uma ficha',''));for(const p of soloPersonagens)sel.add(new Option(p.nome,String(p.id)));$('solo-xp-vincular').hidden=Boolean(r.campanha.personagem_id)||!soloPersonagens.length;}
 $('solo-xp-confirmar').onclick=async()=>{const id=soloCampanhaId,p=$('solo-xp-ficha').value;if(!id||!p||soloOcupado)return;const b=$('solo-xp-confirmar');b.disabled=true;try{await api('/api/solo/campanhas/'+id+'/personagem','POST',{personagemId:Number(p)});await soloAbrir(id);}catch(e){soloEstado(e.message,true);}finally{b.disabled=false;}};
 function soloMensagem(papel,texto,tipo='acao',teste=null,numero=null){
  const art=el('article','','solo-mensagem '+(papel==='mestre'?'mestre':'jogador'));
@@ -753,17 +757,48 @@ function soloAdicionarTeste(art,teste,numero){
      (v.criticoNatural?' · 🎯 Acerto crítico (20 natural)!':v.falhaNatural?' · Falha automática (1 natural)':'')+
      (v.passou===null?'':v.passou?' · Sucesso!':' · Falha');
    soloMensagem('jogador',resultado,'acao');
-   const art=soloMensagem('mestre',r.narracao,'acao',r.teste,r.numero);soloXP(r.xp,art);soloRecursos(r,art);
+   const acompanhar=soloPertoDoFim();const art=soloMensagem('mestre',r.narracao,'acao',r.teste,r.numero);soloXP(r.xp,art);soloRecursos(r,art);if(acompanhar)soloFimLista(art);else soloBotaoFim();
    if(mesaTelaVisivel==='solo')cinemaSolo(r.narracao);
    botao.remove();texto.textContent='Resultado registrado nesta campanha.';
    soloEstado('');
   }catch(e){animacao.cancelar();palco.replaceChildren();texto.textContent=e.message;botao.disabled=false;soloEstado('Não foi possível concluir a rolagem: '+e.message,true);}
-  finally{soloOcupado=false;$('solo-enviar').disabled=false;$('solo-voltar').disabled=false;soloFimLista();}
+  finally{soloOcupado=false;$('solo-enviar').disabled=false;$('solo-voltar').disabled=false;soloBotaoFim();}
  };
  caixa.appendChild(botao);art.appendChild(caixa);
 }
-function soloFimLista(){
- const painel=$('solo-mensagens');painel.scrollTop=painel.scrollHeight;
+function soloAtualizarResumo(){
+ const alvo=$('solo-resumo-recursos');alvo.replaceChildren();alvo.hidden=!soloResumoXP&&!soloResumoEstado;
+ if(alvo.hidden)return;
+ const e=soloResumoEstado,x=soloResumoXP;
+ const ficha=el('span',x?.personagem||'Personagem','solo-resumo-nome');alvo.append(ficha);
+ const chip=(nome,valor,classe)=>{const p=el('span','','solo-chip '+classe);p.append(el('strong',nome),el('span',valor));alvo.append(p);};
+ if(e){chip('Nível',String(e.nivel),'nivel');chip('PV',e.pv+'/'+e.pvMax,'pv');if(e.manaMax)chip('MP',e.mana+'/'+e.manaMax,'mana');}
+ else if(x?.nivel!=null)chip('Nível',String(x.nivel),'nivel');
+ if(x)chip('XP',x.total.toLocaleString('pt-BR')+(x.proximo==null?'':'/'+x.proximo.toLocaleString('pt-BR')),'xp');
+}
+function soloFecharPaineis(){for(const id of ['solo-personagem-dialog','solo-ajustes-dialog']){const d=$(id);if(d?.open)d.close();}}
+for(const [botao,painel] of [['solo-personagem-abrir','solo-personagem-dialog'],['solo-ajustes-abrir','solo-ajustes-dialog']]){
+ $(botao).onclick=()=>{soloFecharPaineis();$(painel).showModal();};
+}
+for(const b of document.querySelectorAll('[data-solo-fechar]'))b.onclick=()=>$(b.dataset.soloFechar).close();
+for(const id of ['solo-personagem-dialog','solo-ajustes-dialog'])$(id).addEventListener('click',ev=>{const d=$(id);if(ev.target!==d)return;const b=d.getBoundingClientRect();if(ev.clientX<b.left||ev.clientX>b.right||ev.clientY<b.top||ev.clientY>b.bottom)d.close();});
+function soloAtualizarCompositor(){
+ const ajuste=$('solo-tipo').value==='ajuste',campo=$('solo-acao'),recurso=$('solo-uso');
+ recurso.disabled=ajuste;
+ $('solo-modo-dica').textContent=ajuste?'Solicite uma alteração na história.':'Descreva sua ação ou selecione um recurso.';
+ campo.placeholder=ajuste?'O que você quer mudar na história?':'O que você faz agora?';
+ $('solo-contagem').textContent=campo.value.length+'/1600';
+ campo.style.height='auto';campo.style.height=Math.min(campo.scrollHeight,120)+'px';
+}
+$('solo-tipo').addEventListener('change',soloAtualizarCompositor);
+$('solo-acao').addEventListener('input',soloAtualizarCompositor);
+function soloPertoDoFim(){const p=$('solo-mensagens');return p.scrollHeight-p.scrollTop-p.clientHeight<90;}
+function soloBotaoFim(){$('solo-ultima-mensagem').hidden=soloPertoDoFim();}
+$('solo-mensagens').addEventListener('scroll',soloBotaoFim,{passive:true});
+$('solo-ultima-mensagem').onclick=()=>soloFimLista();
+function soloFimLista(cena=null){
+ const painel=$('solo-mensagens');
+ requestAnimationFrame(()=>{if($('solo-jogo').hidden)return;if(cena&&painel.contains(cena)){const y=cena.getBoundingClientRect().top-painel.getBoundingClientRect().top+painel.scrollTop;const altura=cena.getBoundingClientRect().height;if(altura>painel.clientHeight-24)painel.scrollTop=Math.max(0,y-12);else painel.scrollTop=painel.scrollHeight;}else painel.scrollTop=painel.scrollHeight;soloBotaoFim();});
 }
 async function soloAbrir(id){
  if(soloOcupado)return;
@@ -775,8 +810,8 @@ async function soloAbrir(id){
   $('solo-mensagens').replaceChildren();
   soloXPInicio(r);for(const msg of r.mensagens){const art=soloMensagem(msg.papel,msg.texto,msg.tipo,msg.papel==='mestre'&&Number(msg.numero)===Number(r.campanha.turno_atual)?msg.teste:null,msg.numero);const g=msg.papel==='mestre'&&r.ganhos?.find(g=>Number(g.chave)===Number(msg.numero));if(g)art.append(el('p','✦ +'+g.quantidade+' XP · '+g.categoria,'mesa-xp-recompensa'));if(msg.papel==='mestre'&&Array.isArray(msg.recursos_evento))for(const ev of msg.recursos_evento)art.append(el('p',ev,'mesa-xp-recompensa'));}
   soloMostrarTrilha(r.campanha.genero,r.campanha.tom);
-  $('solo-entrada').hidden=true;$('solo-jogo').hidden=false;
-  $('solo-acao').value='';soloFimLista();
+  soloFecharPaineis();$('solo-entrada').hidden=true;$('solo-jogo').hidden=false;soloEstado('');
+  $('solo-acao').value='';$('solo-tipo').value='acao';soloAtualizarCompositor();soloFimLista($('solo-mensagens').lastElementChild);window.scrollTo(0,0);
  }catch(e){soloEstado(e.message,true);}
 }
 function soloMostrarTrilha(genero,tom,sugestao=''){$('solo-trilha').replaceChildren();playerDaHistoria($('solo-trilha'),genero,tom,sugestao);}
@@ -809,8 +844,8 @@ async function soloAbrirDepoisCriar(r){
  $('solo-mensagens').replaceChildren();
  soloXPInicio(r);soloMensagem('mestre',r.mestre,'inicio',r.teste,0);
   soloMostrarTrilha($('solo-genero').value,$('solo-tom').value,soloOrigens.find(a=>String(a.id)===$('solo-aventura').value)?.conteudo?.trilha||'');
- $('solo-entrada').hidden=true;$('solo-jogo').hidden=false;soloEstado('');
- $('solo-acao').value='';soloFimLista();if(mesaTelaVisivel==='solo')cinemaSolo(r.mestre);
+ soloFecharPaineis();$('solo-entrada').hidden=true;$('solo-jogo').hidden=false;soloEstado('');
+ $('solo-acao').value='';$('solo-tipo').value='acao';soloAtualizarCompositor();soloFimLista($('solo-mensagens').lastElementChild);window.scrollTo(0,0);if(mesaTelaVisivel==='solo')cinemaSolo(r.mestre);
 }
 $('solo-acao-form').onsubmit=async ev=>{
  ev.preventDefault();if(soloOcupado||!soloCampanhaId)return;
@@ -819,17 +854,18 @@ $('solo-acao-form').onsubmit=async ev=>{
  soloOcupado=true;$('solo-enviar').disabled=true;$('solo-voltar').disabled=true;
  soloEstado('O Mestre IA está narrando a consequência...');
  const rascunho=soloMensagem('jogador',acao,tipo);
- const esperando=soloMensagem('mestre','Escrevendo a próxima cena...');
+ const esperando=soloMensagem('mestre','Escrevendo a próxima cena...');esperando.classList.add('solo-escrevendo');
+ $('solo-acao').readOnly=true;
  soloFimLista();
  try{
   const r=await api('/api/solo/campanhas/'+soloCampanhaId+'/turnos','POST',{acao,tipo,uso:tipo==='acao'?$('solo-uso').value||null:null});
-  esperando.querySelector('p').textContent=r.narracao;soloXP(r.xp,esperando);soloRecursos(r,esperando);
+  const acompanhar=soloPertoDoFim();esperando.classList.remove('solo-escrevendo');esperando.querySelector('p').textContent=r.narracao;soloXP(r.xp,esperando);soloRecursos(r,esperando);
   if(mesaTelaVisivel==='solo')cinemaSolo(r.narracao);
   if(r.teste)soloAdicionarTeste(esperando,r.teste,r.numero);
-  $('solo-acao').value='';soloEstado('');
+  $('solo-acao').value='';soloEstado('');if(acompanhar)soloFimLista(esperando);else soloBotaoFim();
  }catch(e){
-  rascunho.remove();esperando.remove();soloEstado(e.message,true);
- }finally{soloOcupado=false;$('solo-enviar').disabled=false;$('solo-voltar').disabled=false;soloFimLista();}
+  rascunho.remove();esperando.remove();soloEstado(e.message,true);soloBotaoFim();
+ }finally{soloOcupado=false;$('solo-enviar').disabled=false;$('solo-voltar').disabled=false;$('solo-acao').readOnly=false;soloAtualizarCompositor();}
 };
 
 // Animação compartilhada pelas ferramentas, sem compartilhar estado ou resultados.

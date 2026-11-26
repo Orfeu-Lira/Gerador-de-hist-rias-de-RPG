@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./style.css?v=portal25">
+<link rel="stylesheet" href="./style.css?v=portal26">
 </head>
 <body class="mesa-sem-sessao tela-acesso">
 <div id="mesa-abertura" class="mesa-intro" aria-hidden="true" inert>
@@ -157,25 +157,46 @@
       <div id="solo-lista"></div>
     </div>
     <div id="solo-jogo" class="solo-jogo" hidden>
-      <div class="solo-jogo-topo">
-        <button id="solo-voltar" type="button" class="guia-abrir">← Minhas campanhas</button>
-        <div><span class="sobretitulo">CAMPANHA SOLO</span><h2 id="solo-jogo-titulo"></h2></div>
-      </div>
-      <div id="solo-xp" class="mesa-xp folha" aria-live="polite"></div><div id="solo-recursos" class="mesa-recursos folha" aria-live="polite" hidden></div><div id="solo-xp-vincular" class="folha" hidden><label for="solo-xp-ficha">Vincular ficha a esta campanha</label><select id="solo-xp-ficha"></select><button type="button" id="solo-xp-confirmar">Vincular personagem</button><p class="suave">Somente recompensas futuras serão registradas.</p></div><div id="solo-trilha"></div><div class="folha"><label><input id="solo-cinema-som" type="checkbox"> Sons cinematográficos</label><label><input id="solo-cinema-visual" type="checkbox" checked> Animações cinematográficas</label><p class="suave">Efeitos de cenas novas, sem alterar os resultados da narrativa.</p></div>
-      <div id="solo-mensagens" class="solo-mensagens" role="log" aria-label="Narração e ações da campanha" aria-live="polite"></div>
-      <form id="solo-acao-form" class="folha solo-compositor">
-        <label for="solo-tipo">O que deseja fazer?</label>
-        <select id="solo-tipo">
-          <option value="acao">Ação do meu personagem</option>
-          <option value="ajuste">Pedir modificação da história</option>
-        </select>
-        <div id="solo-uso-campo" hidden><label for="solo-uso">Usar item ou habilidade conquistada (opcional)</label><select id="solo-uso"><option value="">Ação livre</option></select><p class="suave">Selecione o recurso para validar nível, quantidade e custo de mana.</p></div><label for="solo-acao">Escreva sua ação ou modificação</label>
-        <textarea id="solo-acao" maxlength="1600" required rows="4" placeholder="Eu me aproximo da porta e tento escutar o que acontece lá dentro..."></textarea>
-        <div class="solo-acoes">
-          <span class="suave">Cada ação gera uma nova resposta do Mestre IA. Limite: 30 narrações por dia para contas comuns.</span>
-          <button id="solo-enviar" class="principal" type="submit">✦ Enviar ao Mestre IA</button>
+      <header class="solo-jogo-topo">
+        <button id="solo-voltar" type="button" class="solo-icone-botao" aria-label="Voltar às minhas campanhas" title="Minhas campanhas">←</button>
+        <div class="solo-titulo-compacto"><span class="sobretitulo">MESTRE IA · CAMPANHA SOLO</span><h2 id="solo-jogo-titulo"></h2></div>
+        <div class="solo-topo-acoes">
+          <button id="solo-personagem-abrir" type="button" class="solo-icone-botao" aria-haspopup="dialog" aria-label="Abrir personagem e inventário" title="Personagem">♙ <span>Ficha</span></button>
+          <button id="solo-ajustes-abrir" type="button" class="solo-icone-botao" aria-haspopup="dialog" aria-label="Abrir opções de som e efeitos" title="Som e efeitos">⚙ <span>Som</span></button>
         </div>
+      </header>
+      <div id="solo-resumo-recursos" class="solo-resumo-recursos" aria-live="polite" hidden></div>
+      <div class="solo-conversa">
+        <div id="solo-mensagens" class="solo-mensagens" role="log" aria-label="Narração e ações da campanha" aria-live="polite" tabindex="0"></div>
+        <button id="solo-ultima-mensagem" class="solo-ultima-mensagem" type="button" hidden>↓ Mensagem mais recente</button>
+      </div>
+      <form id="solo-acao-form" class="folha solo-compositor">
+        <div id="solo-jogo-alerta" class="solo-status-inline" role="status" aria-live="polite" hidden></div>
+        <div class="solo-compositor-opcoes">
+          <div class="solo-controle-tipo"><label for="solo-tipo" class="solo-sr">Tipo de interação</label><select id="solo-tipo">
+            <option value="acao">✦ Ação</option>
+            <option value="ajuste">✎ Ajustar história</option>
+          </select></div>
+          <div id="solo-uso-campo" class="solo-controle-recurso" hidden><label for="solo-uso" class="solo-sr">Usar item ou habilidade (opcional)</label><select id="solo-uso"><option value="">Ação livre</option></select></div>
+        </div>
+        <div class="solo-compositor-linha">
+          <label for="solo-acao" class="solo-sr">Escreva sua ação ou modificação</label>
+          <textarea id="solo-acao" maxlength="1600" required rows="2" placeholder="O que você faz agora?"></textarea>
+          <button id="solo-enviar" class="principal solo-enviar" type="submit" aria-label="Enviar ao Mestre IA" title="Enviar ao Mestre IA">➤</button>
+        </div>
+        <div class="solo-compositor-rodape"><span id="solo-modo-dica">Descreva sua ação.</span><span id="solo-contagem" aria-hidden="true">0/1600</span></div>
       </form>
+      <dialog id="solo-personagem-dialog" class="solo-dialog" aria-labelledby="solo-personagem-titulo">
+        <div class="solo-dialog-topo"><h2 id="solo-personagem-titulo">Seu personagem</h2><button type="button" class="solo-fechar-dialog" data-solo-fechar="solo-personagem-dialog" aria-label="Fechar ficha">×</button></div>
+        <div id="solo-xp" class="mesa-xp folha" aria-live="polite"></div>
+        <div id="solo-recursos" class="mesa-recursos folha" aria-live="polite" hidden></div>
+        <div id="solo-xp-vincular" class="folha" hidden><label for="solo-xp-ficha">Vincular ficha a esta campanha</label><select id="solo-xp-ficha"></select><button type="button" id="solo-xp-confirmar">Vincular personagem</button><p class="suave">Somente recompensas futuras serão registradas.</p></div>
+      </dialog>
+      <dialog id="solo-ajustes-dialog" class="solo-dialog" aria-labelledby="solo-ajustes-titulo">
+        <div class="solo-dialog-topo"><h2 id="solo-ajustes-titulo">Som e efeitos</h2><button type="button" class="solo-fechar-dialog" data-solo-fechar="solo-ajustes-dialog" aria-label="Fechar opções">×</button></div>
+        <div class="solo-ajustes-lista"><label class="solo-toggle"><span><strong>Sons cinematográficos</strong><small>Áudio dos eventos da aventura</small></span><input id="solo-cinema-som" type="checkbox"></label><label class="solo-toggle"><span><strong>Animações cinematográficas</strong><small>Efeitos visuais de novas cenas</small></span><input id="solo-cinema-visual" type="checkbox" checked></label></div>
+        <div id="solo-trilha"></div>
+      </dialog>
     </div>
   </section>
   <section id="v-instalar" hidden>
@@ -628,7 +649,7 @@
 <script src="./email-validation.js"></script>
 <dialog id="mesa-denuncia-dialog" aria-labelledby="mesa-denuncia-titulo"><form id="mesa-denuncia-form" class="formulario"><h2 id="mesa-denuncia-titulo">Enviar denúncia</h2><p id="mesa-denuncia-alvo"></p><label for="mesa-denuncia-motivo">Motivo</label><select id="mesa-denuncia-motivo" required><option value="assedio">Assédio</option><option value="ameaca">Ameaça</option><option value="spam">Spam</option><option value="discriminacao">Discriminação</option><option value="outro">Outro</option></select><label for="mesa-denuncia-detalhes">Detalhes (opcional)</label><textarea id="mesa-denuncia-detalhes" maxlength="1000" rows="4"></textarea><p class="suave">A denúncia e, se selecionada, a mensagem denunciada serão encaminhadas à moderação. Nenhuma punição é automática.</p><p id="mesa-denuncia-status" role="status" aria-live="polite"></p><button type="submit" class="principal">Enviar denúncia</button><button id="mesa-denuncia-cancelar" type="button">Cancelar</button></form></dialog>
   <div id="campanha-cinema" class="mesa-cinema" hidden aria-live="polite"><div id="campanha-cinema-arte" aria-hidden="true"></div><p id="campanha-cinema-texto"></p><button id="campanha-cinema-fechar" type="button">Pular efeito</button></div>
-<script src="./app.js?v=portal25"></script>
+<script src="./app.js?v=portal26"></script>
 
 </body>
 </html>
