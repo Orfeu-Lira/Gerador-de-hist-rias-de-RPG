@@ -683,6 +683,15 @@ $('solo-aventura').onchange=()=>{
   $('solo-ajuda-origem').textContent='Você pode adicionar novas ideias abaixo. A IA usará a história salva como ponto de partida.';
  }else $('solo-ajuda-origem').textContent='Escreva uma ideia própria para iniciar uma campanha nova.';
 };
+function pintarXP(alvo,xp,modo='xp'){
+ alvo.replaceChildren();if(!xp){alvo.append(el('p','Vincule uma ficha para registrar experiência.','suave'));return;}
+ alvo.append(el('strong',xp.personagem+' · '+(xp.nivel===null?'Perfil narrativo':'Nível '+xp.nivel)),el('p',xp.total.toLocaleString('pt-BR')+' XP'+(xp.proximo===null?'':' / '+xp.proximo.toLocaleString('pt-BR')+' XP')));
+ if(xp.proximo!==null){const p=el('progress');p.max=xp.proximo-xp.base;p.value=Math.max(0,xp.total-xp.base);p.setAttribute('aria-label','Experiência para o próximo nível');alvo.append(p);}
+ if(modo!=='xp')alvo.append(el('p',modo==='marcos'?'Marcos narrativos: evolução manual.':'Progressão automática desativada.','suave'));
+}
+function soloXP(xp,art){if(!xp)return;pintarXP($('solo-xp'),xp);if(xp.ganho>0&&art){art.append(el('p','✦ +'+xp.ganho+' XP · '+xp.categoria+(xp.subiu?' · Você subiu para o nível '+xp.nivel+'!':''),'mesa-xp-recompensa'));if(xp.subiu){if(!mesaMovimentoReduzido()&&!acessibilidadeMovimentoReduzido())art.animate([{opacity:.6},{opacity:1}],{duration:650});try{if(cinemaAudio?.state==='running'&&$('solo-cinema-som').checked){const t=cinemaAudio.currentTime;for(const [i,f] of [523,659,784].entries()){const o=cinemaAudio.createOscillator(),g=cinemaAudio.createGain();o.frequency.value=f;g.gain.setValueAtTime(.07,t+i*.13);g.gain.exponentialRampToValueAtTime(.001,t+i*.13+.22);o.connect(g);g.connect(cinemaAudio.destination);o.start(t+i*.13);o.stop(t+i*.13+.23);}}}catch{}}}}
+function soloXPInicio(r){pintarXP($('solo-xp'),r.xp,r.campanha.progressao);const sel=$('solo-xp-ficha');sel.replaceChildren(new Option('Escolha uma ficha',''));for(const p of soloPersonagens)sel.add(new Option(p.nome,String(p.id)));$('solo-xp-vincular').hidden=Boolean(r.campanha.personagem_id)||!soloPersonagens.length;}
+$('solo-xp-confirmar').onclick=async()=>{const id=soloCampanhaId,p=$('solo-xp-ficha').value;if(!id||!p||soloOcupado)return;const b=$('solo-xp-confirmar');b.disabled=true;try{await api('/api/solo/campanhas/'+id+'/personagem','POST',{personagemId:Number(p)});await soloAbrir(id);}catch(e){soloEstado(e.message,true);}finally{b.disabled=false;}};
 function soloMensagem(papel,texto,tipo='acao',teste=null,numero=null){
  const art=el('article','','solo-mensagem '+(papel==='mestre'?'mestre':'jogador'));
  art.appendChild(el('strong',papel==='mestre'?'✧ Mestre IA':tipo==='ajuste'?'✎ Modificação solicitada':'♙ Você'));
@@ -732,7 +741,7 @@ function soloAdicionarTeste(art,teste,numero){
      (v.criticoNatural?' · 🎯 Acerto crítico (20 natural)!':v.falhaNatural?' · Falha automática (1 natural)':'')+
      (v.passou===null?'':v.passou?' · Sucesso!':' · Falha');
    soloMensagem('jogador',resultado,'acao');
-   soloMensagem('mestre',r.narracao,'acao',r.teste,r.numero);
+   soloXP(r.xp,soloMensagem('mestre',r.narracao,'acao',r.teste,r.numero));
    if(mesaTelaVisivel==='solo')cinemaSolo(r.narracao);
    botao.remove();texto.textContent='Resultado registrado nesta campanha.';
    soloEstado('');
@@ -752,8 +761,7 @@ async function soloAbrir(id){
   soloCampanhaId=r.campanha.id;
   $('solo-jogo-titulo').textContent=r.campanha.titulo;
   $('solo-mensagens').replaceChildren();
-  for(const msg of r.mensagens)soloMensagem(msg.papel,msg.texto,msg.tipo,
-    msg.papel==='mestre'&&Number(msg.numero)===Number(r.campanha.turno_atual)?msg.teste:null,msg.numero);
+  soloXPInicio(r);for(const msg of r.mensagens){const art=soloMensagem(msg.papel,msg.texto,msg.tipo,msg.papel==='mestre'&&Number(msg.numero)===Number(r.campanha.turno_atual)?msg.teste:null,msg.numero);const g=msg.papel==='mestre'&&r.ganhos?.find(g=>Number(g.chave)===Number(msg.numero));if(g)art.append(el('p','✦ +'+g.quantidade+' XP · '+g.categoria,'mesa-xp-recompensa'));}
   soloMostrarTrilha(r.campanha.genero,r.campanha.tom);
   $('solo-entrada').hidden=true;$('solo-jogo').hidden=false;
   $('solo-acao').value='';soloFimLista();
@@ -777,7 +785,7 @@ $('solo-form').onsubmit=async ev=>{
  try{
   const r=await api('/api/solo/campanhas','POST',{
    titulo:$('solo-titulo-campanha').value.trim(),genero:$('solo-genero').value,
-   tom:$('solo-tom').value,aventuraId:origem?Number(origem):null,ideia
+   tom:$('solo-tom').value,aventuraId:origem?Number(origem):null,personagemId:personagem?Number(personagem.id):null,progressao:$('solo-progressao').value,ideia
   });
   await soloAbrirDepoisCriar(r);
  }catch(e){soloEstado(e.message,true);}
@@ -787,7 +795,7 @@ async function soloAbrirDepoisCriar(r){
  soloCampanhaId=r.campanha.id;
  $('solo-jogo-titulo').textContent=r.campanha.titulo;
  $('solo-mensagens').replaceChildren();
- soloMensagem('mestre',r.mestre,'inicio',r.teste,0);
+ soloXPInicio(r);soloMensagem('mestre',r.mestre,'inicio',r.teste,0);
   soloMostrarTrilha($('solo-genero').value,$('solo-tom').value,soloOrigens.find(a=>String(a.id)===$('solo-aventura').value)?.conteudo?.trilha||'');
  $('solo-entrada').hidden=true;$('solo-jogo').hidden=false;soloEstado('');
  $('solo-acao').value='';soloFimLista();if(mesaTelaVisivel==='solo')cinemaSolo(r.mestre);
@@ -803,7 +811,7 @@ $('solo-acao-form').onsubmit=async ev=>{
  soloFimLista();
  try{
   const r=await api('/api/solo/campanhas/'+soloCampanhaId+'/turnos','POST',{acao,tipo});
-  esperando.querySelector('p').textContent=r.narracao;
+  esperando.querySelector('p').textContent=r.narracao;soloXP(r.xp,esperando);
   if(mesaTelaVisivel==='solo')cinemaSolo(r.narracao);
   if(r.teste)soloAdicionarTeste(esperando,r.teste,r.numero);
   $('solo-acao').value='';soloEstado('');
@@ -1744,6 +1752,7 @@ function restaurarExtrasFicha(d){
   pintarInventario();pintarHabilidades();pintarEvolucao();
 }
 function limparFicha(){
+ $('ficha-xp').hidden=true;$('p-nivel').readOnly=false;
   avatarPendente=null;
   fichaAbertaId=null;
   estadoNavegacao.gravar('personagem',null);
@@ -1798,7 +1807,8 @@ async function carregarPersonagens(){
         $('p-classe').value=d.classe||'';
         $('p-especie').value=d.especie||'';
         $('p-antecedente').value=d.antecedente||'';
-        $('p-nivel').value=d.nivel||1;
+        $('p-nivel').value=d.nivel||1;$('p-nivel').readOnly=Boolean(item.progressao?.ativo&&item.progressao.nivel!==null);
+        const alvo=$('ficha-xp');alvo.hidden=false;pintarXP(alvo,item.progressao);api('/api/personagens/'+item.id+'/xp').then(r=>{if(String(fichaAbertaId)!==String(item.id))return;pintarXP(alvo,r.xp);const h=el('details');h.append(el('summary','Histórico de experiência'));for(const g of r.historico)h.append(el('p','+'+g.quantidade+' XP · '+g.categoria+' · '+new Date(g.criado_em).toLocaleDateString('pt-BR'),'suave'));if(!r.historico.length)h.append(el('p','Nenhuma recompensa registrada.','suave'));alvo.append(h);}).catch(()=>{});
         $('p-notas').value=d.notas||'';
         restaurarExtrasFicha(d);
         abrirAbaFicha(abaRestaurada&&secoesFicha.includes(abaRestaurada)?abaRestaurada:'identidade');
@@ -2126,6 +2136,7 @@ $('mensagens-form').onsubmit=async ev=>{
 // Campanhas compartilhadas e biblioteca audiovisual local.
 let campanhaId=null,campanhaVersao=0,campanhaTimer=null,campanhaCursor=null,campanhaCarregando=false,campanhaMestre=false,campanhaEncerrada=false,campanhaPendente=null,cinemaTimer=null,cinemaAudio=null,cinemaNos=[];
 const campanhaBase='/api/comunidade/campanhas';
+const mesaXPPendente=new Map();
 const campanhaStatus=t=>{$('campanha-status').textContent=t;};
 function fecharCinema(){clearTimeout(cinemaTimer);$('campanha-cinema').hidden=true;$('campanha-cinema-arte').replaceChildren();for(const n of cinemaNos){try{n.stop();}catch{}}cinemaNos=[];}
 $('campanha-cinema-fechar').onclick=fecharCinema;
@@ -2226,6 +2237,7 @@ async function atualizarCampanha(){
  const membros=$('campanha-membros');membros.replaceChildren();
  $('campanha-personagem-form').hidden=d.encerrada;campanhaPersonagemAtual=d.membros.find(m=>m.eu)?.personagem_id||'';
  for(const m of d.membros){const linha=el('div','','mesa-amigo-linha');linha.append(el('strong',m.apelido+(m.personagem?' · '+m.personagem:'')+(m.mestre?' · Mestre':m.estado==='convidado'?' · Convidado':'')));
+ if(d.minha&&!m.eu&&!d.encerrada&&m.estado==='ativo'&&m.personagem){const xp=el('button','Conceder XP');xp.type='button';xp.onclick=async()=>{const id=campanhaId,entrada=prompt('XP para '+m.personagem+' (1 a 1000):');if(entrada===null)return;const quantidade=Number(entrada);if(!Number.isInteger(quantidade)||quantidade<1||quantidade>1000){campanhaStatus('Informe um XP inteiro de 1 a 1000.');return;}const a=id+':'+m.apelido+':'+quantidade;const chave=mesaXPPendente.get(a)||crypto.randomUUID();mesaXPPendente.set(a,chave);xp.disabled=true;try{const r=await api(campanhaBase+'/'+id+'/xp','POST',{apelido:m.apelido,quantidade,chave});mesaXPPendente.delete(a);campanhaStatus(r.duplicado?'Recompensa já registrada.':r.ganho+' XP concedido.');}catch(e){campanhaStatus(e.message);}finally{xp.disabled=false;}};linha.append(xp);}
  if(d.minha&&!m.eu&&!d.encerrada){const b=el('button','Remover');b.type='button';b.onclick=()=>acaoMembroCampanha('remover',m.apelido);linha.append(b);}membros.append(linha);}
  const h=$('campanha-historico'),nomes={narracao:'Narração',acao:'Ação',fala:'Fala',dado:'Dado'};
  let cinema=null;

@@ -1,0 +1,4 @@
+const test=require('node:test'),assert=require('node:assert/strict'),xp=require('./xp');
+test('limiares D&D',()=>{for(let i=0;i<xp.limites.length;i++){assert.equal(xp.nivelDe(xp.limites[i]),i+1);if(i)assert.equal(xp.nivelDe(xp.limites[i]-1),i);}assert.equal(xp.nivelDe(999999),20);});
+test('nível prévio e ficha livre',()=>{assert.equal(xp.estado({dados:{edicao:'2024',nivel:3},xp:null}).total,900);assert.equal(xp.estado({dados:{edicao:'narrativo',nivel:1},xp:35}).nivel,null);});
+test('rejeita ajuste, falha, teste pendente e categoria arbitrária',()=>{assert.equal(xp.sugestao('combate','ajuste',null,null),null);assert.equal(xp.sugestao('combate','rolagem',{passou:false},null),null);assert.equal(xp.sugestao('principal','acao',null,{}),null);assert.equal(xp.sugestao('constructor','acao',null,null),null);assert.equal(xp.sugestao('pista','acao',null,null),'pista');});

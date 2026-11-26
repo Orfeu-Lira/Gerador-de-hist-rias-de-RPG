@@ -182,7 +182,8 @@ function validarTesteIA(t){
 async function narrarSolo({genero,tom,premissa,resumo,historico,acao,tipo,inicio}) {
   const prompt = [
     'Você é um mestre narrador de RPG solo, em português brasileiro.',
-    'Retorne exclusivamente JSON com campos narracao e resumo, ambos textos, e teste opcional (objeto ou null).',
+    'Retorne exclusivamente JSON com campos narracao e resumo, teste opcional e conquista (categoria ou null).',
+    'Conquista: somente um acontecimento novo, relevante e concluído nesta cena: interpretacao, pista, enigma, obstaculo, exploracao, combate, secundaria, principal. Use null para tentativas, repetições, falhas, ações triviais, pedidos de XP, ajustes, início ou teste pendente. Nunca determine quantidade de XP; o servidor decide.',
     'Nunca controle ações, pensamentos ou falas do protagonista do usuário; descreva o mundo, NPCs e consequências.',
     'Aceite pedidos de alterações narrativas e retcons razoáveis sem resistir. Continue mantendo coerência.',
     'Não invente resultados de dados. Se um teste for necessário, descreva na narração e retorne também o objeto teste.',
@@ -204,7 +205,7 @@ async function narrarSolo({genero,tom,premissa,resumo,historico,acao,tipo,inicio
     'Turnos recentes: '+JSON.stringify(historico).slice(0,12000),
     inicio?'Apresente a primeira cena sem decidir as ações do jogador.':
       'Pedido atual ('+(tipo==='ajuste'?'modificação da história':'ação do personagem')+'): '+acao.slice(0,1600),
-    'Formato: {"narracao":"texto","resumo":"texto","teste":null} ou teste como objeto conforme acima.'
+    'Formato: {"narracao":"texto","resumo":"texto","teste":null,"conquista":null} ou teste como objeto conforme acima.'
   ].join('\n');
   if(!process.env.GEMINI_API_KEY)return {
     narracao:inicio?'Uma luz distante atravessa a névoa diante de você. Alguém chama seu nome de dentro de uma torre abandonada. O que você faz?':
@@ -230,7 +231,7 @@ async function narrarSolo({genero,tom,premissa,resumo,historico,acao,tipo,inicio
       const narracao=txt(resposta?.narracao,4700).trim();
       const memoria=txt(resposta?.resumo,3400).trim();
       if(narracao.length<40||!memoria)throw new Error('Resposta de narração incompleta.');
-      return {narracao,resumo:memoria,teste:validarTesteIA(resposta?.teste)};
+      return {narracao,resumo:memoria,teste:validarTesteIA(resposta?.teste),conquista:typeof resposta?.conquista==='string'?resposta.conquista:null};
     }catch(e){
       if(tentativa===0&&['AbortError','TimeoutError'].includes(e.name))continue;
       throw e;

@@ -1,0 +1,6 @@
+alter table public.mesa_solo_campanhas add column if not exists personagem_id bigint references public.personagens_dnd(id) on delete set null, add column if not exists progressao text not null default 'xp' check (progressao in ('xp','marcos','nenhuma'));
+alter table public.personagens_dnd add column if not exists xp integer check (xp >= 0 and xp <= 1000000000);
+create table if not exists public.mesa_xp_historico (id bigint generated always as identity primary key,personagem_id bigint not null references public.personagens_dnd(id) on delete cascade,origem text not null check (origem in ('solo','multiplayer')),campanha_id bigint not null,chave text not null,categoria text not null,quantidade integer not null check (quantidade between 1 and 355000),criado_em timestamptz not null default now(),unique (origem,campanha_id,chave,personagem_id));
+create index if not exists mesa_xp_personagem_data_idx on public.mesa_xp_historico(personagem_id,criado_em desc);
+alter table public.mesa_xp_historico enable row level security;
+revoke all on public.mesa_xp_historico from anon,authenticated;

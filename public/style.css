@@ -1117,3 +1117,5 @@ body.mesa-sem-sessao .mesa-sobre-vibe{margin-inline:auto;max-width:680px}
   #menu-lateral > *{flex:none;min-width:0}
   #menu-lateral #nav{justify-content:flex-start}
 }
+
+.mesa-xp{margin:12px 0;padding:14px;border:1px solid #a6813b;border-radius:10px}.mesa-xp progress{width:100%;height:13px;accent-color:#b68c40}.mesa-xp-recompensa{padding:9px 12px;border-left:3px solid #b68c40;background:rgba(182,140,64,.12);font-weight:600}.mesa-xp details{margin-top:10px}.mesa-xp p{margin:6px 0}
