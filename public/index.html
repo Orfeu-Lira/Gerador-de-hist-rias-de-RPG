@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./style.css?v=portal8">
+<link rel="stylesheet" href="./style.css?v=portal10">
 </head>
 <body>
 <div id="mesa-abertura" class="mesa-intro" aria-hidden="true" inert>
@@ -398,6 +398,13 @@
     <div class="folha dnd-trilha-aprendizado"><span class="sobretitulo">COMECE DO ZERO</span><h2>Aprenda D&D do primeiro dado às regras avançadas</h2><p>Não sabe o que é RPG? Comece pela introdução oficial. Depois explore as regras gratuitas de D&D 2024: criação de personagens, testes, combate, classes, magias, equipamentos, condições e evolução.</p><div class="dnd-trilha-links"><a class="guia-abrir" href="https://www.dndbeyond.com/en/how-to-play-dnd" target="_blank" rel="noopener noreferrer">① Como jogar D&D — guia inicial ↗</a><a class="guia-abrir" href="https://www.dndbeyond.com/sources/dnd/br-2024" target="_blank" rel="noopener noreferrer">② Regras gratuitas 2024 — compêndio ↗</a><button type="button" class="guia-abrir" id="dnd-tutorial-mesa">③ Como usar o Mesa para jogar ↗</button></div><p class="suave">Os recursos oficiais são em inglês. Use a tradução do navegador caso prefira ler em português. O conteúdo gratuito é extenso, mas não inclui todas as opções dos livros pagos.</p></div>
     <div class="folha assistente-painel"><h2>O que você quer aprender?</h2><p>O assistente explica regras e dá exemplos. Ele não modifica personagens e pode cometer erros: confirme decisões importantes na fonte oficial.</p><form id="f-ajuda-dnd"><label for="pergunta-dnd">Sua pergunta</label><textarea id="pergunta-dnd" rows="4" maxlength="450" required placeholder="Ex.: Como funcionam os testes de habilidade e a dificuldade (CD)?"></textarea><div class="acoes"><button class="principal" id="ajuda-enviar" type="submit">✦ Pedir explicação</button></div></form><div id="resposta-dnd" class="assistente-resposta" role="status" aria-live="polite"></div><p class="suave">Base de referência: <a target="_blank" rel="noopener noreferrer" href="https://www.dndbeyond.com/srd">SRD 5.2.1 — D&D Beyond</a>. Limite inicial: seis consultas diárias por conta.</p></div>
   </section>
+  <section id="v-amigos" hidden aria-labelledby="amigos-titulo">
+    <div class="pagina-intro"><span class="sobretitulo">COMUNIDADE</span><h1 id="amigos-titulo">Amigos</h1><p>Encontre outros aventureiros pelo apelido e gerencie suas amizades.</p></div>
+    <div class="folha mesa-perfil-card"><h2>Encontrar jogadores</h2><form id="amigos-busca" class="formulario"><label for="amigos-termo">Apelido</label><input id="amigos-termo" minlength="3" maxlength="25" required placeholder="Digite um apelido"><button type="submit" class="principal">Pesquisar</button></form><p class="suave">Apenas jogadores que permitiram ser encontrados aparecem na pesquisa.</p><div id="amigos-resultados"></div></div>
+    <div class="folha mesa-perfil-card"><h2>Solicitações recebidas</h2><div id="amigos-recebidas"></div><h2>Solicitações enviadas</h2><div id="amigos-enviadas"></div><h2>Meus amigos</h2><div id="amigos-lista"></div><button id="amigos-atualizar" type="button">Atualizar lista</button></div>
+    <div class="folha mesa-perfil-card"><h2>Pessoas bloqueadas</h2><div id="amigos-bloqueados"></div><p class="suave">Bloquear uma pessoa remove a amizade e impede novas solicitações entre vocês.</p></div>
+    <p id="amigos-status" role="status" aria-live="polite"></p>
+  </section>
   <section id="v-perfil" hidden aria-labelledby="perfil-titulo">
     <div class="pagina-intro"><span class="sobretitulo">MINHA CONTA</span><h1 id="perfil-titulo">Meu perfil</h1><p>Personalize sua identidade e acompanhe suas gerações.</p></div>
     <div class="folha mesa-perfil-card">
@@ -598,6 +605,6 @@
 <script src="./mesa-dice-audio.js"></script>
 <script src="./dice-rules.js"></script>
 <script src="./email-validation.js"></script>
-<script src="./app.js?v=portal9"></script>
+<script src="./app.js?v=portal10"></script>
 </body>
 </html>
