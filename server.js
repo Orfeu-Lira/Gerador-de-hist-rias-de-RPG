@@ -1,5 +1,6 @@
 // Mesa — backend Express preparado para Vercel com PostgreSQL/Supabase.
 const crypto = require('crypto');
+const perfilSessao=require('./perfil-sessao');
 const express = require('express');
 const session = require('express-session');
 const helmet = require('helmet');
@@ -60,7 +61,7 @@ app.use((req,res,next) => {
       'Access-Control-Allow-Origin': origin,
       'Access-Control-Allow-Credentials': 'true',
       'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type'
+      'Access-Control-Allow-Headers': 'Content-Type, X-Mesa-Perfil-Sessao'
     });
   }
   if (req.method === 'OPTIONS') return res.sendStatus(origemPermitida ? 204 : 403);
@@ -150,7 +151,7 @@ const exigirLimiteAuth=async(req,res,classe,email='')=>{
  return true;
 };
 // Respostas sensíveis não devem ser armazenadas por caches compartilhados.
-app.use('/api',(req,res,next)=>{res.set('Cache-Control','no-store');next();});
+app.use('/api',(req,res,next)=>{res.set({'Cache-Control':'private, no-store, max-age=0','Pragma':'no-cache'});res.vary('Cookie');next();});
 app.post('/api/cadastro', asyncHandler(async(req,res) => {
   if(!await exigirLimiteAuth(req,res,'cadastro'))return;
   const {email,senha,tokenBootstrap,aceiteTermos,tratamento='neutro',nome='',apelido=null} = req.body || {};
@@ -295,7 +296,7 @@ app.post('/api/logout', (req,res,next) => {
 app.get('/api/eu',asyncHandler(async(req,res) => {
   const u = await atual(req);
   const perfil=u?(await query('SELECT nome,tratamento FROM public.mesa_perfis WHERE usuario_id=$1',[u.id])).rows[0]:null;
-  res.json({logado:!!u,email:u?.email||null,papel:u?.papel||null,restantes:await restantes(req,u),nome:perfil?.nome||'',tratamento:perfil?.tratamento||'neutro'});
+  res.json({logado:!!u,email:u?.email||null,perfilSessao:u?perfilSessao.chave(process.env.SESSION_SECRET,req.sessionID,u.id):null,papel:u?.papel||null,restantes:await restantes(req,u),nome:perfil?.nome||'',tratamento:perfil?.tratamento||'neutro'});
 }));
 // Todas as funcionalidades da plataforma exigem sessão confirmada.
 // Rotas públicas de login, cadastro, recuperação e saúde ficam acima deste ponto.
@@ -622,6 +623,13 @@ app.post('/api/comunidade/campanhas/:id/xp',asyncHandler(async(req,res)=>{
  const xp=await xpMesa.conceder(client,{personagemId:m.personagem_id,usuarioId:m.usuario_id,origem:'multiplayer',campanhaId:s.id,chave,categoria:'mestre',quantidade});
  if(!xp)return campanhaErro('Ficha indisponível.');return {dados:{ganho:xp.ganho,duplicado:xp.duplicado===true}};
  });
+}));
+// Protege formulários de perfil que ficaram abertos durante uma troca de conta.
+app.use('/api/conta/perfil',asyncHandler(async(req,res,next)=>{
+ const u=await atual(req);
+ if(!u)return res.status(401).json({erro:'Entre na sua conta.',codigo:'login_obrigatorio'});
+ if(!perfilSessao.confere(process.env.SESSION_SECRET,req.sessionID,u.id,req.get('X-Mesa-Perfil-Sessao')))return res.status(409).json({erro:'A sessão do perfil mudou. Reabra o Mesa antes de editar.',codigo:'perfil_sessao_alterada'});
+ next();
 }));
 app.get('/api/conta/perfil',asyncHandler(async(req,res)=>{
  const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});

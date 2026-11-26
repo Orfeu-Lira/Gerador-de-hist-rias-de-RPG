@@ -26,7 +26,7 @@ window.addEventListener('online',()=>mesaConexao(''));
 async function api(url, metodo = 'GET', corpo) {
  if (!API_BASE_URL) throw new Error('Configure a URL do backend em config.js antes de usar a API.');
  metodo=metodo.toUpperCase();
- const leitura=metodo==='GET',chave=metodo+' '+url;
+ const leitura=metodo==='GET',sessaoPerfil=eu.perfilSessao||'',perfil=url==='/api/conta/perfil'||url.startsWith('/api/conta/perfil/'),chave=metodo+' '+url+' '+sessaoPerfil;
  if(leitura&&mesaConsultas.has(chave))return mesaConsultas.get(chave);
  if(!leitura&&mesaEnvios.has(chave))throw Error('Uma solicitação igual já está em andamento.');
  if(!navigator.onLine){mesaConexao('Sem conexão com a internet.');throw Error('Sem conexão. Verifique sua internet.');}
@@ -39,8 +39,10 @@ async function api(url, metodo = 'GET', corpo) {
    const timer=setTimeout(()=>controle.abort(),longa?90000:15000);
    let erro;
    try{
-    const r=await fetch(API_BASE_URL+url,{method:metodo,credentials:'include',headers:{'Content-Type':'application/json'},body:corpo?JSON.stringify(corpo):undefined,signal:controle.signal});
+    const r=await fetch(API_BASE_URL+url,{method:metodo,credentials:'include',cache:'no-store',headers:{'Content-Type':'application/json',...(perfil?{'X-Mesa-Perfil-Sessao':sessaoPerfil}:{})},body:corpo?JSON.stringify(corpo):undefined,signal:controle.signal});
     const dados=await r.json().catch(()=>({}));
+    if(perfil&&sessaoPerfil!==(eu.perfilSessao||''))throw Error('A sessão mudou. Abra seu perfil novamente.');
+    if(perfil&&dados.codigo==='perfil_sessao_alterada'){perfilLimparCampos();location.replace('/');throw Error('A sessão mudou. Reabra o Mesa.');}
     if(!r.ok){if(r.status===401&&dados.codigo==='login_obrigatorio'&&eu.logado){eu={logado:false};document.body.classList.add('mesa-sem-sessao');location.replace('/');}throw Object.assign(Error(dados.erro||'Não foi possível concluir a solicitação.'),{dados,status:r.status});}
     mesaConexao('');return dados;
    }catch(e){erro=e;}finally{clearTimeout(timer);}
@@ -297,7 +299,7 @@ function mostrar(tela, restaurando=false) {
   if(tela!=='compartilhadas'&&mesaTelaVisivel==='compartilhadas')limparCompartilhadas();
   if(tela!=='mensagens'&&mesaTelaVisivel==='mensagens')limparMensagens();
   if(tela!=='campanhas'&&mesaTelaVisivel==='campanhas')limparCampanha();
-  if(tela!=='perfil'&&mesaTelaVisivel==='perfil'){perfilRequisicao++;limparFotoPerfil();$('perfil-nome').value='';$('perfil-email').value='';}
+  if(tela!=='perfil'&&mesaTelaVisivel==='perfil')perfilLimparCampos();
   if(!eu.logado&&!['conta','privacidade','termos'].includes(tela))tela='conta';
   if(tela==='admin'&&eu.papel!=='admin')tela='gerador';
   if(tela==='musica'&&mesaTelaVisivel&&mesaTelaVisivel!=='musica')mesaAntesDaMusica=mesaTelaVisivel;
@@ -458,6 +460,7 @@ function textoInfo() {
 async function atualizarEu() {
   // Não substitua o estado de login antes que o servidor confirme a sessão.
   const resposta=await api('/api/eu');
+  if(eu.logado&&eu.perfilSessao&&eu.perfilSessao!==resposta.perfilSessao){perfilLimparCampos();location.replace('/');throw Error('A conta mudou. Reabra o Mesa.');}
   eu=resposta;
   document.body.classList.toggle('mesa-sem-sessao',!eu.logado);
   montarNav();
@@ -2106,41 +2109,45 @@ $('f-ajuda-dnd').onsubmit=async ev=>{
 };
 
 // Perfil privado, com cota consultada diretamente no servidor.
-let perfilFotoUrl=null,perfilRequisicao=0;
+let perfilFotoUrl=null,perfilRequisicao=0,perfilSessaoCarregada=null;
+function perfilControles(habilitar){for(const campo of $('perfil-form').querySelectorAll('input,textarea,select,button'))campo.disabled=!habilitar;$('perfil-arquivo').disabled=!habilitar;}
+function perfilLimparCampos(){perfilRequisicao++;perfilSessaoCarregada=null;limparFotoPerfil();for(const id of ['perfil-nome','perfil-email','perfil-apelido','perfil-bio','perfil-arquivo'])$(id).value='';$('perfil-tratamento').value='neutro';$('perfil-encontravel').checked=false;$('perfil-cota').textContent='';$('perfil-progresso').hidden=true;$('perfil-status').textContent='';perfilControles(false);}
+function perfilAtual(token,sessao){return token===perfilRequisicao&&eu.logado&&mesaTelaVisivel==='perfil'&&Boolean(sessao)&&sessao===eu.perfilSessao;}
 function limparFotoPerfil(){
  if(perfilFotoUrl)URL.revokeObjectURL(perfilFotoUrl);
  perfilFotoUrl=null;$('perfil-foto').removeAttribute('src');$('perfil-foto').hidden=true;$('perfil-foto-vazio').hidden=false;$('perfil-remover').disabled=true;
 }
 async function carregarMeuPerfil(){
- const token=++perfilRequisicao;
- limparFotoPerfil();$('perfil-nome').value='';$('perfil-email').value='';$('perfil-cota').textContent='Consultando limite diário...';$('perfil-progresso').hidden=true;$('perfil-status').textContent='';
+ perfilLimparCampos();const token=perfilRequisicao,sessao=eu.perfilSessao;
+ $('perfil-cota').textContent='Consultando limite diário...';
  try{
   const p=await api('/api/conta/perfil');
-  if(token!==perfilRequisicao||!eu.logado||mesaTelaVisivel!=='perfil')return;
-  $('perfil-nome').value=p.nome;$('perfil-email').value=p.email;$('perfil-tratamento').value=p.tratamento||'neutro';$('perfil-apelido').value=p.apelido||'';$('perfil-bio').value=p.bio||'';$('perfil-encontravel').checked=!!p.encontravel;
+  if(!perfilAtual(token,sessao))return;
+  if(p.email!==eu.email){perfilLimparCampos();location.replace('/');return;}
+  $('perfil-nome').value=p.nome;$('perfil-email').value=p.email;$('perfil-tratamento').value=p.tratamento||'neutro';$('perfil-apelido').value=p.apelido||'';$('perfil-bio').value=p.bio||'';$('perfil-encontravel').checked=!!p.encontravel;perfilSessaoCarregada=sessao;perfilControles(true);
   $('perfil-cota').textContent=p.limite===null?'Acesso administrativo sem limite de geração.':p.restantes+' de '+p.limite+' gerações disponíveis hoje.';
   if(p.limite!==null){$('perfil-progresso').max=p.limite;$('perfil-progresso').value=p.restantes;$('perfil-progresso').hidden=false;}
   if(p.temFoto){
-   const resp=await fetch(API_BASE_URL+'/api/conta/perfil/foto',{credentials:'include',cache:'no-store'});
-   if(!resp.ok)throw Error('Não foi possível carregar a foto.');
-   const blob=await resp.blob();if(token!==perfilRequisicao||!eu.logado||mesaTelaVisivel!=='perfil')return;
+   const resp=await fetch(API_BASE_URL+'/api/conta/perfil/foto',{credentials:'include',cache:'no-store',headers:{'X-Mesa-Perfil-Sessao':sessao}});
+   if(resp.status===409){perfilLimparCampos();location.replace('/');return;}if(!resp.ok)throw Error('Não foi possível carregar a foto.');
+   const blob=await resp.blob();if(!perfilAtual(token,sessao))return;
    perfilFotoUrl=URL.createObjectURL(blob);$('perfil-foto').src=perfilFotoUrl;$('perfil-foto').hidden=false;$('perfil-foto-vazio').hidden=true;$('perfil-remover').disabled=false;
   }
  }catch(e){if(token===perfilRequisicao)$('perfil-status').textContent=e.message;}
 }
 $('perfil-form').onsubmit=async ev=>{
- ev.preventDefault();const b=ev.currentTarget.querySelector('button');b.disabled=true;
- try{await api('/api/conta/perfil','POST',{nome:$('perfil-nome').value,tratamento:$('perfil-tratamento').value,...($('perfil-apelido').value?{apelido:$('perfil-apelido').value.trim()}:{}),bio:$('perfil-bio').value,encontravel:$('perfil-encontravel').checked});await atualizarEu();$('perfil-status').textContent='Perfil salvo.';}
- catch(e){$('perfil-status').textContent=e.message;}finally{b.disabled=false;}
+ ev.preventDefault();const token=perfilRequisicao,sessao=perfilSessaoCarregada;if(!perfilAtual(token,sessao))return;const b=ev.currentTarget.querySelector('button');b.disabled=true;
+ try{await api('/api/conta/perfil','POST',{nome:$('perfil-nome').value,tratamento:$('perfil-tratamento').value,...($('perfil-apelido').value?{apelido:$('perfil-apelido').value.trim()}:{}),bio:$('perfil-bio').value,encontravel:$('perfil-encontravel').checked});if(perfilAtual(token,sessao)){await atualizarEu();if(perfilAtual(token,sessao))$('perfil-status').textContent='Perfil salvo.';}}
+ catch(e){if(perfilAtual(token,sessao))$('perfil-status').textContent=e.message;}finally{if(perfilAtual(token,sessao))b.disabled=false;}
 };
 $('perfil-arquivo').onchange=async()=>{
- const campo=$('perfil-arquivo'),arquivo=campo.files?.[0];if(!arquivo)return;
+ const campo=$('perfil-arquivo'),arquivo=campo.files?.[0],token=perfilRequisicao,sessao=perfilSessaoCarregada;if(!arquivo||!perfilAtual(token,sessao))return;
  campo.disabled=true;$('perfil-status').textContent='Otimizando e enviando foto...';
  try{if(!['image/jpeg','image/png','image/webp'].includes(arquivo.type))throw Error('Escolha JPG, PNG ou WebP.');
- const imagem=await prepararWebpAvatar(arquivo);await api('/api/conta/perfil/foto','POST',{imagem});await carregarMeuPerfil();$('perfil-status').textContent='Foto salva.';}
- catch(e){$('perfil-status').textContent=e.message;}finally{campo.value='';campo.disabled=false;}
+ const imagem=await prepararWebpAvatar(arquivo);if(!perfilAtual(token,sessao))return;await api('/api/conta/perfil/foto','POST',{imagem});if(perfilAtual(token,sessao))await carregarMeuPerfil();}
+ catch(e){if(perfilAtual(token,sessao))$('perfil-status').textContent=e.message;}finally{if(perfilAtual(token,sessao)){campo.value='';campo.disabled=false;}}
 };
-$('perfil-remover').onclick=async()=>{const b=$('perfil-remover');b.disabled=true;try{await api('/api/conta/perfil/foto','DELETE');limparFotoPerfil();$('perfil-status').textContent='Foto removida.';}catch(e){b.disabled=false;$('perfil-status').textContent=e.message;}};
+$('perfil-remover').onclick=async()=>{const token=perfilRequisicao,sessao=perfilSessaoCarregada;if(!perfilAtual(token,sessao))return;const b=$('perfil-remover');b.disabled=true;try{await api('/api/conta/perfil/foto','DELETE');if(perfilAtual(token,sessao)){limparFotoPerfil();$('perfil-status').textContent='Foto removida.';}}catch(e){if(perfilAtual(token,sessao)){b.disabled=false;$('perfil-status').textContent=e.message;}}};
 $('perfil-opcoes').onclick=()=>navegarMesa('opcoes');
 // Preferências locais, sem alterar ou restringir as opções assistivas.
 const mesaPreferencias={ortografia:true,fonte:'padrao'};
