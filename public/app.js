@@ -60,7 +60,7 @@ async function api(url, metodo = 'GET', corpo) {
 function aviso(texto, bom) { const a = $('aviso'); a.textContent = texto || ''; a.className = bom ? 'bom' : ''; }
 
 // ---- Navegação entre telas ----
-const TELAS = ['gerador','solo','dados','historico','personagens','assistente','tutorial','novidades','suporte','instalar','conta','admin','privacidade','termos','musica','inicio','perfil','opcoes','amigos'];
+const TELAS = ['gerador','solo','dados','historico','personagens','assistente','tutorial','novidades','suporte','instalar','conta','admin','privacidade','termos','musica','inicio','perfil','opcoes','amigos','compartilhadas'];
 // Mantém o player no mesmo documento e fora das configurações de acessibilidade.
 (function separarMusica(){
   const player=$('musica-ambiente');
@@ -257,8 +257,9 @@ function mostrar(tela) {
   if(!TELAS.includes(tela))return;
   pararJornada();
   if(tela!=='amigos'&&mesaTelaVisivel==='amigos')amigosLimpar();
+  if(tela!=='compartilhadas'&&mesaTelaVisivel==='compartilhadas')limparCompartilhadas();
   if(tela!=='perfil'&&mesaTelaVisivel==='perfil'){perfilRequisicao++;limparFotoPerfil();$('perfil-nome').value='';$('perfil-email').value='';}
-  if(!eu.logado&&['historico','personagens','assistente','admin','perfil','amigos'].includes(tela))tela='conta';
+  if(!eu.logado&&['historico','personagens','assistente','admin','perfil','amigos','compartilhadas'].includes(tela))tela='conta';
   if(tela==='admin'&&eu.papel!=='admin')tela='gerador';
   if(tela==='musica'&&mesaTelaVisivel&&mesaTelaVisivel!=='musica')mesaAntesDaMusica=mesaTelaVisivel;
   estadoNavegacao.gravar('tela',tela);
@@ -281,6 +282,7 @@ function mostrar(tela) {
   if (tela === 'novidades') noticiasMesa();
   if (tela === 'perfil') carregarMeuPerfil();
   if (tela === 'amigos') carregarAmigos();
+  if (tela === 'compartilhadas') carregarCompartilhadas();
   if (tela === 'inicio') mesaSaudacao();
 }
 $('abrir-tutorial-menu').onclick=()=>navegarMesa('tutorial');
@@ -378,7 +380,7 @@ function montarNav() {
   nav.append(item('inicio','⌂','Início'));
   grupo('Aventuras',[['gerador','✦','Gerador de histórias',false],['gerador','♙','Gerador de NPCs',true],['solo','✧','RPG Solo'],...(eu.logado?[['historico','▤','Minhas aventuras']]:[])]);
   grupo('Ferramentas',[...(eu.logado?[['personagens','♙','Personagens'],['assistente','✧','Tutor D&D']]:[]),['dados','◇','Oráculo dos dados'],['musica','♫','Música']]);
-  grupo('Comunidade',[...(eu.logado?[['amigos','♙','Amigos']]:[]),['novidades','✦','Novidades'],['tutorial','❖','Tutorial'],...(eu.logado?[['suporte','✉','Suporte']]:[])]);
+  grupo('Comunidade',[...(eu.logado?[['amigos','♙','Amigos'],['compartilhadas','▤','Fichas compartilhadas']]:[]),['novidades','✦','Novidades'],['tutorial','❖','Tutorial'],...(eu.logado?[['suporte','✉','Suporte']]:[])]);
   grupo('Minha conta',[...(eu.logado?[['perfil','♙','Meu perfil']]:[['conta','↪','Entrar']]),['opcoes','⚙','Opções'],['instalar','⬇','Instalar Mesa']]);
   if(eu.papel==='admin')grupo('Administração',[['admin','⚙','Painel']]);
   const acesso=el('button','','menu-item');acesso.type='button';acesso.title='Acessibilidade';acesso.setAttribute('aria-label','Abrir acessibilidade');acesso.setAttribute('aria-controls','mesa-acessibilidade-painel');
@@ -1929,6 +1931,43 @@ $('amigos-busca').onsubmit=async ev=>{
  if(!lista.length)alvo.append(el('p','Nenhum jogador encontrado.','suave'));
  for(const a of lista)amigoLinha(alvo,a.apelido,[['Adicionar','solicitar'],['Bloquear','bloquear']]);
  }catch(e){if(versao===amigosVersao)$('amigos-status').textContent=e.message;}finally{b.disabled=false;}
+};
+let compartilhadasVersao=0;
+function limparCompartilhadas(){
+ compartilhadasVersao++;
+ for(const id of ['compartilhar-personagem','compartilhar-amigo','fichas-enviadas','fichas-recebidas'])$(id).replaceChildren();
+ $('fichas-compartilhadas-status').textContent='';
+}
+async function carregarCompartilhadas(){
+ const v=++compartilhadasVersao;
+ try{
+ const [fichas,amigos,proprias]=await Promise.all([api('/api/comunidade/fichas'),api('/api/comunidade/amigos'),api('/api/personagens')]);
+ if(v!==compartilhadasVersao||mesaTelaVisivel!=='compartilhadas'||!eu.logado)return;
+ const ps=$('compartilhar-personagem'),as=$('compartilhar-amigo');
+ ps.replaceChildren(new Option('Selecione um personagem',''));as.replaceChildren(new Option('Selecione um amigo',''));
+ for(const f of proprias)ps.append(new Option(f.nome,String(f.id)));
+ for(const a of amigos.filter(a=>a.estado==='aceita'))as.append(new Option(a.apelido,a.apelido));
+ const env=$('fichas-enviadas'),rec=$('fichas-recebidas');env.replaceChildren();rec.replaceChildren();
+ if(!fichas.enviadas.length)env.append(el('p','Nenhuma ficha compartilhada.','suave'));
+ if(!fichas.recebidas.length)rec.append(el('p','Nenhuma ficha recebida.','suave'));
+ for(const f of fichas.enviadas){
+ const linha=el('div','','mesa-amigo-linha');linha.append(el('strong',f.personagem+' · '+f.apelido));
+ const b=el('button','Revogar acesso');b.type='button';b.onclick=async()=>{
+ if(!confirm('Revogar acesso a esta ficha?'))return;
+ b.disabled=true;
+ try{await api('/api/comunidade/fichas','POST',{id:f.id,apelido:f.apelido,acao:'revogar'});await carregarCompartilhadas();}catch(e){$('fichas-compartilhadas-status').textContent=e.message;}finally{b.disabled=false;}
+ };linha.append(b);env.append(linha);}
+ for(const f of fichas.recebidas){
+ const art=el('article','','folha');art.append(el('h3',f.personagem),el('p','Compartilhada por '+f.apelido+' · Somente visualização','suave'));
+ for(const [k,n] of [['classe','Classe'],['raca','Raça'],['nivel','Nível'],['cenario','Cenário'],['especialidade','Especialidade']]){
+ const valor=f.ficha?.[k];if(typeof valor==='string'||typeof valor==='number')art.append(el('p',n+': '+valor));
+ }rec.append(art);}
+ }catch(e){if(v===compartilhadasVersao)$('fichas-compartilhadas-status').textContent=e.message;}
+}
+$('fichas-compartilhadas-atualizar').onclick=carregarCompartilhadas;
+$('compartilhar-ficha-form').onsubmit=async ev=>{
+ ev.preventDefault();const b=ev.currentTarget.querySelector('button');b.disabled=true;
+ try{await api('/api/comunidade/fichas','POST',{id:$('compartilhar-personagem').value,apelido:$('compartilhar-amigo').value,acao:'compartilhar'});await carregarCompartilhadas();$('fichas-compartilhadas-status').textContent='Ficha compartilhada para visualização.';}catch(e){$('fichas-compartilhadas-status').textContent=e.message;}finally{b.disabled=false;}
 };
 // ---- Conta e recuperação de acesso ----
 const formulariosConta = ['f-login','f-cadastro','f-recuperar','f-redefinir'];
