@@ -1058,6 +1058,7 @@ const kitPorCenario={
 'Terror':['Lanterna','Kit de emergência'],
 'Ficção científica':['Comunicador do cenário','Identificação']
 };
+let sugestaoAtributosAplicada=false,kitInicialAplicado=false;
 function sugerirEquipamentos(){
  const cenario=$('p-cenario').value, aventura=aventurasFicha.find(a=>String(a.id)===$('p-aventura').value);
  const nome=fichaNarrativa() ? $('p-especialidade').value : $('p-classe').value;
@@ -1080,21 +1081,16 @@ function exigirPersonagemSalvo(){
 }
 function atualizarKit(){
  const kit=sugerirEquipamentos();
- // Mantenha o clique ativo para explicar por que ainda não é possível gerar itens.
- $('p-gerar-kit').disabled=false;
- $('p-kit-origem').textContent=!fichaAbertaId
+ const botao=$('p-gerar-kit');
+ botao.disabled=kitInicialAplicado||!fichaAbertaId||!kit;
+ botao.textContent=kitInicialAplicado?'✓ Equipamentos adicionados':'✦ Sugerir kit inicial';
+ botao.classList.toggle('mesa-sugestao-aplicada',kitInicialAplicado);
+ $('p-kit-origem').textContent=kitInicialAplicado?'Kit inicial adicionado a esta ficha. Você pode editar os itens manualmente. Salve a ficha para guardar as alterações.':!fichaAbertaId
  ? 'Selecione um personagem existente ou crie e salve uma ficha para editar o inventário.'
  : kit ? 'Sugestão para '+kit.descricao+'. Revise os itens com o mestre.'
  : 'Selecione cenário e classe ou especialidade para sugerir equipamentos.';
  if($('p-inventario-aviso'))$('p-inventario-aviso').hidden=Boolean(fichaAbertaId);
 }
-$('p-gerar-kit').onclick=()=>{
- if(!exigirPersonagemSalvo())return;
- const kit=sugerirEquipamentos();
- if(!kit){aviso('Escolha uma classe ou especialidade na aba Identidade para receber uma sugestão de kit.');abrirAbaFicha('identidade');return;}
- if($('p-equipamentos').value.trim()&&!confirm('Substituir os equipamentos atuais pela nova sugestão?'))return;
- $('p-equipamentos').value=kit.itens.join('\n');
-};
 
 let aventurasFicha = [];
 function definirOpcoes(select, valores, vazio) {
@@ -1305,20 +1301,25 @@ const sugestoesDnd = {
 function atualizarSugestaoClasse() {
   const classe = $('p-classe').value;
   const sugerida = sugestoesDnd[classe];
-  $('p-aplicar-sugestao').disabled = fichaNarrativa() || !sugerida;
-  $('p-recomendacao').textContent = sugerida
+  const botao=$('p-aplicar-sugestao');
+  botao.disabled=sugestaoAtributosAplicada||fichaNarrativa()||!sugerida;
+  botao.textContent=sugestaoAtributosAplicada?'✓ Pontos distribuídos':'Aplicar sugestão de 27 pontos';
+  botao.classList.toggle('mesa-sugestao-aplicada',sugestaoAtributosAplicada);
+  $('p-recomendacao').textContent = sugestaoAtributosAplicada?'Os 27 pontos sugeridos foram distribuídos. Você ainda pode ajustar os atributos manualmente. Salve a ficha para guardar as alterações.':sugerida
     ? sugerida.dica+' A sugestão usa os 27 pontos e ainda não inclui bônus de antecedente. Você pode modificá-la.'
     : 'Escolha uma classe para ver os atributos que vale a pena priorizar.';
 }
 $('p-aplicar-sugestao').onclick = () => {
   const classe = $('p-classe').value;
   const sugerida = sugestoesDnd[classe];
-  if (fichaNarrativa() || !sugerida) return;
+  if (sugestaoAtributosAplicada || fichaNarrativa() || !sugerida) return;
   const atual = atributosDnd.map(([sigla]) => Number($('at-'+sigla).value));
   if (atual.some((valor,i) => valor !== 8 && valor !== sugerida.valores[i]) &&
       !confirm('Aplicar a sugestão substituirá os atributos atuais. Continuar?')) return;
   atributosDnd.forEach(([sigla],i) => { $('at-'+sigla).value = String(sugerida.valores[i]); });
-  atualizarPontosDnd();
+  sugestaoAtributosAplicada=true;
+  atualizarPontosDnd();atualizarSugestaoClasse();
+  aviso('Os 27 pontos sugeridos foram distribuídos. Salve a ficha para confirmar.',true);
 };
 $('p-classe').addEventListener('change', atualizarSugestaoClasse);
 function atualizarResumoDnd() {
@@ -1580,17 +1581,15 @@ function adicionarItemFicha(nome,tipo='Outros'){
 }
 $('p-item-adicionar').onclick=()=>adicionarItemFicha($('p-item-nome').value,$('p-item-tipo').value);
 $('p-item-nome').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('p-item-adicionar').click();}};
-const acaoKitOriginal=$('p-gerar-kit').onclick;
 $('p-gerar-kit').onclick=()=>{
-  if(!exigirPersonagemSalvo())return;
-  // O botão antigo atualiza a lista textual; aproveitamos a mesma sugestão confirmada.
-  const anterior=$('p-equipamentos').value;
-  acaoKitOriginal();
-  const novo=$('p-equipamentos').value;
-  if(novo!==anterior){
-    inventarioFicha=normalizarInventario({equipamentos:novo});
-    pintarInventario();
-  }
+ if(kitInicialAplicado||!exigirPersonagemSalvo())return;
+ const kit=sugerirEquipamentos();if(!kit)return;
+ const existentes=new Set(inventarioFicha.map(i=>i.nome.trim().toLowerCase()));
+ const faltantes=kit.itens.map(nome=>textoLimitado(nome,80)).filter(nome=>{const k=nome.toLowerCase();if(existentes.has(k))return false;existentes.add(k);return true;});
+ if(inventarioFicha.length+faltantes.length>32){aviso('Não há espaço para o kit completo. Libere espaço no inventário antes de aplicar a sugestão.');return;}
+ for(const nome of faltantes)inventarioFicha.push({nome,tipo:'Outros',quantidade:1,equipado:false,descricao:''});
+ kitInicialAplicado=true;pintarInventario();atualizarKit();
+ aviso(faltantes.length?faltantes.length+' equipamentos adicionados. Salve a ficha para confirmar.':'Os equipamentos sugeridos já estavam no inventário.',true);
 };
 
 // --- Habilidades sugeridas como temas, nunca poder concedido automaticamente ---
@@ -1676,6 +1675,8 @@ $('p-evolucao-adicionar').onclick=()=>{
 };
 $('p-evolucao-nota').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('p-evolucao-adicionar').click();}};
 function restaurarExtrasFicha(d){
+  sugestaoAtributosAplicada=d?.sugestaoAtributosAplicada===true;
+  kitInicialAplicado=d?.kitInicialAplicado===true;
   inventarioFicha=normalizarInventario(d||{});
   habilidadesFicha=Array.isArray(d?.habilidades)?d.habilidades.slice(0,24).filter(x=>x&&typeof x.nome==='string').map(x=>({
     nome:textoLimitado(x.nome,80),tipo:categoriasHabilidade.includes(x.tipo)?x.tipo:'Narrativa',descricao:textoLimitado(x.descricao,200)
@@ -1785,6 +1786,7 @@ $('f-personagem').onsubmit=async ev=>{
     especie:narrativa?'':$('p-especie').value.trim(),antecedente:narrativa?'':$('p-antecedente').value.trim(),
     nivel:narrativa?1:Number($('p-nivel').value),notas:$('p-notas').value.trim(),
     equipamentos:$('p-equipamentos').value.trim(),
+    sugestaoAtributosAplicada,kitInicialAplicado,
     inventario:inventarioFicha.map(x=>({...x})),
     habilidades:habilidadesFicha.map(x=>({...x})),
     evolucao:evolucaoFicha.map(x=>({...x})),
