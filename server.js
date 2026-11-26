@@ -583,7 +583,7 @@ async function campanhaRodada(client,s){
  const testes=(Array.isArray(s.ia_testes)?s.ia_testes:[]).filter(t=>membros.some(m=>String(m.usuario_id)===String(t.usuario)));
  return {membros,eventos,testes,estado:rodadasRpg.rodada(membros,eventos,testes)};
 }
-function rodadaPublica(r,u){return {...r.estado,jogadores:r.estado.jogadores.map(j=>({apelido:j.apelido,eu:j.usuario===String(u.id),disponivel:j.disponivel,precisa:j.precisa,feito:j.feito,passou:j.passou,teste:j.usuario===String(u.id)?j.teste:null}))};}
+function rodadaPublica(r,u){return {...r.estado,chave:String(r.eventos.at(-1)?.id||'0'),souUltimo:String(r.eventos.at(-1)?.autor||'')===String(u.id),jogadores:r.estado.jogadores.map(j=>({apelido:j.apelido,eu:j.usuario===String(u.id),disponivel:j.disponivel,precisa:j.precisa,feito:j.feito,passou:j.passou,teste:j.usuario===String(u.id)?j.teste:null}))};}
 
 app.get('/api/comunidade/campanhas/:id',asyncHandler(async(req,res)=>{
  const depois=req.query.depois;if(depois!==undefined&&!/^(0|[1-9][0-9]{0,17})$/.test(String(depois)))return res.status(400).json({erro:'Cursor inválido.'});
