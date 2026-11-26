@@ -190,7 +190,7 @@ tutorialMostrarPasso(tutorialPasso);
 // Menu lateral: recolhível no computador e gaveta no celular.
 const preferirMobile=()=>window.matchMedia('(max-width:850px)').matches;
 function menuRecolher(recolher){
-  if(preferirMobile()){menuMobile(false);return;}
+  if(preferirMobile()){desenharMenuMobile(false);return;}
   document.body.classList.toggle('menu-compacto',recolher);
   $('menu-retrair').textContent=recolher?'›':'‹';
   $('menu-retrair').setAttribute('aria-expanded',String(!recolher));
@@ -199,9 +199,18 @@ function menuRecolher(recolher){
   try{localStorage.setItem('mesa-menu-compacto',recolher?'1':'0');}catch{}
 }
 function menuMobile(aberto){
+  if(aberto && preferirMobile() && !document.body.classList.contains('mesa-sem-sessao') && mesaTelaVisivel && !history.state?.mesaMenu){
+    history.pushState({...history.state,mesaMenu:true},'');
+  }else if(!aberto && history.state?.mesaMenu){
+    history.back();
+  }
+  desenharMenuMobile(aberto);
+}
+function desenharMenuMobile(aberto){
   const ativo=Boolean(aberto)&&preferirMobile();
   document.body.classList.toggle('menu-mobile-aberto',ativo);
   $('menu-fundo').hidden=!ativo;
+  document.querySelector('#mesa-mobile-nav [aria-controls="menu-lateral"]')?.setAttribute('aria-expanded',String(ativo));
   $('menu-abrir-mobile').setAttribute('aria-expanded',String(ativo));
   $('menu-abrir-mobile').setAttribute('aria-label',ativo?'Fechar menu lateral':'Abrir menu lateral');
   if(!ativo&&preferirMobile()&&document.activeElement?.closest('#menu-lateral'))$('menu-abrir-mobile').focus({preventScroll:true});
@@ -210,7 +219,7 @@ $('menu-retrair').onclick=()=>preferirMobile()?menuMobile(false):menuRecolher(!d
 $('menu-abrir-mobile').onclick=()=>menuMobile(!document.body.classList.contains('menu-mobile-aberto'));
 $('menu-fundo').onclick=()=>menuMobile(false);
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&document.body.classList.contains('menu-mobile-aberto'))menuMobile(false);});
-window.addEventListener('resize',()=>{if(!preferirMobile())menuMobile(false);});
+window.addEventListener('resize',()=>{if(!preferirMobile()&&document.body.classList.contains('menu-mobile-aberto'))menuMobile(false);});
 try{menuRecolher(localStorage.getItem('mesa-menu-compacto')==='1');}catch{menuRecolher(false);}
 // Transições sem atrasar a lógica de navegação: snapshot nativo quando disponível.
 let mesaTelaVisivel=null, mesaAnimacaoTela=null, mesaTransicaoAtiva=null;
@@ -253,7 +262,34 @@ function navegarMesa(tela, depois){
     if(mesaTransicaoAtiva===transicao)mesaTransicaoAtiva=null;
   });
 }
-function mostrar(tela) {
+function registrarTela(tela){
+  const raiz=eu.logado?'inicio':'conta';
+  let atual=history.state;
+  if(atual?.mesaRaiz!==raiz){
+    atual={mesaRaiz:raiz,mesaTela:raiz,mesaNivel:0};
+    history.replaceState(atual,'');
+  }
+  if(tela===raiz && atual.mesaNivel>0){
+    history.go(-atual.mesaNivel-(atual.mesaMenu?1:0));
+    return;
+  }
+  if(atual.mesaMenu && atual.mesaTela===tela){history.back();return;}
+  if(atual.mesaTela===tela)return;
+  const proximo={mesaRaiz:raiz,mesaTela:tela,mesaNivel:atual.mesaNivel+1};
+  if(atual.mesaMenu)history.replaceState(proximo,'');
+  else history.pushState(proximo,'');
+}
+window.addEventListener('popstate',ev=>{
+  if(!mesaTelaVisivel)return;
+  if(mesaTransicaoAtiva){mesaTransicaoAtiva.skipTransition();mesaTransicaoAtiva=null;}
+  const raiz=eu.logado?'inicio':'conta';
+  const estado=ev.state;
+  const tela=estado?.mesaRaiz===raiz && TELAS.includes(estado.mesaTela)?estado.mesaTela:raiz;
+  if(estado?.mesaRaiz!==raiz)history.replaceState({mesaRaiz:raiz,mesaTela:raiz,mesaNivel:0},'');
+  if(tela!==mesaTelaVisivel)mostrar(tela,true);
+  desenharMenuMobile(Boolean(estado?.mesaMenu && eu.logado));
+});
+function mostrar(tela, restaurando=false) {
   if(!TELAS.includes(tela))return;
   pararJornada();
   if(mesaTelaVisivel==='solo'&&tela!=='solo')fecharCinema();
@@ -271,7 +307,8 @@ function mostrar(tela) {
   TELAS.forEach((t) => { $('v-' + t).hidden = t !== tela; });
   mesaMenuAtualizar(tela);
   if(tela==='tutorial')tutorialMostrarPasso(tutorialPasso);
-  menuMobile(false);
+  if(!restaurando)registrarTela(tela);
+  desenharMenuMobile(false);
   const primeira=mesaTelaVisivel===null;
   const mudou=mesaTelaVisivel!==tela;
   mesaTelaVisivel=tela;
@@ -2748,8 +2785,8 @@ atualizarEu().then(() => {
     abrirFormularioConta('f-redefinir'); mostrar('conta');
   } else {
     const pedida=new URL(location.href).searchParams.get('tela');
-    const anterior=estadoNavegacao.ler('tela');
-    mostrar(!eu.logado?(['termos','privacidade'].includes(pedida)?pedida:'conta'):TELAS.includes(pedida)?pedida:TELAS.includes(anterior)&&anterior!=='conta'?anterior:'inicio');
+    const anterior=history.state?.mesaTela || estadoNavegacao.ler('tela');
+    mostrar(!eu.logado?(['termos','privacidade'].includes(pedida)?pedida:'conta'):!history.state?.mesaTela&&TELAS.includes(pedida)?pedida:TELAS.includes(anterior)&&anterior!=='conta'?anterior:'inicio');
     if(mesaTelaVisivel==='gerador'&&estadoNavegacao.ler('modo-gerador')==='npc')modoGeradorNPC(true);
   }
 }).catch((e) => {

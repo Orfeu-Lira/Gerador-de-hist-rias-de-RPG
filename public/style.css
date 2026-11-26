@@ -1102,3 +1102,18 @@ body.mesa-sem-sessao section[id^="v-"]:not(#v-conta):not(#v-termos):not(#v-priva
 body.mesa-sem-sessao>main{margin:0 auto!important;width:100%!important;max-width:800px!important;padding:clamp(18px,4vw,40px) 16px 70px!important}
 body.mesa-sem-sessao .acesso-cartao{margin-inline:auto}
 body.mesa-sem-sessao .mesa-sobre-vibe{margin-inline:auto;max-width:680px}
+
+@media (max-width:850px){
+  #menu-lateral{
+    flex-flow:column nowrap;
+    justify-content:flex-start;
+    box-sizing:border-box;
+    max-width:100vw;
+    overflow-x:hidden;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    padding-bottom:calc(18px + env(safe-area-inset-bottom));
+  }
+  #menu-lateral > *{flex:none;min-width:0}
+  #menu-lateral #nav{justify-content:flex-start}
+}
