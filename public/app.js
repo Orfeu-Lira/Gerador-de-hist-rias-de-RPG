@@ -100,7 +100,7 @@ let mesaAntesDaMusica='inicio';
   const b=el('button','','mesa-home-card');b.type='button';
   const icone=el('span',simbolo,'mesa-home-icone');icone.setAttribute('aria-hidden','true');
   b.append(icone,el('strong',nome),el('span',descricao,'mesa-home-descricao'));
-  b.onclick=()=>navegarMesa(tela,typeof npc==='boolean'?()=>modoGeradorNPC(npc):undefined);
+  b.onclick=()=>navegarMesa(tela,undefined,npc);
   grade.append(b);
  }
  pagina.append(hero,grade);$('v-gerador').before(pagina);
@@ -199,9 +199,19 @@ function menuRecolher(recolher){
   try{localStorage.setItem('mesa-menu-compacto',recolher?'1':'0');}catch{}
 }
 function menuMobile(aberto){
+  const passo=history.state?.mesa;
+  if(aberto && preferirMobile() && passo && !passo.menu){
+    history.pushState({mesa:{...passo,menu:true,nivel:passo.nivel+1}},'');
+  }else if(!aberto && passo?.menu && document.body.classList.contains('menu-mobile-aberto')){
+    history.back();
+  }
+  exibirMenuMobile(aberto);
+}
+function exibirMenuMobile(aberto){
   const ativo=Boolean(aberto)&&preferirMobile();
   document.body.classList.toggle('menu-mobile-aberto',ativo);
   $('menu-fundo').hidden=!ativo;
+  document.querySelector('#mesa-mobile-nav [aria-controls]')?.setAttribute('aria-expanded',String(ativo));
   $('menu-abrir-mobile').setAttribute('aria-expanded',String(ativo));
   $('menu-abrir-mobile').setAttribute('aria-label',ativo?'Fechar menu lateral':'Abrir menu lateral');
   if(!ativo&&preferirMobile()&&document.activeElement?.closest('#menu-lateral'))$('menu-abrir-mobile').focus({preventScroll:true});
@@ -233,8 +243,11 @@ function mesaTransicaoTela(tela, primeira){
 }
 // Ações de navegação interativas usam a mesma transição, inclusive atalhos internos.
 // A lógica dependente da tela roda junto da troca, nunca antes do snapshot.
-function navegarMesa(tela, depois){
-  const aplicar=()=>{mostrar(tela);if(mesaTelaVisivel===tela)depois?.();};
+function navegarMesa(tela, depois, npc){
+  const aplicar=()=>{
+    mostrar(tela,true,npc);
+    if(mesaTelaVisivel===tela)depois?.();
+  };
   if(mesaTransicaoAtiva){
     const anterior=mesaTransicaoAtiva;
     mesaTransicaoAtiva=null;
@@ -253,7 +266,49 @@ function navegarMesa(tela, depois){
     if(mesaTransicaoAtiva===transicao)mesaTransicaoAtiva=null;
   });
 }
-function mostrar(tela) {
+// Cada tela ocupa uma entrada nativa. Ao escolher um destino na gaveta,
+// substituímos a entrada da gaveta para que Voltar retorne à tela de origem.
+function registrarTela(tela,npc){
+  const raiz=eu.logado?'inicio':'conta';
+  let atual=history.state?.mesa;
+  if(!atual || atual.raiz!==raiz){
+    atual={tela:raiz,raiz,nivel:0,menu:false};
+    history.replaceState({mesa:atual},'');
+  }
+  if(mesaTelaVisivel===null && atual.tela===tela)return;
+  if(tela===raiz && atual.nivel>0){
+    history.go(-atual.nivel);
+  }else if(tela!==atual.tela || (tela==='gerador' && atual.npc!==npc)){
+    const metodo=atual.menu?'replaceState':'pushState';
+    history[metodo]({mesa:{raiz,tela,nivel:atual.nivel+(atual.menu?0:1),menu:false,
+      npc}},'');
+  }else if(atual.menu && mesaTelaVisivel!==null){
+    menuMobile(false);
+  }
+}
+window.addEventListener('popstate',event=>{
+  const passo=event.state?.mesa;
+  if(!passo || !mesaTelaVisivel)return;
+  mesaTransicaoAtiva?.skipTransition();
+  mesaTransicaoAtiva=null;
+  if(mesaTelaVisivel!==passo.tela)mostrar(passo.tela,false,passo.npc);
+  if(mesaTelaVisivel==='gerador' && typeof passo.npc==='boolean' && passo.npc===$('f-gerar-npc').hidden)
+    modoGeradorNPC(passo.npc);
+  exibirMenuMobile(Boolean(passo.menu && eu.logado));
+});
+document.querySelectorAll('a[href^="/?tela="]:not([target])').forEach(link=>{
+  link.addEventListener('click',event=>{
+    if(event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+    event.preventDefault();
+    navegarMesa(new URL(link.href).searchParams.get('tela'));
+  });
+});
+document.querySelector('#menu-lateral .marca').onclick=event=>{
+  if(event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+  event.preventDefault();
+  navegarMesa('inicio');
+};
+function mostrar(tela,registrar=true,npc) {
   if(!TELAS.includes(tela))return;
   pararJornada();
   if(mesaTelaVisivel==='solo'&&tela!=='solo')fecharCinema();
@@ -271,7 +326,12 @@ function mostrar(tela) {
   TELAS.forEach((t) => { $('v-' + t).hidden = t !== tela; });
   mesaMenuAtualizar(tela);
   if(tela==='tutorial')tutorialMostrarPasso(tutorialPasso);
-  menuMobile(false);
+  if(tela==='gerador'){
+    npc=npc ?? !$('f-gerar-npc').hidden;
+    if(npc===$('f-gerar-npc').hidden)modoGeradorNPC(npc);
+  }
+  if(registrar)registrarTela(tela,npc);
+  exibirMenuMobile(false);
   const primeira=mesaTelaVisivel===null;
   const mudou=mesaTelaVisivel!==tela;
   mesaTelaVisivel=tela;
@@ -385,7 +445,7 @@ function montarNav() {
    const icone=el('span',simbolo,'menu-item-icone');icone.setAttribute('aria-hidden','true');
    botao.append(icone,el('span',nome,'menu-item-texto'));
    if(typeof modo==='boolean')botao.dataset.modoGerador=String(modo);
-   botao.onclick=()=>navegarMesa(t,typeof modo==='boolean'?()=>modoGeradorNPC(modo):undefined);
+   botao.onclick=()=>navegarMesa(t,undefined,modo);
    return botao;
   }
   function grupo(nome,itens){
@@ -484,8 +544,8 @@ function modoGeradorNPC(ativar){
  if(ativar){carregarOrigensNPC();if(eu.logado)carregarBibliotecaNPC();}
 }
 $('modo-solo').onclick=()=>navegarMesa('solo');
-$('modo-aventura').onclick=()=>modoGeradorNPC(false);
-$('modo-npc').onclick=()=>modoGeradorNPC(true);
+$('modo-aventura').onclick=()=>navegarMesa('gerador',undefined,false);
+$('modo-npc').onclick=()=>navegarMesa('gerador',undefined,true);
 let aventurasNpcSalvas=[];
 async function carregarOrigensNPC(){
  const select=$('npc-origem'),anterior=select.value;
@@ -1230,7 +1290,7 @@ function musicaParar(){
  $('musica-indicador').classList.remove('tocando');
 }
 musicaGlobal.onended=musicaParar;
-$('musica-fechar').onclick=()=>navegarMesa(mesaAntesDaMusica);
+$('musica-fechar').onclick=()=>history.state?.mesa?.nivel>0?history.back():navegarMesa(mesaAntesDaMusica);
 musicaSelecionada.onchange=()=>{
  musicaParar();musicaGlobal.removeAttribute('src');musicaGlobal.load();
  musicaAtualizarFonte();musicaStatus.textContent='Faixa selecionada. Toque em Reproduzir.';
@@ -2255,7 +2315,7 @@ function limparTokenDaUrl() {
   const u = new URL(window.location.href);
   if (u.searchParams.has('reset_token')) {
     u.searchParams.delete('reset_token');
-    history.replaceState(null, '', u.pathname + u.search + u.hash);
+    history.replaceState(history.state, '', u.pathname + u.search + u.hash);
   }
 }
 $('voltar-inicio').onclick = () => { limparTokenDaUrl(); abrirFormularioConta('f-login'); navegarMesa('gerador'); };
@@ -2747,10 +2807,11 @@ atualizarEu().then(() => {
   if (new URL(location.href).searchParams.has('reset_token')) {
     abrirFormularioConta('f-redefinir'); mostrar('conta');
   } else {
-    const pedida=new URL(location.href).searchParams.get('tela');
+    const salvo=history.state?.mesa;
+    const pedida=salvo?.raiz===(eu.logado?'inicio':'conta')?salvo.tela:new URL(location.href).searchParams.get('tela');
     const anterior=estadoNavegacao.ler('tela');
-    mostrar(!eu.logado?(['termos','privacidade'].includes(pedida)?pedida:'conta'):TELAS.includes(pedida)?pedida:TELAS.includes(anterior)&&anterior!=='conta'?anterior:'inicio');
-    if(mesaTelaVisivel==='gerador'&&estadoNavegacao.ler('modo-gerador')==='npc')modoGeradorNPC(true);
+    mostrar(!eu.logado?(['termos','privacidade'].includes(pedida)?pedida:'conta'):TELAS.includes(pedida)?pedida:TELAS.includes(anterior)&&anterior!=='conta'?anterior:'inicio',true,salvo?.npc ?? (estadoNavegacao.ler('modo-gerador')==='npc'));
+    if(salvo?.menu && eu.logado && preferirMobile())exibirMenuMobile(true);
   }
 }).catch((e) => {
   // Um erro de rede/banco na inicialização não significa que o usuário saiu.

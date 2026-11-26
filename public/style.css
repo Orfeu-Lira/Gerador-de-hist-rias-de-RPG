@@ -77,7 +77,7 @@ body.tela-acesso main{max-width:600px;padding:8px 20px 75px}
 .voltar-inicio{display:block;margin:21px auto 0;background:transparent;border:0;color:#d9c9a7;cursor:pointer;padding:10px}
 .voltar-inicio:hover{color:white;text-decoration:underline}
 @media(max-width:800px){.hero{grid-template-columns:1fr;padding:50px 8px 30px;min-height:auto}.hero-arte{display:none}.grade{grid-template-columns:1fr 1fr}.passos{grid-template-columns:1fr}.historico-grade{grid-template-columns:1fr}}
-@media(max-width:560px){main{padding:12px 16px 60px}.topo{padding:14px 16px;flex-wrap:wrap}.topo nav{justify-content:center;width:100%}.marca strong{font-size:20px}.marca-emblema{width:42px;height:42px}.hero{padding:38px 0 30px}.hero h1{font-size:2.45rem}.grade{grid-template-columns:1fr}.folha,.formulario{padding:23px 18px}.gerador-acoes{align-items:stretch;flex-direction:column-reverse}.gerador-acoes button{width:100%}.acesso-cartao{padding:26px 20px}}
+@media(max-width:560px){main{padding:12px 16px 60px}.topo{padding:14px 16px;flex-wrap:nowrap}.topo nav{justify-content:center;width:100%}.marca strong{font-size:20px}.marca-emblema{width:42px;height:42px}.hero{padding:38px 0 30px}.hero h1{font-size:2.45rem}.grade{grid-template-columns:1fr}.folha,.formulario{padding:23px 18px}.gerador-acoes{align-items:stretch;flex-direction:column-reverse}.gerador-acoes button{width:100%}.acesso-cartao{padding:26px 20px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 
 /* Navegação lateral atual está definida no bloco Mesa v3 ao final do arquivo. */
@@ -365,6 +365,10 @@ body.tela-acesso .acesso-cartao{max-width:460px}
  body.menu-compacto .menu-ajuda{justify-content:flex-start;padding:11px 12px}
  .menu-abrir-mobile{position:fixed;top:12px;left:12px;z-index:120;display:flex;align-items:center;gap:8px;padding:8px 15px;min-height:44px;background:#163c35;color:#f6e6c9;border:1px solid #c5a56677;border-radius:12px;box-shadow:0 4px 20px #071c2088;cursor:pointer;font-size:.9rem;font-weight:700}
  .menu-fundo:not([hidden]){display:block;position:fixed;inset:0;background:#0515139c;border:0;z-index:140;cursor:pointer}
+ .topo > *{flex-shrink:0}
+ #nav .menu-item-texto{white-space:normal;overflow-wrap:anywhere}
+ .topo{overscroll-behavior:contain}
+ body.menu-mobile-aberto .mesa-acessibilidade{visibility:hidden}
  body.menu-mobile-aberto{overflow:hidden}
  body.menu-mobile-aberto .menu-abrir-mobile{opacity:0;pointer-events:none}
  body.tela-acesso #v-conta{padding-top:0}
