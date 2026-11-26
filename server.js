@@ -295,6 +295,65 @@ app.get('/api/eu',asyncHandler(async(req,res) => {
   res.json({logado:!!u,email:u?.email||null,papel:u?.papel||null,restantes:await restantes(req,u),nome:perfil?.nome||'',tratamento:perfil?.tratamento||'neutro'});
 }));
 // Perfil privado: sempre derivado da sessão, nunca de um ID enviado pelo cliente.
+// Comunidade: somente apelidos; nunca expor nome privado, email ou tratamento.
+const socialLimite=require('express-rate-limit').rateLimit({windowMs:60000,limit:60,standardHeaders:'draft-7',legacyHeaders:false,message:{erro:'Muitas operações na comunidade. Aguarde um minuto.'}});
+app.use('/api/comunidade',socialLimite);
+async function socialUsuario(req,res){
+ const u=await atual(req);if(!u){res.status(401).json({erro:'Entre na sua conta.'});return null;}
+ const p=(await query('SELECT apelido FROM public.mesa_perfis WHERE usuario_id=$1',[u.id])).rows[0];
+ if(!p?.apelido){res.status(400).json({erro:'Defina seu apelido em Meu perfil para participar da comunidade.'});return null;}return u;
+}
+app.get('/api/comunidade/buscar',asyncHandler(async(req,res)=>{
+ const u=await socialUsuario(req,res);if(!u)return;
+ const termo=String(req.query.apelido||'').trim().replace(/^@/,'');
+ if(!/^[A-Za-z0-9_]{3,24}$/.test(termo))return res.json([]);
+ const r=await query(`SELECT p.apelido FROM public.mesa_perfis p JOIN public.usuarios v ON v.id=p.usuario_id
+ WHERE lower(p.apelido) LIKE lower($2)||'%' ESCAPE '!' AND p.encontravel AND p.usuario_id<>$1 AND (v.bloqueado_ate IS NULL OR v.bloqueado_ate<=now())
+ AND NOT EXISTS(SELECT 1 FROM public.mesa_bloqueios b WHERE (b.autor=$1 AND b.alvo=p.usuario_id) OR (b.alvo=$1 AND b.autor=p.usuario_id))
+ ORDER BY p.apelido LIMIT 20`,[u.id,termo.replace(/_/g,'!_')]);res.json(r.rows);
+}));
+app.get('/api/comunidade/amigos',asyncHandler(async(req,res)=>{
+ const u=await socialUsuario(req,res);if(!u)return;
+ const r=await query(`SELECT p.apelido,a.estado,a.solicitante=$1 AS enviada FROM public.mesa_amizades a
+ JOIN public.mesa_perfis p ON p.usuario_id=CASE WHEN a.a=$1 THEN a.b ELSE a.a END
+ WHERE $1 IN(a.a,a.b) AND NOT EXISTS(SELECT 1 FROM public.mesa_bloqueios b WHERE (b.autor=$1 AND b.alvo=p.usuario_id) OR(b.alvo=$1 AND b.autor=p.usuario_id)) ORDER BY a.criado_em DESC LIMIT 200`,[u.id]);res.json(r.rows);
+}));
+app.get('/api/comunidade/bloqueados',asyncHandler(async(req,res)=>{
+ const u=await socialUsuario(req,res);if(!u)return;
+ const r=await query('SELECT p.apelido FROM public.mesa_bloqueios b JOIN public.mesa_perfis p ON p.usuario_id=b.alvo WHERE b.autor=$1 ORDER BY p.apelido LIMIT 200',[u.id]);res.json(r.rows);
+}));
+app.post('/api/comunidade/amizade',asyncHandler(async(req,res)=>{
+ const u=await socialUsuario(req,res);if(!u)return;
+ const {apelido,acao}=req.body||{};
+ if(!apelidoValido(apelido)||!['solicitar','aceitar','remover','bloquear','desbloquear'].includes(acao))return res.status(400).json({erro:'Operação inválida.'});
+ const {pool}=require('./postgres');const client=await pool.connect();
+ try{
+ await client.query('BEGIN');
+ const p=(await client.query('SELECT usuario_id,encontravel FROM public.mesa_perfis WHERE lower(apelido)=lower($1)',[apelido])).rows[0];
+ if(!p||String(p.usuario_id)===String(u.id)){await client.query('ROLLBACK');return res.status(404).json({erro:'Perfil indisponível.'});}
+ const v=p.usuario_id;
+ // Serializa operações sobre o mesmo par, inclusive bloqueio e aceitação.
+ await client.query("SELECT pg_advisory_xact_lock(hashtextextended('mesa-social:'||least($1::bigint,$2::bigint)::text||':'||greatest($1::bigint,$2::bigint)::text,0))",[u.id,v]);
+ const par=[u.id,v];
+ if(acao==='bloquear'){
+ await client.query('INSERT INTO public.mesa_bloqueios(autor,alvo) VALUES($1,$2) ON CONFLICT DO NOTHING',par);
+ await client.query('DELETE FROM public.mesa_amizades WHERE a=least($1::bigint,$2::bigint) AND b=greatest($1::bigint,$2::bigint)',par);
+ }else if(acao==='desbloquear'){
+ await client.query('DELETE FROM public.mesa_bloqueios WHERE autor=$1 AND alvo=$2',par);
+ }else{
+ const bloqueio=await client.query('SELECT 1 FROM public.mesa_bloqueios WHERE (autor=$1 AND alvo=$2) OR(autor=$2 AND alvo=$1)',par);
+ if(bloqueio.rowCount){await client.query('ROLLBACK');return res.status(404).json({erro:'Perfil indisponível.'});}
+ if(acao==='solicitar'){
+ if(!p.encontravel){await client.query('ROLLBACK');return res.status(404).json({erro:'Perfil indisponível.'});}
+ await client.query("INSERT INTO public.mesa_amizades(a,b,solicitante) VALUES(least($1::bigint,$2::bigint),greatest($1::bigint,$2::bigint),$1) ON CONFLICT DO NOTHING",par);
+ }else if(acao==='aceitar'){
+ const r=await client.query("UPDATE public.mesa_amizades SET estado='aceita' WHERE a=least($1::bigint,$2::bigint) AND b=greatest($1::bigint,$2::bigint) AND estado='pendente' AND solicitante=$2",par);
+ if(!r.rowCount){await client.query('ROLLBACK');return res.status(404).json({erro:'Solicitação indisponível.'});}
+ }else await client.query('DELETE FROM public.mesa_amizades WHERE a=least($1::bigint,$2::bigint) AND b=greatest($1::bigint,$2::bigint)',par);
+ }
+ await client.query('COMMIT');res.json({ok:true});
+ }catch(e){await client.query('ROLLBACK').catch(()=>{});throw e;}finally{client.release();}
+}));
 app.get('/api/conta/perfil',asyncHandler(async(req,res)=>{
  const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
  const r=await query('SELECT nome, tratamento, apelido,bio,encontravel, foto IS NOT NULL AS tem_foto FROM public.mesa_perfis WHERE usuario_id=$1',[u.id]);
