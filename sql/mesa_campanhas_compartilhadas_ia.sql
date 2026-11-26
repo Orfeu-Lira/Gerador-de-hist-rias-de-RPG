@@ -1,0 +1,6 @@
+ALTER TABLE public.mesa_campanhas_online ADD COLUMN IF NOT EXISTS modo_mestre text NOT NULL DEFAULT 'humano' CHECK(modo_mestre IN ('humano','ia')), ADD COLUMN IF NOT EXISTS modo_recursos text NOT NULL DEFAULT 'padrao' CHECK(modo_recursos IN ('padrao','mana')), ADD COLUMN IF NOT EXISTS genero text NOT NULL DEFAULT 'Fantasia épica', ADD COLUMN IF NOT EXISTS tom text NOT NULL DEFAULT 'Aventureiro', ADD COLUMN IF NOT EXISTS origem_historia jsonb NOT NULL DEFAULT '{}'::jsonb, ADD COLUMN IF NOT EXISTS ia_resumo text NOT NULL DEFAULT '', ADD COLUMN IF NOT EXISTS ia_cursor bigint NOT NULL DEFAULT 0, ADD COLUMN IF NOT EXISTS ia_iniciada boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS ia_trava uuid, ADD COLUMN IF NOT EXISTS ia_trava_em timestamptz;
+ALTER TABLE public.mesa_campanha_membros ADD COLUMN IF NOT EXISTS recursos jsonb NOT NULL DEFAULT '{}'::jsonb, ADD COLUMN IF NOT EXISTS compartilhar_ficha boolean NOT NULL DEFAULT false;
+ALTER TABLE public.mesa_campanha_eventos ADD COLUMN IF NOT EXISTS narrador_ia boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS uso_recurso text, ADD COLUMN IF NOT EXISTS resultados jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE public.mesa_campanhas_online ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.mesa_campanha_membros ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.mesa_campanha_eventos ENABLE ROW LEVEL SECURITY;
