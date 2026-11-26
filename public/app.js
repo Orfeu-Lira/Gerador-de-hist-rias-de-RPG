@@ -300,23 +300,31 @@ function notificacoesFechar(devolverFoco=false){
  if(devolverFoco)$('notificacoes-abrir').focus();
 }
 async function notificacoesAtualizar(force=false){
- if(eu.papel!=='admin'||!eu.logado)return;
+ if(!eu.logado||!navigator.onLine)return;
  if(notificacoesEmAndamento)return;
  if(!force&&Date.now()-notificacoesUltimoCarregamento<45000)return;
  notificacoesEmAndamento=true;
  try{
-  const data=await api('/api/admin/notificacoes');
+  const sessao=eu.email,admin=eu.papel==='admin';
+  const [social,data]=await Promise.all([api('/api/comunidade/notificacoes'),admin?api('/api/admin/notificacoes'):Promise.resolve({naoLidas:0,itens:[]})]);
+  if(!eu.logado||eu.email!==sessao||admin!==(eu.papel==='admin'))return;
   notificacoesUltimoCarregamento=Date.now();
-  if(eu.papel!=='admin')return;
-  const contador=$('notificacoes-contador'),quantidade=Number(data.naoLidas)||0;
+  const totalSuporte=Number(data.naoLidas)||0;
+  const contador=$('notificacoes-contador'),quantidade=totalSuporte+['solicitacoes','mensagens','fichas','denuncias'].reduce((n,k)=>n+(Number(social[k])||0),0);
   contador.hidden=quantidade<1;
   contador.textContent=quantidade>99?'99+':String(quantidade);
-  $('notificacoes-abrir').setAttribute('aria-label',quantidade?quantidade+' notificações não lidas de suporte':'Abrir notificações de suporte');
+  $('notificacoes-abrir').setAttribute('aria-label',quantidade?quantidade+' notificações pendentes':'Abrir notificações');
   $('notificacoes-abrir').title=quantidade?quantidade+' notificações não lidas':'Nenhuma notificação pendente';
   const estado=$('notificacoes-estado');
-  estado.textContent=quantidade?quantidade+' chamado(s) ainda não lido(s).':'Tudo em dia! Nenhum chamado novo.';
+  estado.textContent=quantidade?quantidade+' aviso(s) pendente(s).':'Tudo em dia! Nenhum aviso pendente.';
   const lista=$('notificacoes-lista');lista.replaceChildren();
-  if(!data.itens.length)add('p',lista,'Ainda não recebemos mensagens de suporte.','suave');
+  for(const [k,n,tela] of [['solicitacoes','Solicitações de amizade','amigos'],['mensagens','Mensagens não lidas','mensagens'],['fichas','Fichas recebidas','compartilhadas'],['denuncias','Denúncias pendentes','admin']]){
+   if(!social[k])continue;
+   const card=add('article',lista,'','notificacoes-item nao-lida');
+   add('strong',card,n);add('p',card,String(social[k])+' pendente(s)','suave');
+   botaoAdmin(card,'Abrir',()=>{notificacoesFechar();if(k==='denuncias')adminSecao='moderacao';navegarMesa(tela);});
+  }
+  if(admin&&data.itens.length)add('h3',lista,'Suporte administrativo');
   for(const item of data.itens){
    const card=add('article',lista,'','notificacoes-item'+(item.lido?'':' nao-lida'));
    add('strong',card,item.assunto);
@@ -333,7 +341,7 @@ async function notificacoesAtualizar(force=false){
     }catch(e){estado.textContent=e.message;}
    });
   }
-  $('notificacoes-ler-todas').disabled=quantidade===0;
+  $('notificacoes-ler-todas').disabled=totalSuporte===0;
  }catch(e){
   $('notificacoes-estado').textContent='Não foi possível atualizar os avisos. '+e.message;
  }finally{notificacoesEmAndamento=false;}
@@ -353,16 +361,17 @@ $('notificacoes-ir-suporte').onclick=()=>{notificacoesFechar();adminSecao='supor
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&notificacoesAberto)notificacoesFechar(true);});
 document.addEventListener('pointerdown',e=>{if(notificacoesAberto&&!e.target.closest('#mesa-notificacoes'))notificacoesFechar();});
 function notificacoesSessao(){
- const ativo=eu.logado&&eu.papel==='admin';
+ const ativo=eu.logado;
+ $('notificacoes-ler-todas').hidden=eu.papel!=='admin';$('notificacoes-ir-suporte').hidden=eu.papel!=='admin';
  $('mesa-notificacoes').hidden=!ativo;
  if(!ativo){
   notificacoesFechar();notificacoesUltimoCarregamento=0;
-  $('notificacoes-contador').hidden=true;
+  $('notificacoes-contador').hidden=true;$('notificacoes-lista').replaceChildren();
  }else notificacoesAtualizar(true);
 }
 // Consulta de 60 em 60 segundos enquanto o documento estiver visível e autenticado.
 window.setInterval(()=>{if(!document.hidden)notificacoesAtualizar();},60000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&eu.papel==='admin')notificacoesAtualizar();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&eu.logado)notificacoesAtualizar();});
 function montarNav() {
   const nav=$('nav');nav.replaceChildren();
   function item(t,simbolo,nome,modo){
@@ -1923,7 +1932,7 @@ function amigoLinha(alvo,apelido,acoes){
  for(const [texto,acao] of acoes){const b=el('button',texto);b.type='button';b.onclick=async()=>{
  if(['bloquear','remover'].includes(acao)&&!confirm(texto+' '+apelido+'?'))return;
  b.disabled=true;
- try{await api('/api/comunidade/amizade','POST',{apelido,acao});await carregarAmigos();$('amigos-resultados').replaceChildren();$('amigos-status').textContent='Operação concluída.';}catch(e){$('amigos-status').textContent=e.message;}finally{b.disabled=false;}
+ try{await api('/api/comunidade/amizade','POST',{apelido,acao});await carregarAmigos();notificacoesAtualizar(true);$('amigos-resultados').replaceChildren();$('amigos-status').textContent='Operação concluída.';}catch(e){$('amigos-status').textContent=e.message;}finally{b.disabled=false;}
  };botoes.append(b);}
  const denunciar=el('button','Denunciar');denunciar.type='button';denunciar.onclick=()=>abrirDenuncia(apelido);botoes.append(denunciar);
  linha.append(botoes);alvo.append(linha);
@@ -1983,6 +1992,7 @@ async function carregarCompartilhadas(){
  for(const [k,n] of [['classe','Classe'],['raca','Raça'],['nivel','Nível'],['cenario','Cenário'],['especialidade','Especialidade']]){
  const valor=f.ficha?.[k];if(typeof valor==='string'||typeof valor==='number')art.append(el('p',n+': '+valor));
  }rec.append(art);}
+ if(fichas.recebidas.length){await api('/api/comunidade/fichas/vistas','POST',{ids:fichas.recebidas.map(f=>String(f.id))});notificacoesAtualizar(true);}
  }catch(e){if(v===compartilhadasVersao)$('fichas-compartilhadas-status').textContent=e.message;}
 }
 $('fichas-compartilhadas-atualizar').onclick=carregarCompartilhadas;
@@ -2035,7 +2045,7 @@ async function buscarMensagens(antigas=false){
  if(antigas||!anteriores)msgMais=d.mais;
  if(msgHistorico.length!==anteriores||!anteriores)pintarMensagens(!antigas);
  const ultima=d.mensagens.filter(m=>!m.minha).at(-1);
- if(ultima&&!document.hidden&&!antigas)await api('/api/comunidade/mensagens/lidas','POST',{apelido:destino,ate:ultima.id});
+ if(ultima&&!document.hidden&&!antigas){await api('/api/comunidade/mensagens/lidas','POST',{apelido:destino,ate:ultima.id});notificacoesAtualizar();}
  }catch(e){if(v===msgVersao)$('mensagens-status').textContent=e.message;}finally{if(v===msgVersao)msgOcupado=false;}
 }
 async function abrirConversa(apelido){
