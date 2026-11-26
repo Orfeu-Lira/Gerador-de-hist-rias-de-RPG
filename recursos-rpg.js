@@ -5,13 +5,42 @@ const clamp=(v,a,b)=>Math.min(b,Math.max(a,v)),int=(v,a,b)=>Number.isInteger(v)&
 const faixas=[{min:0,nome:'Iniciante',desconto:0},{min:20,nome:'Aprendiz',desconto:0},{min:50,nome:'Proficiente',desconto:1},{min:100,nome:'Especialista',desconto:2},{min:200,nome:'Mestre',desconto:3}];
 function proficiencia(h){const pontos=int(h?.proficiencia,0,200)?h.proficiencia:0;let i=0;while(i+1<faixas.length&&pontos>=faixas[i+1].min)i++;return {pontos,grau:faixas[i].nome,desconto:faixas[i].desconto,base:faixas[i].min,proximo:faixas[i+1]?.min??null};}
 function custoMana(h){const custo=int(h.mana,0,20)?h.mana:0;return Math.max(custo?1:0,custo-Math.min(Math.floor(custo/2),proficiencia(h).desconto));}
-function colecao(p){const a=p?.aquisicoes_rpg||{};return {itens:Array.isArray(a.itens)?a.itens.map(x=>({...x})):[],habilidades:Array.isArray(a.habilidades)?a.habilidades.map(x=>({...x})):[]};}
+const normalizarNome=n=>txt(n,80).normalize('NFKC').toLowerCase().replace(/\s+/g,' ');
+function manualId(n){return 'manual-'+encodeURIComponent(normalizarNome(n));}
+function colecao(p){
+ const a=p?.aquisicoes_rpg||{},itens=Array.isArray(a.itens)?a.itens.map(x=>({...x})):[],habilidades=Array.isArray(a.habilidades)?a.habilidades.map(x=>({...x})):[],manual=Array.isArray(a.manual)?a.manual.filter(x=>x&&typeof x.id==='string').slice(0,100):[];
+ const nomes=new Set(habilidades.map(h=>normalizarNome(h.nome)));
+ for(const h of p?.dados?.habilidades||[]){
+   if(!h||!txt(h.nome,80)||h.treinavel===false||(h.treinavel!==true&&String(h.descricao||'').startsWith('Ideia narrativa para discutir com o mestre;')))continue;
+   const nome=normalizarNome(h.nome);if(nomes.has(nome))continue;nomes.add(nome);
+   const id=manualId(h.nome),m=manual.find(x=>x.id===id)||{};
+   habilidades.push({...m,id,nome:txt(h.nome,80),descricao:txt(h.descricao,200),nivelMin:int(h.nivelMin,1,20)?h.nivelMin:1,mana:int(h.mana,0,20)?h.mana:0,manual:true});
+ }
+ return {itens,habilidades,manual};
+}
+function armazenamento(a){
+ const historico=new Map((a.manual||[]).map(x=>[x.id,x]));
+ for(const h of a.habilidades.filter(x=>x.manual===true)){
+  const {id,proficiencia,praticaDia,praticaHoje,praticaCampanha,praticaTurno,praticaOnline}=h;
+  if(proficiencia||historico.has(id))historico.set(id,{id,proficiencia,praticaDia,praticaHoje,praticaCampanha,praticaTurno,praticaOnline});
+ }
+ const ativos=new Set(a.habilidades.filter(x=>x.manual===true).map(x=>x.id));
+ const registros=[...historico.values()].sort((x,y)=>Number(ativos.has(y.id))-Number(ativos.has(x.id))).slice(0,100);
+ return {itens:a.itens,habilidades:a.habilidades.filter(x=>!x.manual),manual:registros};
+}
+function premiar(h,{campanhaId,turno,origem='solo',agora=new Date().toISOString()}){
+ const antes=proficiencia(h),dia=agora.slice(0,10),gasto=h.praticaDia===dia&&int(h.praticaHoje,0,25)?h.praticaHoje:0;
+ const repetiu=origem==='solo'?h.praticaCampanha===String(campanhaId)&&int(h.praticaTurno,0,100000)&&turno-h.praticaTurno<3:typeof h.praticaOnline==='string'&&Date.parse(agora)-Date.parse(h.praticaOnline)<60000;
+ const ganho=repetiu?0:Math.min(5,25-gasto,200-antes.pontos);
+ if(ganho>0){h.proficiencia=antes.pontos+ganho;h.praticaDia=dia;h.praticaHoje=gasto+ganho;if(origem==='solo'){h.praticaCampanha=String(campanhaId);h.praticaTurno=turno;}else h.praticaOnline=agora;}
+ return {ganho,antes,depois:proficiencia(h)};
+}
 function estado(p,c={},modo='padrao'){
  if(!p)return null;const d=p.dados||{},dnd=d.edicao==='2024',exp=xp.estado(p),nivel=dnd?exp.nivel:Math.min(20,1+Math.floor(Math.sqrt(Math.max(0,exp.total)/100)));
  const mod=Math.floor((Number(d.atributos?.con??10)-10)/2),[faces,fixo]=Object.hasOwn(vida,d.classe)?vida[d.classe]:[8,5];
  const pvMax=dnd?Math.max(1,faces+mod)+(nivel-1)*Math.max(1,fixo+mod):20+(nivel-1)*5,manaMax=modo==='mana'?10+(nivel-1)*5:0;
  const atual=(v,max,old)=>!int(v,0,10000)||!int(old,0,10000)?max:clamp(v+(v>0?Math.max(0,max-old):0),0,max);
- return {nivel,pv:atual(c.pv,pvMax,c.pvMax),pvMax,mana:manaMax?(c.manaMax===0?manaMax:atual(c.mana,manaMax,c.manaMax)):0,manaMax,...colecao(p),modo,dnd,praticaPendente:typeof c.praticaPendente==='string'?c.praticaPendente:null};
+ return {nivel,pv:atual(c.pv,pvMax,c.pvMax),pvMax,mana:manaMax?(c.manaMax===0?manaMax:atual(c.mana,manaMax,c.manaMax)):0,manaMax,...(({itens,habilidades})=>({itens,habilidades}))(colecao(p)),modo,dnd,praticaPendente:typeof c.praticaPendente==='string'?c.praticaPendente:null};
 }
 function erro(s){const e=Error(s);e.status=409;throw e;}
 function preparar(e,uso,tipo){
@@ -46,15 +75,12 @@ function aplicar(p,anterior,modo,uso,efeito,conquista,tipo,turno,campanhaId,opco
    if(h){
      if(opcoes.testePendente)e.praticaPendente=pratica;
      else if(conquista){
-       const antes=proficiencia(h),dia=(opcoes.agora||new Date().toISOString()).slice(0,10);
-       const gasto=h.praticaDia===dia&&int(h.praticaHoje,0,25)?h.praticaHoje:0;
-       const repetiu=h.praticaCampanha===String(campanhaId)&&int(h.praticaTurno,0,100000)&&turno-h.praticaTurno<3;
-       const ganho=repetiu?0:Math.min(5,25-gasto,200-antes.pontos);
-       if(ganho>0){h.proficiencia=antes.pontos+ganho;h.praticaDia=dia;h.praticaHoje=gasto+ganho;h.praticaCampanha=String(campanhaId);h.praticaTurno=turno;const depois=proficiencia(h);eventos.push('+'+ganho+' proficiência · '+h.nome+' ('+depois.pontos+'/200)');if(antes.grau!==depois.grau)eventos.push('Habilidade evoluída: '+h.nome+' → '+depois.grau);}
+       const {ganho,antes,depois}=premiar(h,{campanhaId,turno,agora:opcoes.agora});
+       if(ganho>0){eventos.push('+'+ganho+' proficiência · '+h.nome+' ('+depois.pontos+'/200)');if(antes.grau!==depois.grau)eventos.push('Habilidade evoluída: '+h.nome+' → '+depois.grau);}
      }
    }
  }
  e.itens=a.itens;e.habilidades=a.habilidades;return {estado:e,eventos,aquisicoes:a};
 }
 function persistir(e){return {pv:e.pv,pvMax:e.pvMax,mana:e.mana,manaMax:e.manaMax,praticaPendente:e.praticaPendente??null};}
-module.exports={estado,preparar,aplicar,persistir,colecao,proficiencia,custoMana,faixas};
+module.exports={estado,preparar,aplicar,persistir,colecao,armazenamento,premiar,manualId,proficiencia,custoMana,faixas};

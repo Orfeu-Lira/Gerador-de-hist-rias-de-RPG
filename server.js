@@ -528,7 +528,7 @@ app.get('/api/comunidade/campanhas/:id',asyncHandler(async(req,res)=>{
  await comCampanha(req,res,async(client,s,u,bloqueado)=>{
  if(s.estado!=='ativo'||bloqueado)return campanhaErro('Acesso à campanha indisponível.');
  const membros=await client.query(`SELECT p.apelido,m.estado,m.usuario_id=$2 AS eu,m.usuario_id=$3 AS mestre,f.nome AS personagem,CASE WHEN m.usuario_id=$2 THEN m.personagem_id::text ELSE NULL END AS personagem_id FROM public.mesa_campanha_membros m JOIN public.mesa_perfis p ON p.usuario_id=m.usuario_id LEFT JOIN public.personagens_dnd f ON f.id=m.personagem_id AND f.usuario_id=m.usuario_id WHERE m.campanha_id=$1 AND (m.estado='ativo' OR $4::boolean) ORDER BY mestre DESC,p.apelido`,[s.id,u.id,s.mestre,s.minha]);
- const eventos=await client.query(`SELECT e.id::text AS id,e.tipo,e.texto,e.efeito,e.cor,e.criado_em,p.apelido,e.personagem_nome FROM public.mesa_campanha_eventos e JOIN public.mesa_perfis p ON p.usuario_id=e.autor WHERE e.campanha_id=$1 AND ($2::bigint IS NULL OR e.id>$2::bigint) ORDER BY e.id ${depois?'ASC':'DESC'} LIMIT 80`,[s.id,depois??null]);
+ const eventos=await client.query(`SELECT e.id::text AS id,e.tipo,e.texto,e.efeito,e.cor,e.criado_em,p.apelido,e.personagem_nome,CASE WHEN e.pratica IS NULL THEN NULL ELSE jsonb_build_object('nome',e.pratica->>'nome','status',e.pratica->>'status') END AS pratica FROM public.mesa_campanha_eventos e JOIN public.mesa_perfis p ON p.usuario_id=e.autor WHERE e.campanha_id=$1 AND ($2::bigint IS NULL OR e.id>$2::bigint) ORDER BY e.id ${depois?'ASC':'DESC'} LIMIT 80`,[s.id,depois??null]);
  return {dados:{titulo:s.titulo,descricao:s.descricao,minha:s.minha,encerrada:s.encerrada,membros:membros.rows,eventos:depois?eventos.rows:eventos.rows.reverse()}};
  });
 }));
@@ -566,7 +566,8 @@ app.post('/api/comunidade/campanhas/:id/personagem',asyncHandler(async(req,res)=
  });
 }));
 app.post('/api/comunidade/campanhas/:id/eventos',asyncHandler(async(req,res)=>{
- const {tipo,texto='',efeito='nenhum',cor='vermelho',chave,faces}=req.body||{};
+ const {tipo,texto='',efeito='nenhum',cor='vermelho',chave,faces,habilidadeId}=req.body||{};
+ if(habilidadeId!=null&&(tipo!=='acao'||typeof habilidadeId!=='string'||habilidadeId.length>1100))return res.status(400).json({erro:'Habilidade inválida.'});
  if(!['narracao','acao','fala','dado'].includes(tipo)||typeof texto!=='string'||texto.length>2000||(tipo!=='dado'&&!texto.trim())||!campanhaEfeitos.includes(efeito)||!campanhaCores.includes(cor)||typeof chave!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(chave)||(tipo==='dado'&&![4,6,8,10,12,20,100].includes(faces)))return res.status(400).json({erro:'Evento inválido.'});
  await comCampanha(req,res,async(client,s,u,bloqueado)=>{
  if(s.estado!=='ativo'||s.encerrada||bloqueado||(!s.minha&&(tipo==='narracao'||efeito!=='nenhum'))||(tipo!=='narracao'&&efeito!=='nenhum'))return campanhaErro('Evento não autorizado.');
@@ -576,7 +577,38 @@ app.post('/api/comunidade/campanhas/:id/eventos',asyncHandler(async(req,res)=>{
  if(n.rows[0].n>=20)return campanhaErro('Aguarde um minuto antes de enviar mais eventos.',429);
  const conteudo=tipo==='dado'?'Rolou d'+faces+': '+require('crypto').randomInt(1,faces+1):texto.trim();
  const f=tipo==='narracao'?null:(await client.query('SELECT p.nome FROM public.mesa_campanha_membros m JOIN public.personagens_dnd p ON p.id=m.personagem_id AND p.usuario_id=m.usuario_id WHERE m.campanha_id=$1 AND m.usuario_id=$2',[s.id,u.id])).rows[0];
- const r=await client.query('INSERT INTO public.mesa_campanha_eventos(campanha_id,autor,chave,tipo,texto,efeito,cor,personagem_nome) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id::text AS id',[s.id,u.id,chave,tipo,conteudo,efeito,cor,f?.nome??null]);return {dados:r.rows[0]};
+ let pratica=null;
+ if(habilidadeId){
+  if(s.minha)return campanhaErro('O mestre não pode solicitar a própria evolução.');
+  const p=(await client.query("SELECT p.id,p.nome,p.dados,p.xp,p.aquisicoes_rpg FROM public.mesa_campanha_membros m JOIN public.personagens_dnd p ON p.id=m.personagem_id AND p.usuario_id=m.usuario_id WHERE m.campanha_id=$1 AND m.usuario_id=$2 AND m.estado='ativo'",[s.id,u.id])).rows[0];
+  const e=recursosRpg.estado(p),h=e?.habilidades.find(x=>x.id===habilidadeId);
+  if(!h||e.nivel<h.nivelMin)return campanhaErro('Habilidade indisponível ou acima do nível.',409);
+  pratica={id:h.id,nome:h.nome,personagemId:String(p.id),status:'pendente'};
+ }
+ const r=await client.query('INSERT INTO public.mesa_campanha_eventos(campanha_id,autor,chave,tipo,texto,efeito,cor,personagem_nome,pratica) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb) RETURNING id::text AS id',[s.id,u.id,chave,tipo,conteudo,efeito,cor,f?.nome??null,pratica?JSON.stringify(pratica):null]);return {dados:r.rows[0]};
+ });
+}));
+app.post('/api/comunidade/campanhas/:id/pratica',asyncHandler(async(req,res)=>{
+ const evento=String(req.body?.evento||''),aprovar=req.body?.aprovar;
+ if(!/^[1-9][0-9]{0,17}$/.test(evento)||typeof aprovar!=='boolean')return res.status(400).json({erro:'Solicitação inválida.'});
+ await comCampanha(req,res,async(client,s,u,bloqueado)=>{
+  if(!s.minha||s.estado!=='ativo'||s.encerrada||bloqueado)return campanhaErro('Somente o mestre pode avaliar a prática.');
+  const ev=(await client.query("SELECT id,autor,pratica,personagem_nome FROM public.mesa_campanha_eventos WHERE id=$1 AND campanha_id=$2 AND tipo='acao' FOR UPDATE",[evento,s.id])).rows[0];
+  if(!ev?.pratica||String(ev.autor)===String(u.id))return campanhaErro('Prática indisponível.',404);
+  if(ev.pratica.status!=='pendente')return {dados:{status:ev.pratica.status,ganho:0,duplicado:true}};
+  let ganho=0,status='recusada';
+  if(aprovar){
+   const p=(await client.query("SELECT p.id,p.nome,p.dados,p.xp,p.aquisicoes_rpg FROM public.mesa_campanha_membros m JOIN public.personagens_dnd p ON p.id=m.personagem_id AND p.usuario_id=m.usuario_id WHERE m.campanha_id=$1 AND m.usuario_id=$2 AND m.estado='ativo' AND p.id=$3 FOR UPDATE OF p",[s.id,ev.autor,ev.pratica.personagemId])).rows[0];
+   if(!p)return campanhaErro('O participante ou a ficha vinculada mudou.',409);
+   const a=recursosRpg.colecao(p),h=a.habilidades.find(x=>x.id===ev.pratica.id),e=recursosRpg.estado(p);
+   if(!h||e.nivel<h.nivelMin)return campanhaErro('A habilidade não está mais disponível.',409);
+   const premio=recursosRpg.premiar(h,{origem:'multiplayer',campanhaId:s.id});ganho=premio.ganho;status=ganho?'aprovada':'limite';
+   if(ganho)await client.query('UPDATE public.personagens_dnd SET aquisicoes_rpg=$2::jsonb WHERE id=$1',[p.id,JSON.stringify(recursosRpg.armazenamento(a))]);
+  }
+  await client.query("UPDATE public.mesa_campanha_eventos SET pratica=jsonb_set(pratica,'{status}',to_jsonb($2::text)) WHERE id=$1",[evento,status]);
+  const mensagem=(ev.personagem_nome||'Participante')+' · '+ev.pratica.nome+': '+(ganho?'+'+ganho+' proficiência.':status==='limite'?'prática avaliada, limite de evolução atingido.':'prática não aprovada.');
+  await client.query("INSERT INTO public.mesa_campanha_eventos(campanha_id,autor,chave,tipo,texto,efeito,cor) VALUES($1,$2,$3,'narracao',$4,'nenhum','vermelho')",[s.id,u.id,crypto.randomUUID(),mensagem]);
+  return {dados:{status,ganho}};
  });
 }));
 app.post('/api/comunidade/campanhas/:id/xp',asyncHandler(async(req,res)=>{
@@ -1061,7 +1093,7 @@ app.post('/api/solo/campanhas/:id/turnos',asyncHandler(async(req,res)=>{
     if(!p){const e=Error('A ficha não está mais disponível.');e.status=409;throw e;}
     resultado=recursosRpg.aplicar(p,c.recursos,c.modo_recursos,uso,resposta.teste?null:resposta.efeitos,categoria,tipo,n,id,{testePendente:Boolean(resposta.teste),falhou:rolagem?.passou===false,ativa:c.progressao!=='nenhuma'});
     await client.query('UPDATE public.mesa_solo_campanhas SET recursos=$2::jsonb WHERE id=$1',[id,JSON.stringify(recursosRpg.persistir(resultado.estado))]);
-    await client.query('UPDATE public.personagens_dnd SET aquisicoes_rpg=$2::jsonb WHERE id=$1',[p.id,JSON.stringify(resultado.aquisicoes)]);
+    await client.query('UPDATE public.personagens_dnd SET aquisicoes_rpg=$2::jsonb WHERE id=$1',[p.id,JSON.stringify(recursosRpg.armazenamento(resultado.aquisicoes))]);
     await client.query("UPDATE public.mesa_solo_mensagens SET recursos_evento=$3::jsonb WHERE campanha_id=$1 AND numero=$2 AND papel='mestre'",[id,n,JSON.stringify(resultado.eventos)]);
    }
    await client.query('COMMIT');
@@ -1124,7 +1156,8 @@ function validarFichaDnd(dados) {
     (!Array.isArray(dados.habilidades)||dados.habilidades.length>24||
      !dados.habilidades.every(x=>x&&typeof x==='object'&&!Array.isArray(x)&&
        typeof x.nome==='string'&&x.nome.trim().length>0&&x.nome.length<=80&&
-       tiposHabilidade.includes(x.tipo)&&typeof x.descricao==='string'&&x.descricao.length<=200))) return false;
+       tiposHabilidade.includes(x.tipo)&&typeof x.descricao==='string'&&x.descricao.length<=200&&
+       (x.nivelMin===undefined||Number.isInteger(x.nivelMin)&&x.nivelMin>=1&&x.nivelMin<=20)&&(x.mana===undefined||Number.isInteger(x.mana)&&x.mana>=0&&x.mana<=20)&&(x.treinavel===undefined||typeof x.treinavel==='boolean')))) return false;
   if(dados.evolucao!==undefined &&
     (!Array.isArray(dados.evolucao)||dados.evolucao.length>30||
      !dados.evolucao.every(x=>x&&typeof x==='object'&&!Array.isArray(x)&&
@@ -1239,7 +1272,7 @@ app.delete('/api/personagens/:id/avatar',asyncHandler(async(req,res)=>{
 app.get('/api/personagens',asyncHandler(async(req,res)=>{
   const u=await atual(req);if(!u) return res.status(401).json({erro:'Entre na sua conta para consultar suas fichas.'});
   const r=await query('SELECT id,nome,dados,xp,aquisicoes_rpg,atualizado_em FROM public.personagens_dnd WHERE usuario_id=$1 ORDER BY atualizado_em DESC LIMIT 50',[u.id]);
-  res.json(r.rows.map(p=>({...p,progressao:xpMesa.estado(p)})));
+  res.json(r.rows.map(p=>({...p,progressao:xpMesa.estado(p),habilidadesDisponiveis:recursosRpg.colecao(p).habilidades})));
 }));
 app.get('/api/personagens/:id/xp',asyncHandler(async(req,res)=>{
  const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});const id=soloId(req.params.id);if(!id)return res.status(400).json({erro:'Ficha inválida.'});
