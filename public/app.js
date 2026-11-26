@@ -256,6 +256,7 @@ function navegarMesa(tela, depois){
 function mostrar(tela) {
   if(!TELAS.includes(tela))return;
   pararJornada();
+  if(mesaTelaVisivel==='solo'&&tela!=='solo')fecharCinema();
   if(tela!=='amigos'&&mesaTelaVisivel==='amigos')amigosLimpar();
   if(tela!=='compartilhadas'&&mesaTelaVisivel==='compartilhadas')limparCompartilhadas();
   if(tela!=='mensagens'&&mesaTelaVisivel==='mensagens')limparMensagens();
@@ -692,6 +693,7 @@ function soloAdicionarTeste(art,teste,numero){
      (v.passou===null?'':v.passou?' · Sucesso!':' · Falha');
    soloMensagem('jogador',resultado,'acao');
    soloMensagem('mestre',r.narracao,'acao',r.teste,r.numero);
+   if(mesaTelaVisivel==='solo')cinemaSolo(r.narracao);
    botao.remove();texto.textContent='Resultado registrado nesta campanha.';
    soloEstado('');
   }catch(e){animacao.cancelar();palco.replaceChildren();texto.textContent=e.message;botao.disabled=false;soloEstado('Não foi possível concluir a rolagem: '+e.message,true);}
@@ -748,7 +750,7 @@ async function soloAbrirDepoisCriar(r){
  soloMensagem('mestre',r.mestre,'inicio',r.teste,0);
   soloMostrarTrilha($('solo-genero').value,$('solo-tom').value,soloOrigens.find(a=>String(a.id)===$('solo-aventura').value)?.conteudo?.trilha||'');
  $('solo-entrada').hidden=true;$('solo-jogo').hidden=false;soloEstado('');
- $('solo-acao').value='';soloFimLista();
+ $('solo-acao').value='';soloFimLista();if(mesaTelaVisivel==='solo')cinemaSolo(r.mestre);
 }
 $('solo-acao-form').onsubmit=async ev=>{
  ev.preventDefault();if(soloOcupado||!soloCampanhaId)return;
@@ -762,6 +764,7 @@ $('solo-acao-form').onsubmit=async ev=>{
  try{
   const r=await api('/api/solo/campanhas/'+soloCampanhaId+'/turnos','POST',{acao,tipo});
   esperando.querySelector('p').textContent=r.narracao;
+  if(mesaTelaVisivel==='solo')cinemaSolo(r.narracao);
   if(r.teste)soloAdicionarTeste(esperando,r.teste,r.numero);
   $('solo-acao').value='';soloEstado('');
  }catch(e){
@@ -2086,11 +2089,12 @@ const campanhaBase='/api/comunidade/campanhas';
 const campanhaStatus=t=>{$('campanha-status').textContent=t;};
 function fecharCinema(){clearTimeout(cinemaTimer);$('campanha-cinema').hidden=true;$('campanha-cinema-arte').replaceChildren();for(const n of cinemaNos){try{n.stop();}catch{}}cinemaNos=[];}
 $('campanha-cinema-fechar').onclick=fecharCinema;
-$('campanha-visual').onchange=()=>{if(!$('campanha-visual').checked)fecharCinema();};
+for(const id of ['campanha-visual','solo-cinema-visual'])$(id).onchange=()=>{if(!$(id).checked)fecharCinema();};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('campanha-cinema').hidden)fecharCinema();});
-$('campanha-som').onchange=async()=>{if(!$('campanha-som').checked){fecharCinema();return;}try{cinemaAudio=cinemaAudio||new(window.AudioContext||window.webkitAudioContext)();await cinemaAudio.resume();campanhaStatus('Sons cinematográficos ativados.');}catch{ $('campanha-som').checked=false;campanhaStatus('Não foi possível ativar o áudio.');}};
+for(const id of ['campanha-som','solo-cinema-som'])$(id).onchange=async()=>{if(!$(id).checked){fecharCinema();return;}try{cinemaAudio=cinemaAudio||new(window.AudioContext||window.webkitAudioContext)();await cinemaAudio.resume();aviso('Sons cinematográficos ativados.',true);}catch{$(id).checked=false;aviso('Não foi possível ativar o áudio.');}};
+function cinemaSolo(texto){if(typeof texto!=='string')return;const d=detectarCinema(texto);if(d.efeito!=='nenhum')exibirCinema({...d,texto});}
 function somCinema(efeito){
- if(!$('campanha-som').checked||!cinemaAudio||cinemaAudio.state!=='running')return;
+ if(!$(mesaTelaVisivel==='solo'?'solo-cinema-som':'campanha-som').checked||!cinemaAudio||cinemaAudio.state!=='running')return;
  const ctx=cinemaAudio,t=ctx.currentTime;
  const dur=efeito==='dragao_fogo'?2.8:efeito==='dragao'?1.7:efeito==='tempestade'?2.2:1.3;
  const gain=ctx.createGain();gain.gain.setValueAtTime(.001,t);gain.gain.exponentialRampToValueAtTime(.13,t+.09);gain.gain.exponentialRampToValueAtTime(.001,t+dur);gain.connect(ctx.destination);
@@ -2116,7 +2120,7 @@ function arteDragao(cor,fogo){
 function exibirCinema(e){
  if(e.efeito==='nenhum'||document.hidden)return;
  fecharCinema();somCinema(e.efeito);
- if(!$('campanha-visual').checked){cinemaTimer=setTimeout(fecharCinema,4200);return;}
+ if(!$(mesaTelaVisivel==='solo'?'solo-cinema-visual':'campanha-visual').checked){cinemaTimer=setTimeout(fecharCinema,4200);return;}
  const painel=$('campanha-cinema'),arte=$('campanha-cinema-arte');
  painel.className='mesa-cinema efeito-'+e.efeito+((mesaMovimentoReduzido()||acessibilidadeMovimentoReduzido())?' sem-movimento':'');
  if(e.efeito.startsWith('dragao'))arte.append(arteDragao(e.cor,e.efeito==='dragao_fogo'));
@@ -2131,7 +2135,7 @@ function detectarCinema(texto){
  return {efeito,cor};
 }
 function limparCampanha(){
- clearInterval(campanhaTimer);campanhaTimer=null;campanhaVersao++;campanhaId=null;campanhaCursor=null;campanhaCarregando=false;campanhaPendente=null;
+ clearInterval(campanhaTimer);campanhaTimer=null;campanhaVersao++;campanhaId=null;campanhaCursor=null;campanhaCarregando=false;campanhaPendente=null;campanhaPersonagemAtual='';$('campanha-personagem').replaceChildren(new Option('Sem personagem vinculado',''));
  fecharCinema();$('campanha-historico').replaceChildren();$('campanha-membros').replaceChildren();$('campanha-amigo').replaceChildren();$('campanhas-lista').replaceChildren();$('campanha-texto').value='';$('campanha-sala').hidden=true;$('campanhas-lobby').hidden=false;campanhaStatus('');
 }
 async function carregarCampanhas(){
@@ -2145,6 +2149,18 @@ async function carregarCampanhas(){
  alvo.append(card);}
  }catch(e){if(v===campanhaVersao)campanhaStatus(e.message);}
 }
+let campanhaPersonagemAtual='';
+async function carregarPersonagensCampanha(){
+ const v=campanhaVersao,lista=await api('/api/personagens');
+ if(v!==campanhaVersao)return;
+ const sel=$('campanha-personagem');sel.replaceChildren(new Option('Sem personagem vinculado',''));
+ for(const f of lista)sel.append(new Option(f.nome,String(f.id)));
+ sel.value=campanhaPersonagemAtual;
+}
+$('campanha-personagem-form').onsubmit=async ev=>{
+ ev.preventDefault();if(!campanhaId)return;const v=campanhaVersao,b=ev.currentTarget.querySelector('button');b.disabled=true;
+ try{await api(campanhaBase+'/'+campanhaId+'/personagem','POST',{personagem:$('campanha-personagem').value||null});if(v!==campanhaVersao)return;await atualizarCampanha();campanhaStatus('Personagem vinculado.');}catch(e){if(v===campanhaVersao)campanhaStatus(e.message);}finally{b.disabled=false;}
+};
 async function preencherConvites(){
  const v=campanhaVersao;const lista=await api('/api/comunidade/amigos');if(v!==campanhaVersao)return;
  const sel=$('campanha-amigo');sel.replaceChildren(new Option('Escolha um amigo',''));for(const a of lista.filter(a=>a.estado==='aceita'))sel.append(new Option(a.apelido,a.apelido));
@@ -2153,7 +2169,7 @@ function atualizarTipoCampanha(){$('campanha-efeitos').hidden=!campanhaMestre||$
 $('campanha-tipo').onchange=atualizarTipoCampanha;
 async function abrirCampanha(id){
  campanhaVersao++;campanhaId=String(id);campanhaCursor=null;campanhaPendente=null;campanhaCarregando=false;$('campanha-historico').replaceChildren();$('campanha-texto').value='';$('campanhas-lobby').hidden=true;$('campanha-sala').hidden=false;
- await atualizarCampanha();if(campanhaMestre&&!campanhaEncerrada)await preencherConvites().catch(e=>campanhaStatus(e.message));
+ await atualizarCampanha();if(campanhaId===String(id)){await carregarPersonagensCampanha().catch(e=>campanhaStatus(e.message));if(campanhaMestre&&!campanhaEncerrada)await preencherConvites().catch(e=>campanhaStatus(e.message));}
 }
 async function atualizarCampanha(){
  if(!campanhaId||campanhaCarregando||document.hidden||!navigator.onLine)return;
@@ -2168,11 +2184,12 @@ async function atualizarCampanha(){
  $('campanha-sair').textContent=d.minha?'Encerrar campanha':'Sair da campanha';$('campanha-sair').disabled=d.minha&&d.encerrada;
  $('campanha-narracao').disabled=!d.minha;if(!d.minha&&$('campanha-tipo').value==='narracao')$('campanha-tipo').value='acao';atualizarTipoCampanha();
  const membros=$('campanha-membros');membros.replaceChildren();
- for(const m of d.membros){const linha=el('div','','mesa-amigo-linha');linha.append(el('strong',m.apelido+(m.mestre?' · Mestre':m.estado==='convidado'?' · Convidado':'')));
+ $('campanha-personagem-form').hidden=d.encerrada;campanhaPersonagemAtual=d.membros.find(m=>m.eu)?.personagem_id||'';
+ for(const m of d.membros){const linha=el('div','','mesa-amigo-linha');linha.append(el('strong',m.apelido+(m.personagem?' · '+m.personagem:'')+(m.mestre?' · Mestre':m.estado==='convidado'?' · Convidado':'')));
  if(d.minha&&!m.eu&&!d.encerrada){const b=el('button','Remover');b.type='button';b.onclick=()=>acaoMembroCampanha('remover',m.apelido);linha.append(b);}membros.append(linha);}
  const h=$('campanha-historico'),nomes={narracao:'Narração',acao:'Ação',fala:'Fala',dado:'Dado'};
  let cinema=null;
- for(const e of d.eventos){const item=el('article','','mesa-chat-bolha'+(e.tipo==='narracao'?' narracao':''));item.append(el('strong',e.apelido+' · '+nomes[e.tipo]),el('p',e.texto),el('small',new Date(e.criado_em).toLocaleTimeString('pt-BR')));h.append(item);campanhaCursor=e.id;
+ for(const e of d.eventos){const item=el('article','','mesa-chat-bolha'+(e.tipo==='narracao'?' narracao':''));item.append(el('strong',e.apelido+(e.personagem_nome?' · '+e.personagem_nome:'')+' · '+nomes[e.tipo]),el('p',e.texto),el('small',new Date(e.criado_em).toLocaleTimeString('pt-BR')));h.append(item);campanhaCursor=e.id;
  if(cursor&&e.efeito!=='nenhum')cinema=e;}
  // Uma sala vazia não deve reproduzir efeitos históricos ao entrar.
  if(!campanhaCursor)campanhaCursor='0';
