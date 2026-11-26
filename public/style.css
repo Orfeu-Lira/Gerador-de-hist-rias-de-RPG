@@ -1256,3 +1256,19 @@ body.mesa-alto-contraste #solo-jogo .solo-mensagem.jogador{background:#073e2a;co
 @media(prefers-reduced-motion:reduce){.solo-hud-recurso progress::-webkit-progress-value{transition:none}}
 body.mesa-alto-contraste #solo-resumo-recursos.solo-hud{background:#080808;border:2px solid white}
 body.mesa-alto-contraste .solo-hud :is(strong,span,small){color:white}
+
+/* Inventário e grimório dentro da ficha Solo. */
+.solo-ficha-colecao{margin:10px 0 0}
+.solo-ficha-abas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin:0 0 10px;width:100%}
+.solo-ficha-abas button{min-width:0;min-height:44px;padding:6px 3px;border-radius:8px;background:#f0e4cd;color:#56432b;border:1px solid #cbb38a;font-size:.76rem;font-weight:700;cursor:pointer;overflow-wrap:anywhere}
+.solo-ficha-abas button[aria-pressed=true]{background:#285447;color:#fff3d8;border-color:#285447}
+.solo-ficha-item{border:1px solid #dbc7a2;border-radius:10px;padding:11px;margin:7px 0;background:#fff9ea;color:#403324;overflow-wrap:anywhere}
+.solo-ficha-item-topo{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;font-size:.94rem}
+.solo-ficha-marca{font-size:.74rem;color:#735424;font-weight:700;flex:none}
+.solo-ficha-item p{font-size:.84rem;line-height:1.5;margin:5px 0}
+.solo-ficha-item .mesa-recurso-linha{font-size:.78rem;margin:8px 0}
+.solo-ficha-item .guia-abrir{margin-top:6px;font-size:.8rem;min-height:38px}
+#solo-teclado-dica{display:none}
+@media(any-pointer:fine) and (min-width:850px){#solo-teclado-dica{display:inline;margin-left:auto;white-space:nowrap}}
+body.mesa-alto-contraste .solo-ficha-item{background:#fff;color:#000;border:2px solid #000}
+body.mesa-alto-contraste .solo-ficha-item :is(p,span,strong){color:#111}

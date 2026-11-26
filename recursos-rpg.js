@@ -14,7 +14,7 @@ function colecao(p){
    if(!h||!txt(h.nome,80)||h.treinavel===false||(h.treinavel!==true&&String(h.descricao||'').startsWith('Ideia narrativa para discutir com o mestre;')))continue;
    const nome=normalizarNome(h.nome);if(nomes.has(nome))continue;nomes.add(nome);
    const id=manualId(h.nome),m=manual.find(x=>x.id===id)||{};
-   habilidades.push({...m,id,nome:txt(h.nome,80),descricao:txt(h.descricao,200),nivelMin:int(h.nivelMin,1,20)?h.nivelMin:1,mana:int(h.mana,0,20)?h.mana:0,manual:true});
+   habilidades.push({...m,id,nome:txt(h.nome,80),descricao:txt(h.descricao,200),nivelMin:int(h.nivelMin,1,20)?h.nivelMin:1,mana:int(h.mana,0,20)?h.mana:0,manual:true,tipo:txt(h.tipo,30)||'Narrativa'});
  }
  return {itens,habilidades,manual};
 }
@@ -65,7 +65,7 @@ function aplicar(p,anterior,modo,uso,efeito,conquista,tipo,turno,campanhaId,opco
  if(conquista&&g&&typeof g==='object'&&!Array.isArray(g)&&['item','habilidade'].includes(g.tipo)){
  const nome=txt(g.nome,80),descricao=txt(g.descricao,160),nivelMin=g.nivelMin;
  if(nome&&descricao&&int(nivelMin,1,20)){const lista=g.tipo==='item'?a.itens:a.habilidades,existe=lista.find(x=>x.nome.normalize('NFKC').toLowerCase()===nome.normalize('NFKC').toLowerCase());
- if(!existe&&lista.length<40){const novo={id:String(campanhaId)+'-'+String(turno),nome,descricao,nivelMin};if(g.tipo==='item'){novo.quantidade=1;novo.consumivel=g.consumivel===true;}else {novo.mana=int(g.mana,0,20)?g.mana:0;novo.proficiencia=0;}lista.push(novo);eventos.push((g.tipo==='item'?'Item adquirido: ':'Habilidade aprendida: ')+nome+(nivelMin>e.nivel?' (bloqueado até nível '+nivelMin+')':''));}
+ if(!existe&&lista.length<40){const novo={id:String(campanhaId)+'-'+String(turno),nome,descricao,nivelMin};if(g.tipo==='item'){novo.quantidade=1;novo.consumivel=g.consumivel===true;}else {novo.mana=int(g.mana,0,20)?g.mana:0;novo.proficiencia=0;novo.tipo=['Característica','Perícia','Magia','Talento','Narrativa'].includes(g.categoriaHabilidade)?g.categoriaHabilidade:'Narrativa';}lista.push(novo);eventos.push((g.tipo==='item'?'Item adquirido: ':'Habilidade aprendida: ')+nome+(nivelMin>e.nivel?' (bloqueado até nível '+nivelMin+')':''));}
  else if(existe&&g.tipo==='item'&&existe.consumivel&&existe.quantidade<99&&['secundaria','principal','combate','exploracao'].includes(conquista)){existe.quantidade++;eventos.push('Item adquirido: '+existe.nome+' (+1)');}
  }}
  const pratica=uso?.tipo==='habilidade'?uso.id:tipo==='rolagem'?e.praticaPendente:null;
@@ -82,5 +82,18 @@ function aplicar(p,anterior,modo,uso,efeito,conquista,tipo,turno,campanhaId,opco
  }
  e.itens=a.itens;e.habilidades=a.habilidades;return {estado:e,eventos,aquisicoes:a};
 }
+function fichaSolo(p,e){
+ if(!p||!e)return null;
+ const d=p.dados||{},base=Array.isArray(d.inventario)?d.inventario:String(d.equipamentos||'').split('\n').map(nome=>({nome,tipo:'Outros',quantidade:1}));
+ const inventario=base.slice(0,32).filter(i=>i&&txt(i.nome,80)).map(i=>({nome:txt(i.nome,80),tipo:txt(i.tipo,30)||'Outros',quantidade:int(i.quantidade,1,99)?i.quantidade:1,equipado:i.equipado===true,descricao:txt(i.descricao,120),origem:'ficha'}));
+ for(const i of e.itens||[])inventario.push({...i,origem:'aventura',tipo:i.consumivel?'Consumível':'Outros'});
+ const cadastradas=Array.isArray(d.habilidades)?d.habilidades:[],porNome=new Map(cadastradas.filter(h=>h&&txt(h.nome,80)).map(h=>[normalizarNome(h.nome),h]));
+ const habilidades=(e.habilidades||[]).map(h=>({...h,tipo:h.tipo||porNome.get(normalizarNome(h.nome))?.tipo||'Narrativa',origem:h.manual?'ficha':'aventura',utilizavel:true}));
+ const nomes=new Set(habilidades.map(h=>normalizarNome(h.nome)));
+ for(const h of cadastradas.slice(0,24))if(h&&txt(h.nome,80)&&!nomes.has(normalizarNome(h.nome))){
+  nomes.add(normalizarNome(h.nome));habilidades.push({nome:txt(h.nome,80),tipo:txt(h.tipo,30)||'Narrativa',descricao:txt(h.descricao,200),origem:'ficha',utilizavel:false,nivelMin:int(h.nivelMin,1,20)?h.nivelMin:1,mana:int(h.mana,0,20)?h.mana:0});
+ }
+ return {inventario,feiticos:habilidades.filter(h=>h.tipo==='Magia'),habilidades:habilidades.filter(h=>h.tipo!=='Magia')};
+}
 function persistir(e){return {pv:e.pv,pvMax:e.pvMax,mana:e.mana,manaMax:e.manaMax,praticaPendente:e.praticaPendente??null};}
-module.exports={estado,preparar,aplicar,persistir,colecao,armazenamento,premiar,manualId,proficiencia,custoMana,faixas};
+module.exports={estado,preparar,aplicar,persistir,fichaSolo,colecao,armazenamento,premiar,manualId,proficiencia,custoMana,faixas};

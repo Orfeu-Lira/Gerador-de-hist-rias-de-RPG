@@ -698,16 +698,28 @@ function dominioHabilidade(h){const pontos=Math.min(200,Math.max(0,Number(h.prof
 function listarAquisicoes(alvo,a,nivel){
  for(const [titulo,lista] of [['Itens conquistados',a?.itens||[]],['Habilidades e proficiência',a?.habilidades||[]]]){const d=el('details');d.append(el('summary',titulo+' ('+lista.length+')'));for(const x of lista){const item=x.quantidade!==undefined,h=item?null:dominioHabilidade(x),card=el('div','','mesa-dominio');card.append(el('p',x.nome+' · Nível mínimo '+x.nivelMin+(item?' · ×'+x.quantidade:' · '+h.grau+' · custo de mana '+h.custo)+(nivel<x.nivelMin?' · Bloqueado':'')+(x.manual?' · Cadastrada':'')+' — '+x.descricao));if(h){barraRecurso(card,'Proficiência',h.pontos,200,'mesa-proficiencia');if(h.proximo!==null)card.append(el('p','Próximo grau: '+h.proximo+' pontos','suave'));else card.append(el('p','Domínio máximo','suave'));}d.append(card);}if(!lista.length)d.append(el('p','Nenhum ainda.','suave'));alvo.append(d);}
 }
+let soloFichaDados=null,soloFichaAba='inventario';
+function soloPintarColecao(){
+ const box=$('solo-ficha-colecao'),lista=$('solo-ficha-lista'),dados=soloFichaDados,e=soloResumoEstado;
+ box.hidden=!dados||!e;lista.replaceChildren();if(box.hidden)return;
+ const nomes={inventario:'Inventário',feiticos:'Feitiços',habilidades:'Habilidades'};
+ for(const b of box.querySelectorAll('[data-solo-colecao]')){const k=b.dataset.soloColecao;b.textContent=nomes[k]+' ('+(dados[k]?.length||0)+')';b.setAttribute('aria-pressed',String(k===soloFichaAba));}
+ const itens=dados[soloFichaAba]||[];if(!itens.length){lista.append(el('p',soloFichaAba==='inventario'?'Inventário vazio.':soloFichaAba==='feiticos'?'Nenhum feitiço registrado. Cadastre uma habilidade do tipo Magia na ficha.':'Nenhuma habilidade registrada.','suave'));return;}
+ for(const h of itens){const card=el('article','','solo-ficha-item'),topo=el('div','','solo-ficha-item-topo');topo.append(el('strong',h.nome));const ehItem=soloFichaAba==='inventario',dom=ehItem||!h.utilizavel?null:dominioHabilidade(h);const info=ehItem?'×'+h.quantidade:dom?dom.grau:'Não habilitada';topo.append(el('span',info,'solo-ficha-marca'));card.append(topo);const meta=[h.tipo,h.origem==='ficha'?'Ficha':'Aventura'];if(ehItem){if(h.equipado)meta.push('Equipado');if(h.quantidade===0)meta.push('Esgotado');}else{meta.push('Nível mínimo '+(h.nivelMin||1));if(e.nivel<h.nivelMin)meta.push('Bloqueada');if(dom&&e.manaMax)meta.push(dom.custo+' MP');if(dom&&e.manaMax&&dom.custo>e.mana)meta.push('Mana insuficiente');}card.append(el('p',meta.filter(Boolean).join(' · '),'suave'));if(h.descricao)card.append(el('p',h.descricao));if(dom)barraRecurso(card,'Proficiência',dom.pontos,200,'mesa-proficiencia');
+  const tipo=ehItem?'item':'habilidade',op=[...$('solo-uso').options].find(o=>o.value===tipo+':'+h.id);if(h.id&&op&&!op.disabled){const usar=el('button','Selecionar para ação','guia-abrir');usar.type='button';usar.onclick=()=>{if(soloOcupado)return;$('solo-tipo').value='acao';soloAtualizarCompositor();$('solo-uso').value=op.value;soloFecharPaineis();$('solo-acao').focus();};card.append(usar);}lista.append(card);
+ }
+}
+for(const b of document.querySelectorAll('[data-solo-colecao]'))b.onclick=()=>{soloFichaAba=b.dataset.soloColecao;soloPintarColecao();};
 function soloRecursos(r,art){
  if(r.xpAtual){soloResumoXP=r.xpAtual;pintarXP($('solo-xp'),r.xpAtual,soloResumoModo);}
- soloResumoEstado=r.recursos;soloAtualizarResumo();
- const e=r.recursos,alvo=$('solo-recursos'),sel=$('solo-uso');alvo.hidden=!e;$('solo-uso-campo').hidden=!e;alvo.replaceChildren();sel.replaceChildren(new Option('Ação livre',''));if(!e){soloAtualizarCompositor();return;}
+ soloResumoEstado=r.recursos;soloFichaDados=r.fichaSolo??null;soloAtualizarResumo();
+ const e=r.recursos,alvo=$('solo-recursos'),sel=$('solo-uso');alvo.hidden=!e;$('solo-uso-campo').hidden=!e;alvo.replaceChildren();sel.replaceChildren(new Option('Ação livre',''));if(!e){soloPintarColecao();soloAtualizarCompositor();return;}
  barraRecurso(alvo,'PV',e.pv,e.pvMax,'mesa-pv');if(e.manaMax)barraRecurso(alvo,'Mana',e.mana,e.manaMax,'mesa-mana');else{const ativar=el('button','Ativar mana (regra alternativa)','guia-abrir');ativar.type='button';ativar.onclick=async()=>{if(soloOcupado||!soloCampanhaId||!confirm('Ativar mana nesta campanha? Esta escolha é permanente e não faz parte das regras padrão de D&D.'))return;const id=soloCampanhaId;ativar.disabled=true;try{await api('/api/solo/campanhas/'+id+'/mana','POST',{});await soloAbrir(id);}catch(err){soloEstado(err.message,true);}finally{ativar.disabled=false;}};alvo.append(ativar);}if(!e.dnd)alvo.append(el('p','Nível narrativo Mesa: '+e.nivel,'suave'));
  if(e.pv===0)alvo.append(el('p','Sem PV: escolha pedir socorro ou descansar.','erro'));sel.add(new Option('Pedir socorro / descansar','socorro'));
  for(const [tipo,lista] of [['item',e.itens],['habilidade',e.habilidades]])for(const x of lista){const custo=tipo==='habilidade'&&e.manaMax?dominioHabilidade(x).custo:0;const o=new Option(x.nome+(tipo==='item'?' · ×'+x.quantidade:' · '+dominioHabilidade(x).grau+(custo?' · '+custo+' mana':''))+(e.nivel<x.nivelMin?' · requer nível '+x.nivelMin:''),tipo+':'+x.id);o.disabled=e.pv===0||e.nivel<x.nivelMin||(tipo==='item'&&x.quantidade<1)||custo>e.mana;sel.add(o);}
- if(e.pv===0)sel.value='socorro';soloAtualizarCompositor();listarAquisicoes(alvo,e,e.nivel);if(art&&r.eventosRecursos?.length)for(const ev of r.eventosRecursos)art.append(el('p',ev,'mesa-xp-recompensa'));
+ if(e.pv===0)sel.value='socorro';soloAtualizarCompositor();soloPintarColecao();if(art&&r.eventosRecursos?.length)for(const ev of r.eventosRecursos)art.append(el('p',ev,'mesa-xp-recompensa'));
 }
-function soloXPInicio(r){soloResumoModo=r.campanha.progressao;soloResumoXP=r.xp;soloRecursos(r);soloCarregarAvatar(r.campanha.personagem_id,r.xp?.personagem);pintarXP($('solo-xp'),r.xp,r.campanha.progressao);const sel=$('solo-xp-ficha');sel.replaceChildren(new Option('Escolha uma ficha',''));for(const p of soloPersonagens)sel.add(new Option(p.nome,String(p.id)));$('solo-xp-vincular').hidden=Boolean(r.campanha.personagem_id)||!soloPersonagens.length;}
+function soloXPInicio(r){soloFichaAba='inventario';soloResumoModo=r.campanha.progressao;soloResumoXP=r.xp;soloRecursos(r);soloCarregarAvatar(r.campanha.personagem_id,r.xp?.personagem);pintarXP($('solo-xp'),r.xp,r.campanha.progressao);const sel=$('solo-xp-ficha');sel.replaceChildren(new Option('Escolha uma ficha',''));for(const p of soloPersonagens)sel.add(new Option(p.nome,String(p.id)));$('solo-xp-vincular').hidden=Boolean(r.campanha.personagem_id)||!soloPersonagens.length;}
 $('solo-xp-confirmar').onclick=async()=>{const id=soloCampanhaId,p=$('solo-xp-ficha').value;if(!id||!p||soloOcupado)return;const b=$('solo-xp-confirmar');b.disabled=true;try{await api('/api/solo/campanhas/'+id+'/personagem','POST',{personagemId:Number(p)});await soloAbrir(id);}catch(e){soloEstado(e.message,true);}finally{b.disabled=false;}};
 function soloMensagem(papel,texto,tipo='acao',teste=null,numero=null){
  const art=el('article','','solo-mensagem '+(papel==='mestre'?'mestre':'jogador'));
@@ -823,6 +835,11 @@ function soloAtualizarCompositor(){
 }
 $('solo-tipo').addEventListener('change',soloAtualizarCompositor);
 $('solo-acao').addEventListener('input',soloAtualizarCompositor);
+$('solo-acao').addEventListener('keydown',ev=>{
+ if(ev.key!=='Enter'||ev.shiftKey||ev.ctrlKey||ev.altKey||ev.metaKey||ev.isComposing||ev.keyCode===229||!matchMedia('(any-pointer: fine)').matches)return;
+ ev.preventDefault();if(ev.repeat||soloOcupado||!soloCampanhaId||$('solo-enviar').disabled||!$('solo-acao').value.trim())return;
+ $('solo-acao-form').requestSubmit($('solo-enviar'));
+});
 function soloPertoDoFim(){const p=$('solo-mensagens');return p.scrollHeight-p.scrollTop-p.clientHeight<90;}
 function soloBotaoFim(){$('solo-ultima-mensagem').hidden=soloPertoDoFim();}
 $('solo-mensagens').addEventListener('scroll',soloBotaoFim,{passive:true});
