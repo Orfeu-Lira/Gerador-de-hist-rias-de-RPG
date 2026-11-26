@@ -60,7 +60,7 @@ async function api(url, metodo = 'GET', corpo) {
 function aviso(texto, bom) { const a = $('aviso'); a.textContent = texto || ''; a.className = bom ? 'bom' : ''; }
 
 // ---- Navegação entre telas ----
-const TELAS = ['gerador','solo','dados','historico','personagens','assistente','tutorial','novidades','suporte','instalar','conta','admin','privacidade','termos','musica','inicio','perfil','opcoes'];
+const TELAS = ['gerador','solo','dados','historico','personagens','assistente','tutorial','novidades','suporte','instalar','conta','admin','privacidade','termos','musica','inicio','perfil','opcoes','amigos'];
 // Mantém o player no mesmo documento e fora das configurações de acessibilidade.
 (function separarMusica(){
   const player=$('musica-ambiente');
@@ -256,8 +256,9 @@ function navegarMesa(tela, depois){
 function mostrar(tela) {
   if(!TELAS.includes(tela))return;
   pararJornada();
+  if(tela!=='amigos'&&mesaTelaVisivel==='amigos')amigosLimpar();
   if(tela!=='perfil'&&mesaTelaVisivel==='perfil'){perfilRequisicao++;limparFotoPerfil();$('perfil-nome').value='';$('perfil-email').value='';}
-  if(!eu.logado&&['historico','personagens','assistente','admin','perfil'].includes(tela))tela='conta';
+  if(!eu.logado&&['historico','personagens','assistente','admin','perfil','amigos'].includes(tela))tela='conta';
   if(tela==='admin'&&eu.papel!=='admin')tela='gerador';
   if(tela==='musica'&&mesaTelaVisivel&&mesaTelaVisivel!=='musica')mesaAntesDaMusica=mesaTelaVisivel;
   estadoNavegacao.gravar('tela',tela);
@@ -279,6 +280,7 @@ function mostrar(tela) {
   if (tela === 'suporte') suporteListar();
   if (tela === 'novidades') noticiasMesa();
   if (tela === 'perfil') carregarMeuPerfil();
+  if (tela === 'amigos') carregarAmigos();
   if (tela === 'inicio') mesaSaudacao();
 }
 $('abrir-tutorial-menu').onclick=()=>navegarMesa('tutorial');
@@ -376,7 +378,7 @@ function montarNav() {
   nav.append(item('inicio','⌂','Início'));
   grupo('Aventuras',[['gerador','✦','Gerador de histórias',false],['gerador','♙','Gerador de NPCs',true],['solo','✧','RPG Solo'],...(eu.logado?[['historico','▤','Minhas aventuras']]:[])]);
   grupo('Ferramentas',[...(eu.logado?[['personagens','♙','Personagens'],['assistente','✧','Tutor D&D']]:[]),['dados','◇','Oráculo dos dados'],['musica','♫','Música']]);
-  grupo('Comunidade',[['novidades','✦','Novidades'],['tutorial','❖','Tutorial'],...(eu.logado?[['suporte','✉','Suporte']]:[])]);
+  grupo('Comunidade',[...(eu.logado?[['amigos','♙','Amigos']]:[]),['novidades','✦','Novidades'],['tutorial','❖','Tutorial'],...(eu.logado?[['suporte','✉','Suporte']]:[])]);
   grupo('Minha conta',[...(eu.logado?[['perfil','♙','Meu perfil']]:[['conta','↪','Entrar']]),['opcoes','⚙','Opções'],['instalar','⬇','Instalar Mesa']]);
   if(eu.papel==='admin')grupo('Administração',[['admin','⚙','Painel']]);
   const acesso=el('button','','menu-item');acesso.type='button';acesso.title='Acessibilidade';acesso.setAttribute('aria-label','Abrir acessibilidade');acesso.setAttribute('aria-controls','mesa-acessibilidade-painel');
@@ -1886,6 +1888,48 @@ $('opcoes-fonte').onchange=()=>{mesaPreferencias.fonte=$('opcoes-fonte').value;m
 $('opcoes-restaurar').onclick=()=>{mesaPreferencias.ortografia=true;mesaPreferencias.fonte='padrao';mesaAplicarPreferencias(true);};
 document.addEventListener('focusin',e=>{if(e.target instanceof Element)mesaAplicarOrtografia(e.target);});
 mesaAplicarPreferencias();
+// Comunidade: o nome social é sempre o apelido, sem @.
+let amigosVersao=0;
+function amigosLimpar(){
+ amigosVersao++;
+ for(const id of ['amigos-resultados','amigos-recebidas','amigos-enviadas','amigos-lista','amigos-bloqueados'])$(id).replaceChildren();
+ $('amigos-termo').value='';$('amigos-status').textContent='';
+}
+function amigoLinha(alvo,apelido,acoes){
+ const linha=el('div','','mesa-amigo-linha');linha.append(el('strong',apelido));
+ const botoes=el('div','','mesa-amigo-acoes');
+ for(const [texto,acao] of acoes){const b=el('button',texto);b.type='button';b.onclick=async()=>{
+ if(['bloquear','remover'].includes(acao)&&!confirm(texto+' '+apelido+'?'))return;
+ b.disabled=true;
+ try{await api('/api/comunidade/amizade','POST',{apelido,acao});await carregarAmigos();$('amigos-resultados').replaceChildren();$('amigos-status').textContent='Operação concluída.';}catch(e){$('amigos-status').textContent=e.message;}finally{b.disabled=false;}
+ };botoes.append(b);}
+ linha.append(botoes);alvo.append(linha);
+}
+async function carregarAmigos(){
+ const versao=++amigosVersao;
+ try{
+ const [amigos,bloqueados]=await Promise.all([api('/api/comunidade/amigos'),api('/api/comunidade/bloqueados')]);
+ if(versao!==amigosVersao||mesaTelaVisivel!=='amigos'||!eu.logado)return;
+ const grupos={'amigos-recebidas':amigos.filter(a=>a.estado==='pendente'&&!a.enviada),'amigos-enviadas':amigos.filter(a=>a.estado==='pendente'&&a.enviada),'amigos-lista':amigos.filter(a=>a.estado==='aceita'),'amigos-bloqueados':bloqueados};
+ for(const [id,lista] of Object.entries(grupos)){
+ const alvo=$(id);alvo.replaceChildren();
+ if(!lista.length)alvo.append(el('p','Nenhum registro.','suave'));
+ for(const a of lista){
+ const acoes=id==='amigos-recebidas'?[['Aceitar','aceitar'],['Recusar','remover'],['Bloquear','bloquear']]:id==='amigos-enviadas'?[['Cancelar','remover']]:id==='amigos-lista'?[['Remover','remover'],['Bloquear','bloquear']]:[['Desbloquear','desbloquear']];
+ amigoLinha(alvo,a.apelido,acoes);
+ }}
+ }catch(e){if(versao===amigosVersao)$('amigos-status').textContent=e.message;}
+}
+$('amigos-atualizar').onclick=carregarAmigos;
+$('amigos-busca').onsubmit=async ev=>{
+ ev.preventDefault();const b=ev.currentTarget.querySelector('button');b.disabled=true;
+ const versao=amigosVersao,alvo=$('amigos-resultados');alvo.replaceChildren();
+ try{const lista=await api('/api/comunidade/buscar?apelido='+encodeURIComponent($('amigos-termo').value.trim()));
+ if(versao!==amigosVersao||mesaTelaVisivel!=='amigos')return;
+ if(!lista.length)alvo.append(el('p','Nenhum jogador encontrado.','suave'));
+ for(const a of lista)amigoLinha(alvo,a.apelido,[['Adicionar','solicitar'],['Bloquear','bloquear']]);
+ }catch(e){if(versao===amigosVersao)$('amigos-status').textContent=e.message;}finally{b.disabled=false;}
+};
 // ---- Conta e recuperação de acesso ----
 const formulariosConta = ['f-login','f-cadastro','f-recuperar','f-redefinir'];
 // Feedback de formato local, sem enviar o endereço enquanto a pessoa digita.
