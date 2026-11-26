@@ -1037,7 +1037,7 @@ app.post('/api/solo/campanhas',asyncHandler(async(req,res)=>{
    await client.query("INSERT INTO public.mesa_solo_mensagens(campanha_id,numero,papel,tipo,texto,teste) VALUES($1,0,'mestre','inicio',$2,$3::jsonb)",[campanha.id,resposta.narracao,JSON.stringify(resposta.teste)]);
    await client.query('COMMIT');
   }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
-  res.status(201).json({campanha,mestre:resposta.narracao,teste:resposta.teste,xp:xpMesa.estado(personagem),recursos:recursosIniciais,companheiros:aliados.lista,fichaSolo:recursosRpg.fichaSolo(personagem,recursosIniciais)});
+  res.status(201).json({campanha,mestre:resposta.narracao,teste:resposta.teste,xp:xpMesa.estado(personagem),recursos:recursosIniciais,companheiros:aliados.lista,fichaSolo:recursosRpg.fichaSolo(personagem,recursosIniciais),retroXP:retroXp.progresso({},0),resgateRpg:resgateRpg.publico(resgateRpg.progresso({},0))});
  }catch(e){await soloDevolver(quota);console.error('Falha ao iniciar solo',e.name);soloErroIA(res,e);}
 }));
 app.post('/api/solo/campanhas/:id/turnos',asyncHandler(async(req,res)=>{
@@ -1129,7 +1129,7 @@ app.post('/api/solo/campanhas/:id/turnos',asyncHandler(async(req,res)=>{
    await client.query('UPDATE public.mesa_solo_campanhas SET recursos=$2::jsonb WHERE id=$1',[id,JSON.stringify({...c.recursos,...(resultado?recursosRpg.persistir(resultado.estado):{}),companheiros:aliados.lista})]);
    await client.query("UPDATE public.mesa_solo_mensagens SET recursos_evento=$3::jsonb WHERE campanha_id=$1 AND numero=$2 AND papel='mestre'",[id,n,JSON.stringify(eventosRecursos)]);
    await client.query('COMMIT');
-   res.json({numero:n,narracao:resposta.narracao,teste:resposta.teste,rolagem,xp,xpAtual,fichaSolo,recursos:resultado?.estado??null,companheiros:aliados.lista,eventosRecursos});
+   res.json({numero:n,narracao:resposta.narracao,teste:resposta.teste,rolagem,xp,xpAtual,fichaSolo,recursos:resultado?.estado??null,companheiros:aliados.lista,eventosRecursos,campanha:{personagem_id:c.personagem_id,progressao:c.progressao},retroXP:retroXp.progresso(c.recursos,n),resgateRpg:resgateRpg.publico(resgateRpg.progresso(c.recursos,n))});
   }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
  }catch(e){await soloDevolver(quota);if(e.status===429||e.status===409)return res.status(e.status).json({erro:e.message});console.error('Falha em turno solo',e.name);soloErroIA(res,e);}
  finally{await query('UPDATE public.mesa_solo_campanhas SET processando=false WHERE id=$1 AND usuario_id=$2 AND turno_atual=$3',[id,u.id,c.turno_atual]).catch(()=>{});}

@@ -293,8 +293,9 @@ window.addEventListener('popstate',ev=>{
 });
 function mostrar(tela, restaurando=false) {
   if(!TELAS.includes(tela))return;
+  const retomarSolo=tela==='solo'&&mesaTelaVisivel==='musica'&&mesaAntesDaMusica==='solo'&&soloCampanhaId&&!$('solo-jogo').hidden;
   pararJornada();
-  if(mesaTelaVisivel==='solo'&&tela!=='solo'){soloLimparAvatar();soloFecharPaineis();fecharCinema();}
+  if(mesaTelaVisivel==='solo'&&tela!=='solo'){if(tela!=='musica')soloLimparAvatar();soloFecharPaineis();fecharCinema();}
   if(tela!=='amigos'&&mesaTelaVisivel==='amigos')amigosLimpar();
   if(tela!=='compartilhadas'&&mesaTelaVisivel==='compartilhadas')limparCompartilhadas();
   if(tela!=='mensagens'&&mesaTelaVisivel==='mensagens')limparMensagens();
@@ -317,7 +318,7 @@ function mostrar(tela, restaurando=false) {
   if(mudou)mesaTransicaoTela(tela,primeira);
   aviso('');
   if (tela === 'gerador' && !$('f-gerar-npc').hidden) { carregarOrigensNPC(); if(eu.logado)carregarBibliotecaNPC(); }
-  if (tela === 'solo') soloAtualizarInicio();
+  if (tela === 'solo'&&!retomarSolo) soloAtualizarInicio();
   if (tela === 'historico') carregarHistorico();
   if (tela === 'personagens') { carregarAventurasDaFicha().then(carregarPersonagens); }
   if (tela === 'admin') {carregarResumo();notificacoesAtualizar();}
@@ -396,7 +397,7 @@ async function notificacoesAtualizar(force=false){
     }catch(e){estado.textContent=e.message;}
    });
   }
-  $('notificacoes-ler-todas').disabled=totalSuporte+totalConta===0;
+  $('notificacoes-ler-todas').disabled=totalSuporte+totalConta===0;$('notificacoes-ler-todas').textContent=admin?'Marcar avisos da conta e suporte como lidos':'Marcar avisos da conta como lidos';
  }catch(e){
   $('notificacoes-estado').textContent='Não foi possível atualizar os avisos. '+e.message;
  }finally{notificacoesEmAndamento=false;}
@@ -775,6 +776,7 @@ function soloPintarColecao(){
 }
 for(const b of document.querySelectorAll('[data-solo-colecao]'))b.onclick=()=>{soloFichaAba=b.dataset.soloColecao;soloPintarColecao();};
 function soloRecursos(r,art){
+ if(r.campanha&&r.resgateRpg){soloPintarResgate(r);soloPintarRetro(r);}
  if(Array.isArray(r.companheiros))soloPintarAliados(r.companheiros);
  if(r.xpAtual){soloResumoXP=r.xpAtual;pintarXP($('solo-xp'),r.xpAtual,soloResumoModo);}
  soloResumoEstado=r.recursos;soloFichaDados=r.fichaSolo??null;soloAtualizarResumo();
