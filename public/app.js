@@ -35,7 +35,7 @@ async function api(url, metodo = 'GET', corpo) {
   for(let tentativa=0;tentativa<(leitura?3:1);tentativa++){
    if(!navigator.onLine)throw Error('Sem conexão. Verifique sua internet.');
    const controle=new AbortController();
-   const longa=!leitura&&(/gerar|\/solo\//.test(url));
+   const longa=!leitura&&(/gerar|\/solo\/|\/avatar$|\/perfil\/foto$/.test(url));
    const timer=setTimeout(()=>controle.abort(),longa?90000:15000);
    let erro;
    try{
@@ -1445,8 +1445,9 @@ for (const [sigla,nome] of atributosDnd) {
   item.append(rotulo,campo,modificador);$('p-atributos').appendChild(item);
 }
 // Avatares ficam em um bucket privado. Somente a própria conta pode carregá-los.
-let avatarObjectUrl=null;
+let avatarObjectUrl=null,avatarEnviando=false,avatarVersao=0;
 function limparPreviewAvatar(){
+  avatarVersao++;
   if(avatarObjectUrl)URL.revokeObjectURL(avatarObjectUrl);
   avatarObjectUrl=null;
   $('p-avatar-img').removeAttribute('src');
@@ -1457,7 +1458,8 @@ function limparPreviewAvatar(){
 let avatarPendente=null;
 function atualizarEstadoAvatar(){
   const salvo=Boolean(fichaAbertaId);
-  $('p-avatar-file').disabled=false;
+  $('p-avatar-file').disabled=avatarEnviando;$('p-avatar-escolher').disabled=avatarEnviando;
+  $('p-avatar-tentar').hidden=!avatarPendente||!salvo||avatarEnviando;
   if(avatarPendente&&!salvo){
     $('p-avatar-info').textContent='Foto selecionada: '+avatarPendente.name+'. Clique em Salvar ficha ao final do formulário; o retrato será enviado automaticamente.';
     return;
@@ -1470,20 +1472,20 @@ async function carregarAvatar(){
   limparPreviewAvatar();
   atualizarEstadoAvatar();
   if(!fichaAbertaId)return;
-  const id=fichaAbertaId;
+  const id=fichaAbertaId,versao=avatarVersao;
   try{
     const response=await fetch(API_BASE_URL+'/api/personagens/'+id+'/avatar',{credentials:'include',cache:'no-store'});
     if(response.status===404)return;
-    if(!response.ok)throw new Error('Não foi possível carregar o retrato salvo.');
+    if(!response.ok){const dados=await response.json().catch(()=>({}));throw new Error(dados.erro||'Não foi possível carregar o retrato salvo.');}
     const blob=await response.blob();
-    if(fichaAbertaId!==id)return;
+    if(String(fichaAbertaId)!==String(id)||versao!==avatarVersao)return;
     avatarObjectUrl=URL.createObjectURL(blob);
     $('p-avatar-img').src=avatarObjectUrl;
     $('p-avatar-img').hidden=false;
     $('p-avatar-vazio').hidden=true;
     $('p-avatar-remover').hidden=false;
   }catch(e){
-    $('p-avatar-info').textContent=e.message||'Não foi possível carregar a foto. Tente novamente.';
+    if(String(fichaAbertaId)===String(id)&&versao===avatarVersao)$('p-avatar-info').textContent=e.message||'Não foi possível carregar a foto. Tente novamente.';
   }
 }
 async function prepararWebpAvatar(arquivo){
@@ -1494,8 +1496,7 @@ async function prepararWebpAvatar(arquivo){
   const url=URL.createObjectURL(arquivo);
   try{
     const foto=new Image();
-    foto.src=url;
-    try{await foto.decode();}catch{throw new Error('Este formato de foto não pôde ser aberto pelo navegador. No celular, tente compartilhar ou salvar a foto em JPG ou PNG.');}
+    try{await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('Tempo de leitura excedido')),12000);foto.onload=()=>{clearTimeout(timer);resolve();};foto.onerror=()=>{clearTimeout(timer);reject(Error('Formato incompatível'));};foto.src=url;});}catch{throw new Error('Este formato não pôde ser aberto. No celular, salve a foto como JPG ou PNG e tente novamente.');}
     if(foto.width<32||foto.height<32)throw new Error('Imagem pequena demais.');
     const canvas=document.createElement('canvas');
     const ctx=canvas.getContext('2d');
@@ -1516,39 +1517,46 @@ async function prepararWebpAvatar(arquivo){
   }finally{URL.revokeObjectURL(url);}
 }
 async function enviarAvatar(arquivo,id){
-  const campo=$('p-avatar-file');
-  campo.disabled=true;
+  if(avatarEnviando)return false;
+  const campo=$('p-avatar-file');avatarEnviando=true;avatarPendente=arquivo;
+  campo.disabled=true;$('p-avatar-escolher').disabled=true;$('p-avatar-tentar').hidden=true;
   $('p-avatar-info').textContent='Otimizando a foto e enviando...';
   try{
     const imagem=await prepararWebpAvatar(arquivo);
-    if(fichaAbertaId!==id)throw new Error('A ficha selecionada mudou. Abra o personagem e tente novamente.');
+    if(String(fichaAbertaId)!==String(id))throw new Error('A ficha selecionada mudou. Abra o personagem e tente novamente.');
     await api('/api/personagens/'+id+'/avatar','POST',{imagem});
+    if(String(fichaAbertaId)!==String(id))return true;
     avatarPendente=null;
-    await carregarAvatar();
+    limparPreviewAvatar();
+    avatarObjectUrl=URL.createObjectURL(new Blob([Uint8Array.from(atob(imagem),c=>c.charCodeAt(0))],{type:'image/webp'}));
+    $('p-avatar-img').src=avatarObjectUrl;$('p-avatar-img').hidden=false;$('p-avatar-vazio').hidden=true;$('p-avatar-remover').hidden=false;
     aviso('Retrato salvo com sucesso!',true);
     $('p-avatar-info').textContent='Retrato salvo! Você pode trocar a foto quando quiser.';
     return true;
   }catch(e){
-    $('p-avatar-info').textContent='Falha no envio: '+e.message;
-    aviso(e.message);
-    return false;
+    if(String(fichaAbertaId)===String(id)){$('p-avatar-info').textContent='Falha no envio: '+e.message;avatarPendente=arquivo;}
+    aviso(e.message);return false;
   }finally{
-    campo.value='';
-    campo.disabled=false;
+    avatarEnviando=false;campo.value='';campo.disabled=false;$('p-avatar-escolher').disabled=false;
+    $('p-avatar-tentar').hidden=!avatarPendente||!fichaAbertaId;
   }
 }
+$('p-avatar-escolher').onclick=()=>{if(!avatarEnviando){$('p-avatar-file').value='';$('p-avatar-file').click();}};
+$('p-avatar-tentar').onclick=()=>{if(avatarPendente&&fichaAbertaId)enviarAvatar(avatarPendente,fichaAbertaId);};
 $('p-avatar-file').onchange=async()=>{
   const arquivo=$('p-avatar-file').files?.[0];
-  if(!arquivo)return;
+  if(!arquivo||avatarEnviando)return;
   avatarPendente=arquivo;
   if(!fichaAbertaId){
-    atualizarEstadoAvatar();
-    return;
+    limparPreviewAvatar();
+    avatarObjectUrl=URL.createObjectURL(arquivo);
+    $('p-avatar-img').src=avatarObjectUrl;$('p-avatar-img').hidden=false;$('p-avatar-vazio').hidden=true;
+    atualizarEstadoAvatar();return;
   }
   await enviarAvatar(arquivo,fichaAbertaId);
 };
 $('p-avatar-remover').onclick=async()=>{
-  if(!fichaAbertaId||!confirm('Remover o retrato desta personagem?'))return;
+  if(avatarEnviando||!fichaAbertaId||!confirm('Remover o retrato desta personagem?'))return;
   try{
     await api('/api/personagens/'+fichaAbertaId+'/avatar','DELETE');
     avatarPendente=null;
@@ -1894,7 +1902,7 @@ $('f-personagem').onsubmit=async ev=>{
     await carregarPersonagens();
     abrirAbaFicha(abaAtual);
     aviso('Ficha salva com sucesso! O personagem continua selecionado.',true);
-    if(fotoAEnviar&&fichaAbertaId)await enviarAvatar(fotoAEnviar,fichaAbertaId);
+    if(fotoAEnviar&&fichaAbertaId){const enviado=await enviarAvatar(fotoAEnviar,fichaAbertaId);if(!enviado){abrirAbaFicha('identidade');return;}}
     if(soloRetomarFicha){soloRetomarFicha=false;soloPersonagemPreferido=fichaAbertaId;navegarMesa('solo');}
   }catch(e){aviso(e.message);}
   finally{botao.disabled=false;}

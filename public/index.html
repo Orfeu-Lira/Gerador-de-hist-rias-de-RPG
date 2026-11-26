@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./style.css?v=portal24">
+<link rel="stylesheet" href="./style.css?v=portal25">
 </head>
 <body class="mesa-sem-sessao tela-acesso">
 <div id="mesa-abertura" class="mesa-intro" aria-hidden="true" inert>
@@ -319,7 +319,7 @@
           <div class="avatar-moldura"><img id="p-avatar-img" alt="Retrato da personagem" hidden><span id="p-avatar-vazio" aria-hidden="true">♙</span></div>
           <div class="avatar-acoes"><h3>Retrato da personagem</h3><p id="p-avatar-info" class="suave" role="status" aria-live="polite">Selecione um retrato. Se a ficha ainda for nova, salve-a antes de enviar.</p>
             <div class="avatar-upload-principal">
-              <label class="principal avatar-upload" for="p-avatar-file">↑ Enviar imagem do personagem</label>
+              <button type="button" class="principal avatar-upload" id="p-avatar-escolher">↑ Enviar imagem do personagem</button><button type="button" id="p-avatar-tentar" class="guia-abrir" hidden>Tentar enviar novamente</button>
               <p class="suave">Envie JPG, PNG, WebP ou uma foto do celular. O Mesa tentará preparar o retrato automaticamente.</p>
               <p class="avatar-ia-futuro">✦ Avatares criados com IA: em breve.</p>
             </div>
@@ -628,7 +628,7 @@
 <script src="./email-validation.js"></script>
 <dialog id="mesa-denuncia-dialog" aria-labelledby="mesa-denuncia-titulo"><form id="mesa-denuncia-form" class="formulario"><h2 id="mesa-denuncia-titulo">Enviar denúncia</h2><p id="mesa-denuncia-alvo"></p><label for="mesa-denuncia-motivo">Motivo</label><select id="mesa-denuncia-motivo" required><option value="assedio">Assédio</option><option value="ameaca">Ameaça</option><option value="spam">Spam</option><option value="discriminacao">Discriminação</option><option value="outro">Outro</option></select><label for="mesa-denuncia-detalhes">Detalhes (opcional)</label><textarea id="mesa-denuncia-detalhes" maxlength="1000" rows="4"></textarea><p class="suave">A denúncia e, se selecionada, a mensagem denunciada serão encaminhadas à moderação. Nenhuma punição é automática.</p><p id="mesa-denuncia-status" role="status" aria-live="polite"></p><button type="submit" class="principal">Enviar denúncia</button><button id="mesa-denuncia-cancelar" type="button">Cancelar</button></form></dialog>
   <div id="campanha-cinema" class="mesa-cinema" hidden aria-live="polite"><div id="campanha-cinema-arte" aria-hidden="true"></div><p id="campanha-cinema-texto"></p><button id="campanha-cinema-fechar" type="button">Pular efeito</button></div>
-<script src="./app.js?v=portal24"></script>
+<script src="./app.js?v=portal25"></script>
 
 </body>
 </html>

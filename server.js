@@ -1226,30 +1226,20 @@ app.post('/api/personagens/:id/avatar/gerar',(req,res)=>{
 });
 app.post('/api/personagens/:id/avatar',asyncHandler(async(req,res)=>{
   const acesso=await avatarDono(req,res);if(!acesso)return;
-  if(!avatarConfigurado())return res.status(503).json({erro:'O armazenamento de avatares ainda precisa ser configurado.'});
-  const base64=req.body?.imagem;
-  if(typeof base64!=='string'||base64.length<80||base64.length>525000||!/^[a-zA-Z0-9+/]+={0,2}$/.test(base64))
-    return res.status(400).json({erro:'Imagem inválida ou grande demais.'});
-  const imagem=Buffer.from(base64,'base64');
-  // Verifica também o tamanho RIFF e o primeiro bloco WEBP. Apenas checar
-  // os quatro primeiros bytes aceitaria arquivos arbitrários com cabeçalho forjado.
-  const tipoWebp=imagem.length>=16?imagem.toString('ascii',12,16):'';
-  if(imagem.length>393216||imagem.length<64||imagem.toString('ascii',0,4)!=='RIFF'||
-     imagem.toString('ascii',8,12)!=='WEBP'||!['VP8 ','VP8L','VP8X'].includes(tipoWebp)||
-     imagem.readUInt32LE(4)!==imagem.length-8)
-    return res.status(400).json({erro:'Use uma imagem WebP válida de até 384 KB.'});
-  const path=acesso.u.id+'/'+acesso.id+'/avatar.webp';
-  const url=avatarBase()+path;
-  const resposta=await fetch(url,{method:'POST',headers:{...avatarHeaders(),'Content-Type':'image/webp','x-upsert':'true'},body:imagem,signal:AbortSignal.timeout(15000)});
-  if(!resposta.ok){console.error('Supabase avatar upload:',resposta.status);return res.status(503).json({erro:'Não foi possível guardar o avatar agora.'});}
-  await query('INSERT INTO public.personagem_avatares(personagem_id,storage_path) VALUES($1,$2) ON CONFLICT(personagem_id) DO UPDATE SET storage_path=EXCLUDED.storage_path, atualizado_em=NOW()',[acesso.id,path]);
-  res.json({ok:true});
+  const imagem=require('./avatar').validarAvatar(req.body?.imagem);
+  if(!imagem)return res.status(400).json({erro:'Não foi possível validar a foto WebP. Selecione uma foto JPG ou PNG e tente novamente.'});
+  const r=await query('UPDATE public.personagens_dnd SET avatar_webp=$3 WHERE id=$1 AND usuario_id=$2 RETURNING id',[acesso.id,acesso.u.id,imagem]);
+  if(!r.rowCount)return res.status(404).json({erro:'Ficha não encontrada.'});
+  res.set('Cache-Control','private, no-store').json({ok:true});
 }));
 app.get('/api/personagens/:id/avatar',asyncHandler(async(req,res)=>{
   const acesso=await avatarDono(req,res);if(!acesso)return;
-  if(!avatarConfigurado())return res.status(503).json({erro:'Armazenamento não configurado.'});
+  const local=await query('SELECT avatar_webp FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2',[acesso.id,acesso.u.id]);
+  if(!local.rowCount)return res.status(404).json({erro:'Ficha não encontrada.'});
+  if(local.rows[0].avatar_webp)return res.set({'Content-Type':'image/webp','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}).send(local.rows[0].avatar_webp);
   const r=await query('SELECT storage_path FROM public.personagem_avatares WHERE personagem_id=$1',[acesso.id]);
   if(!r.rowCount)return res.status(404).json({erro:'Esta ficha ainda não tem avatar.'});
+  if(!avatarConfigurado())return res.status(503).json({erro:'Armazenamento do retrato antigo indisponível.'});
   const path=r.rows[0].storage_path;
   // Não usar URL fornecida pelo usuário; sempre recuperar caminho autenticado do banco.
   const response=await fetch(avatarBase()+path,{headers:avatarHeaders(),signal:AbortSignal.timeout(15000)});
@@ -1262,6 +1252,7 @@ app.get('/api/personagens/:id/avatar',asyncHandler(async(req,res)=>{
 }));
 app.delete('/api/personagens/:id/avatar',asyncHandler(async(req,res)=>{
   const acesso=await avatarDono(req,res);if(!acesso)return;
+  await query('UPDATE public.personagens_dnd SET avatar_webp=NULL WHERE id=$1 AND usuario_id=$2',[acesso.id,acesso.u.id]);
   const r=await query('DELETE FROM public.personagem_avatares WHERE personagem_id=$1 RETURNING storage_path',[acesso.id]);
   if(r.rowCount && avatarConfigurado()){
     fetch(avatarBase()+r.rows[0].storage_path,{method:'DELETE',headers:avatarHeaders(),signal:AbortSignal.timeout(12000)})
