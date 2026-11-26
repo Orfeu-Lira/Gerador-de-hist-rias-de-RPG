@@ -41,7 +41,7 @@ async function api(url, metodo = 'GET', corpo) {
    try{
     const r=await fetch(API_BASE_URL+url,{method:metodo,credentials:'include',headers:{'Content-Type':'application/json'},body:corpo?JSON.stringify(corpo):undefined,signal:controle.signal});
     const dados=await r.json().catch(()=>({}));
-    if(!r.ok)throw Object.assign(Error(dados.erro||'Não foi possível concluir a solicitação.'),{dados,status:r.status});
+    if(!r.ok){if(r.status===401&&dados.codigo==='login_obrigatorio'&&eu.logado){eu={logado:false};document.body.classList.add('mesa-sem-sessao');location.replace('/');}throw Object.assign(Error(dados.erro||'Não foi possível concluir a solicitação.'),{dados,status:r.status});}
     mesaConexao('');return dados;
    }catch(e){erro=e;}finally{clearTimeout(timer);}
    const rede=erro.name==='AbortError'||erro instanceof TypeError;
@@ -234,7 +234,7 @@ function mesaTransicaoTela(tela, primeira){
 // Ações de navegação interativas usam a mesma transição, inclusive atalhos internos.
 // A lógica dependente da tela roda junto da troca, nunca antes do snapshot.
 function navegarMesa(tela, depois){
-  const aplicar=()=>{mostrar(tela);depois?.();};
+  const aplicar=()=>{mostrar(tela);if(mesaTelaVisivel===tela)depois?.();};
   if(mesaTransicaoAtiva){
     const anterior=mesaTransicaoAtiva;
     mesaTransicaoAtiva=null;
@@ -262,10 +262,11 @@ function mostrar(tela) {
   if(tela!=='mensagens'&&mesaTelaVisivel==='mensagens')limparMensagens();
   if(tela!=='campanhas'&&mesaTelaVisivel==='campanhas')limparCampanha();
   if(tela!=='perfil'&&mesaTelaVisivel==='perfil'){perfilRequisicao++;limparFotoPerfil();$('perfil-nome').value='';$('perfil-email').value='';}
-  if(!eu.logado&&['historico','personagens','assistente','admin','perfil','amigos','compartilhadas','mensagens','campanhas'].includes(tela))tela='conta';
+  if(!eu.logado&&!['conta','privacidade','termos'].includes(tela))tela='conta';
   if(tela==='admin'&&eu.papel!=='admin')tela='gerador';
   if(tela==='musica'&&mesaTelaVisivel&&mesaTelaVisivel!=='musica')mesaAntesDaMusica=mesaTelaVisivel;
   estadoNavegacao.gravar('tela',tela);
+  document.body.classList.toggle('mesa-sem-sessao',!eu.logado);
   document.body.classList.toggle('tela-acesso', tela === 'conta');
   TELAS.forEach((t) => { $('v-' + t).hidden = t !== tela; });
   mesaMenuAtualizar(tela);
@@ -377,6 +378,7 @@ window.setInterval(()=>{if(!document.hidden)notificacoesAtualizar();},60000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&eu.logado)notificacoesAtualizar();});
 function montarNav() {
   const nav=$('nav');nav.replaceChildren();
+  if(!eu.logado)return;
   function item(t,simbolo,nome,modo){
    const botao=el('button','','menu-item');botao.dataset.tela=t;botao.type='button';
    botao.title=nome;botao.setAttribute('aria-label',nome);
@@ -406,13 +408,13 @@ function montarNav() {
    const i=el('span','↪','menu-item-icone');i.setAttribute('aria-hidden','true');sair.append(i,el('span','Sair','menu-item-texto'));
    sair.onclick=async()=>{
     await api('/api/logout','POST');estadoNavegacao.gravar('personagem',null);estadoNavegacao.gravar('aba-ficha',null);estadoNavegacao.gravar('tela',null);fichaAbertaId=null;
-    await atualizarEu();mostrar('inicio');
+    location.replace('/');
    };nav.append(sair);
   }
   mesaMenuAtualizar(mesaTelaVisivel||'inicio');
 }
 function textoInfo() {
-  if (!eu.logado) return eu.restantes > 0 ? 'Teste grátis: ' + eu.restantes + ' geração. Crie uma conta para ter mais.' : 'O teste grátis acabou. Crie uma conta para continuar.';
+  if (!eu.logado) return 'Entre ou crie uma conta para acessar o Mesa.';
   return eu.restantes === null ? 'Acesso total (administrador).' : 'Gerações restantes hoje: ' + eu.restantes;
 }
 
@@ -420,6 +422,7 @@ async function atualizarEu() {
   // Não substitua o estado de login antes que o servidor confirme a sessão.
   const resposta=await api('/api/eu');
   eu=resposta;
+  document.body.classList.toggle('mesa-sem-sessao',!eu.logado);
   montarNav();
   notificacoesSessao();
   $('info').textContent=textoInfo();
@@ -2739,14 +2742,14 @@ document.addEventListener('keydown',e=>{
  btn.onclick=()=>{caixa.hidden=true;try{localStorage.setItem('mesa-aviso-privacidade-v1','1');}catch{}};
 })();
 
-noticiasMesa();
 atualizarEu().then(() => {
+  if(eu.logado)noticiasMesa();
   if (new URL(location.href).searchParams.has('reset_token')) {
     abrirFormularioConta('f-redefinir'); mostrar('conta');
   } else {
     const pedida=new URL(location.href).searchParams.get('tela');
     const anterior=estadoNavegacao.ler('tela');
-    mostrar(TELAS.includes(pedida)?pedida:TELAS.includes(anterior)?anterior:'inicio');
+    mostrar(!eu.logado?(['termos','privacidade'].includes(pedida)?pedida:'conta'):TELAS.includes(pedida)?pedida:TELAS.includes(anterior)&&anterior!=='conta'?anterior:'inicio');
     if(mesaTelaVisivel==='gerador'&&estadoNavegacao.ler('modo-gerador')==='npc')modoGeradorNPC(true);
   }
 }).catch((e) => {
@@ -2756,9 +2759,8 @@ atualizarEu().then(() => {
   if (new URL(location.href).searchParams.has('reset_token')) {
     abrirFormularioConta('f-redefinir'); mostrar('conta');
   } else {
-    const ultima=estadoNavegacao.ler('tela');
-    const pagina=TELAS.includes(ultima) && !['historico','personagens','assistente','admin','suporte'].includes(ultima)?ultima:'inicio';
-    mostrar(pagina);
+    const pedida=new URL(location.href).searchParams.get('tela');
+    mostrar(['termos','privacidade'].includes(pedida)?pedida:'conta');
   }
   aviso('Não foi possível verificar a sessão com o servidor agora. Sua conta pode continuar conectada. Atualize a página e tente novamente. Detalhes: '+e.message);
 });
