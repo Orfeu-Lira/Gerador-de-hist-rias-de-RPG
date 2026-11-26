@@ -98,7 +98,7 @@ const quotaKey = (req,u) => u
   ? 'usuario:' + u.id + ':' + new Date().toISOString().slice(0,10)
   : 'visitante:' + (req.ip || 'desconhecido');
 const usadas = async chave => Number((await query('SELECT total FROM public.geracoes_limite WHERE identificador=$1',[chave])).rows[0]?.total || 0);
-const restantes = async (req,u) => u && u.papel === 'admin' ? null : Math.max(0,(u ? 5 : 1) - await usadas(quotaKey(req,u)));
+const restantes = async (req,u) => !u ? 0 : u.papel === 'admin' ? null : Math.max(0,5 - await usadas(quotaKey(req,u)));
 // A duração precisa estar definida ANTES da primeira gravação no PostgreSQL.
 // Cadastro usa cookie de sessão; login oferece a opção persistente de 30 dias.
 const refreshSession = (req, userId, manterConectado = false) => new Promise((resolve,reject) => req.session.regenerate(err => {
@@ -293,6 +293,13 @@ app.get('/api/eu',asyncHandler(async(req,res) => {
   const u = await atual(req);
   const perfil=u?(await query('SELECT nome,tratamento FROM public.mesa_perfis WHERE usuario_id=$1',[u.id])).rows[0]:null;
   res.json({logado:!!u,email:u?.email||null,papel:u?.papel||null,restantes:await restantes(req,u),nome:perfil?.nome||'',tratamento:perfil?.tratamento||'neutro'});
+}));
+// Todas as funcionalidades da plataforma exigem sessão confirmada.
+// Rotas públicas de login, cadastro, recuperação e saúde ficam acima deste ponto.
+app.use('/api',asyncHandler(async(req,res,next)=>{
+ const u=await atual(req);
+ if(!u)return res.status(401).json({erro:'Entre ou crie uma conta para acessar o Mesa.',codigo:'login_obrigatorio'});
+ next();
 }));
 // Perfil privado: sempre derivado da sessão, nunca de um ID enviado pelo cliente.
 // Comunidade: somente apelidos; nunca expor nome privado, email ou tratamento.
@@ -735,13 +742,13 @@ app.post('/api/gerar',asyncHandler(async(req,res) => {
   }
   const u=await atual(req);
   const key=quotaKey(req,u);
-  const limit=u?5:1;
+  const limit=5;
   const bypass=u?.papel==='admin';
   if (!bypass) {
     const claimed=await query(
       'INSERT INTO public.geracoes_limite(identificador,total) VALUES($1,1) ON CONFLICT(identificador) DO UPDATE SET total=public.geracoes_limite.total+1 WHERE public.geracoes_limite.total<$2 RETURNING total',
       [key,limit]);
-    if (!claimed.rowCount) return res.status(403).json({erro:u?'Você usou todas as gerações de hoje.':'O teste grátis acabou. Crie uma conta para continuar.',codigo:u?'limite_diario':'limite_visitante'});
+    if (!claimed.rowCount) return res.status(403).json({erro:'Você usou todas as gerações de hoje.',codigo:'limite_diario'});
   }
   try {
     const aventura=await gerarAventura({genero,tom,jogadores,ideia:typeof ideia==='string'?ideia.trim().slice(0,200):''});
@@ -850,12 +857,12 @@ app.post('/api/npcs/gerar',asyncHandler(async(req,res)=>{
  }
  if(!descricao.trim()&&!resumo.trim()&&!tematica.trim()&&!situacao.trim()&&!id)
    return res.status(400).json({erro:'Descreva o NPC ou informe o contexto da cena, ou selecione uma aventura salva.'});
- const key=quotaKey(req,u),limit=u?5:1,bypass=u?.papel==='admin';
+ const key=quotaKey(req,u),limit=5,bypass=u?.papel==='admin';
  if(!bypass){
    const claimed=await query(
      'INSERT INTO public.geracoes_limite(identificador,total) VALUES($1,1) ON CONFLICT(identificador) DO UPDATE SET total=public.geracoes_limite.total+1 WHERE public.geracoes_limite.total<$2 RETURNING total',
      [key,limit]);
-   if(!claimed.rowCount)return res.status(403).json({erro:u?'Você usou todas as gerações de hoje.':'O teste grátis acabou. Crie uma conta para continuar.',codigo:u?'limite_diario':'limite_visitante'});
+   if(!claimed.rowCount)return res.status(403).json({erro:'Você usou todas as gerações de hoje.',codigo:'limite_diario'});
  }
  try{
    const npc=await gerarNpc({genero,tom,descricao:descricao.trim(),contexto,resumo:resumo.trim(),tematica:tematica.trim(),situacao:situacao.trim()});
