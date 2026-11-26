@@ -1073,3 +1073,25 @@ body.mesa-alto-contraste .mesa-chat-historico,body.mesa-alto-contraste .mesa-cha
 
 /* Formulário de denúncia */
 #mesa-denuncia-dialog{width:min(520px,calc(100% - 28px));max-height:85dvh;overflow:auto;border:1px solid #b69b6d;border-radius:16px;padding:20px;background:#fff8ea;color:#392c20}#mesa-denuncia-dialog::backdrop{background:#091c19b8}#mesa-denuncia-dialog .formulario{display:grid;gap:10px}#mesa-denuncia-dialog button{min-height:44px}.mesa-denuncia-evidencia{white-space:pre-wrap;overflow-wrap:anywhere;border-left:3px solid #b69b6d;padding:12px}.mesa-chat-bolha button.link{font-size:.75rem;min-height:36px}
+
+/* Eventos cinematográficos: temporários, sem flashes rápidos, com saída manual. */
+.mesa-cinema{position:fixed;inset:0;z-index:10000;background:#0c181dea;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:clamp(16px,5vw,48px);gap:16px;color:#fff;text-align:center}
+.mesa-cinema[hidden]{display:none!important}
+#campanha-cinema-arte{width:min(88vw,700px);height:min(42vh,340px);display:grid;place-items:center;overflow:hidden}
+#campanha-cinema-texto{max-width:680px;line-height:1.5;font-size:clamp(1rem,2vw,1.3rem);overflow-wrap:anywhere;color:white}
+#campanha-cinema-fechar{min-height:44px;background:#f4ead6;color:#19372e;border:1px solid #c3a96e}
+.mesa-dragao{width:100%;max-height:100%;overflow:visible;filter:drop-shadow(0 12px 15px #0009);animation:mesa-dragao-entrada 4s ease both}
+.mesa-asa{transform-box:fill-box;transform-origin:100% 90%;animation:mesa-asa 1s ease-in-out infinite alternate}
+.mesa-asa.direita{transform-origin:0 90%}
+.mesa-fogo{transform-box:fill-box;transform-origin:left center;animation:mesa-fogo 2.5s ease-out .9s both}
+.mesa-cinema-simbolo{font-size:clamp(90px,25vw,220px);color:#f4d58b;text-shadow:0 0 48px #e5af5d;animation:mesa-cinema-pulso 3.5s ease both}
+.efeito-tempestade .mesa-cinema-simbolo,.efeito-trovao .mesa-cinema-simbolo{color:#b9dcff}
+.efeito-explosao .mesa-cinema-simbolo{color:#f1a56c}
+.mesa-cinema.sem-movimento *,body.mesa-reduzir-movimento .mesa-cinema *{animation:none!important;transition:none!important}
+@media(prefers-reduced-motion:reduce){.mesa-cinema *{animation:none!important;transition:none!important}}
+@keyframes mesa-dragao-entrada{0%{opacity:0;transform:translateX(-22%) scale(.78)}22%,78%{opacity:1;transform:translateX(0) scale(1)}100%{opacity:0;transform:translateX(8%) scale(1.04)}}
+@keyframes mesa-asa{from{transform:scaleY(.83)}to{transform:scaleY(1.07)}}
+@keyframes mesa-fogo{0%{opacity:0;transform:scaleX(.05)}25%,65%{opacity:1;transform:scaleX(1)}100%{opacity:0;transform:scaleX(.8)}}
+@keyframes mesa-cinema-pulso{0%{opacity:0;transform:scale(.6)}35%,75%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.1)}}
+#campanha-historico .narracao{max-width:100%;width:100%;border-left:4px solid #aa854d}
+#campanha-efeitos{display:grid;gap:8px}#campanha-efeitos[hidden]{display:none}
