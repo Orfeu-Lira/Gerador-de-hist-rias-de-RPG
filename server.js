@@ -14,6 +14,7 @@ const { gerarAventura, gerarNpc, narrarSolo, revisarXpSolo, revisarConquistasSol
 const retroXp=require('./xp-retroativo');
 const resgateRpg=require('./resgate-rpg');
 const companheirosSolo=require('./companheiros');
+const grupoRpg=require('./grupo-rpg');
 const {rolar: calcularDadosRpg}=require('./public/dice-rules.js');
 
 const PRODUCAO = process.env.NODE_ENV === 'production';
@@ -543,19 +544,21 @@ const campanhaEfeitos=['nenhum','dragao','dragao_fogo','trovao','explosao','magi
 const campanhaCores=['vermelho','verde','azul','preto','branco','dourado'];
 app.get('/api/comunidade/campanhas',asyncHandler(async(req,res)=>{
  const u=await socialUsuario(req,res);if(!u)return;
- const r=await query(`SELECT c.id::text AS id,c.titulo,c.descricao,c.encerrada,p.apelido AS mestre,c.mestre=$1 AS minha,m.estado
+ const r=await query(`SELECT c.id::text AS id,c.titulo,c.descricao,c.encerrada,c.modo_mestre,p.apelido AS mestre,c.mestre=$1 AS minha,m.estado
  FROM public.mesa_campanha_membros m JOIN public.mesa_campanhas_online c ON c.id=m.campanha_id JOIN public.mesa_perfis p ON p.usuario_id=c.mestre WHERE m.usuario_id=$1
  AND NOT EXISTS(SELECT 1 FROM public.mesa_bloqueios b WHERE (b.autor=$1 AND b.alvo=c.mestre) OR(b.alvo=$1 AND b.autor=c.mestre)) ORDER BY c.id DESC LIMIT 100`,[u.id]);res.json(r.rows);
 }));
 app.post('/api/comunidade/campanhas',asyncHandler(async(req,res)=>{
  const u=await socialUsuario(req,res);if(!u)return;
- const {titulo,descricao=''}=req.body||{};
+ const {titulo,descricao='',modoMestre='humano',modoRecursos='padrao',genero='Fantasia épica',tom='Aventureiro',aventuraId=null}=req.body||{};
+ if(!['humano','ia'].includes(modoMestre)||!['padrao','mana'].includes(modoRecursos)||!GENEROS.includes(genero)||!TONS.includes(tom)||(aventuraId!==null&&!/^[1-9][0-9]{0,17}$/.test(String(aventuraId))))return res.status(400).json({erro:'Configuração da mesa inválida.'});
+ let origem={};if(aventuraId!==null){const a=(await query('SELECT conteudo FROM public.aventuras WHERE id=$1 AND usuario_id=$2',[aventuraId,u.id])).rows[0];if(!a)return res.status(404).json({erro:'Selecione uma história da sua própria conta.'});origem=grupoRpg.origem(a);}
  if(typeof titulo!=='string'||!titulo.trim()||titulo.length>100||typeof descricao!=='string'||descricao.length>1000)return res.status(400).json({erro:'Título ou descrição inválida.'});
  const {pool}=require('./postgres');const client=await pool.connect();
  try{await client.query('BEGIN');await client.query("SELECT pg_advisory_xact_lock(hashtextextended('mesa-campanhas:'||$1::text,0))",[u.id]);
  const n=await client.query('SELECT count(*)::int AS n FROM public.mesa_campanhas_online WHERE mestre=$1 AND NOT encerrada',[u.id]);
  if(n.rows[0].n>=5){await client.query('ROLLBACK');return res.status(409).json({erro:'Limite de cinco campanhas ativas.'});}
- const r=await client.query('INSERT INTO public.mesa_campanhas_online(mestre,titulo,descricao) VALUES($1,$2,$3) RETURNING id::text AS id',[u.id,titulo.trim(),descricao.trim()]);
+ const r=await client.query('INSERT INTO public.mesa_campanhas_online(mestre,titulo,descricao,modo_mestre,modo_recursos,genero,tom,origem_historia) VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb) RETURNING id::text AS id',[u.id,titulo.trim(),descricao.trim(),modoMestre,modoRecursos,genero,tom,JSON.stringify(origem)]);
  await client.query("INSERT INTO public.mesa_campanha_membros(campanha_id,usuario_id,estado) VALUES($1,$2,'ativo')",[r.rows[0].id,u.id]);await client.query('COMMIT');res.json(r.rows[0]);
  }catch(e){await client.query('ROLLBACK').catch(()=>{});throw e;}finally{client.release();}
 }));
@@ -578,14 +581,18 @@ app.get('/api/comunidade/campanhas/:id',asyncHandler(async(req,res)=>{
  await comCampanha(req,res,async(client,s,u,bloqueado)=>{
  if(s.estado!=='ativo'||bloqueado)return campanhaErro('Acesso à campanha indisponível.');
  const membros=await client.query(`SELECT p.apelido,m.estado,m.usuario_id=$2 AS eu,m.usuario_id=$3 AS mestre,f.nome AS personagem,CASE WHEN m.usuario_id=$2 THEN m.personagem_id::text ELSE NULL END AS personagem_id FROM public.mesa_campanha_membros m JOIN public.mesa_perfis p ON p.usuario_id=m.usuario_id LEFT JOIN public.personagens_dnd f ON f.id=m.personagem_id AND f.usuario_id=m.usuario_id WHERE m.campanha_id=$1 AND (m.estado='ativo' OR $4::boolean) ORDER BY mestre DESC,p.apelido`,[s.id,u.id,s.mestre,s.minha]);
- const eventos=await client.query(`SELECT e.id::text AS id,e.tipo,e.texto,e.efeito,e.cor,e.criado_em,p.apelido,e.personagem_nome,CASE WHEN e.pratica IS NULL THEN NULL ELSE jsonb_build_object('nome',e.pratica->>'nome','status',e.pratica->>'status') END AS pratica FROM public.mesa_campanha_eventos e JOIN public.mesa_perfis p ON p.usuario_id=e.autor WHERE e.campanha_id=$1 AND ($2::bigint IS NULL OR e.id>$2::bigint) ORDER BY e.id ${depois?'ASC':'DESC'} LIMIT 80`,[s.id,depois??null]);
- return {dados:{titulo:s.titulo,descricao:s.descricao,minha:s.minha,encerrada:s.encerrada,membros:membros.rows,eventos:depois?eventos.rows:eventos.rows.reverse()}};
+ const eventos=await client.query(`SELECT e.id::text AS id,e.tipo,e.texto,e.efeito,e.cor,e.criado_em,CASE WHEN e.narrador_ia THEN 'Mestre IA' ELSE p.apelido END AS apelido,e.narrador_ia,e.resultados,e.personagem_nome,CASE WHEN e.pratica IS NULL THEN NULL ELSE jsonb_build_object('nome',e.pratica->>'nome','status',e.pratica->>'status') END AS pratica FROM public.mesa_campanha_eventos e JOIN public.mesa_perfis p ON p.usuario_id=e.autor WHERE e.campanha_id=$1 AND ($2::bigint IS NULL OR e.id>$2::bigint) ORDER BY e.id ${depois?'ASC':'DESC'} LIMIT 80`,[s.id,depois??null]);
+ const fichas=(await client.query("SELECT f.id,f.nome,f.dados,f.xp,f.aquisicoes_rpg,m.recursos,m.compartilhar_ficha,m.usuario_id=$2 AS eu,p.apelido FROM public.mesa_campanha_membros m JOIN public.mesa_perfis p ON p.usuario_id=m.usuario_id JOIN public.personagens_dnd f ON f.id=m.personagem_id AND f.usuario_id=m.usuario_id WHERE m.campanha_id=$1 AND m.estado='ativo' AND (m.usuario_id=$2 OR m.compartilhar_ficha)",[s.id,u.id])).rows;
+ const minhaFicha=fichas.find(f=>f.eu),grupo=fichas.map(f=>({apelido:f.apelido,eu:f.eu,...grupoRpg.ficha(f,f.recursos,s.modo_recursos,true)}));
+ const pendentes=s.modo_mestre==='ia'?(await client.query("SELECT count(*)::int AS n FROM public.mesa_campanha_eventos WHERE campanha_id=$1 AND id>$2 AND NOT narrador_ia AND tipo IN ('acao','fala','dado')",[s.id,s.ia_cursor])).rows[0].n:0;
+ return {dados:{titulo:s.titulo,descricao:s.descricao,minha:s.minha,encerrada:s.encerrada,membros:membros.rows,eventos:depois?eventos.rows:eventos.rows.reverse(),modoMestre:s.modo_mestre,modoRecursos:s.modo_recursos,origem:s.origem_historia,iaIniciada:s.ia_iniciada,iaOcupada:grupoRpg.ocupado(s),pendentes,grupo,compartilhar:!!minhaFicha?.compartilhar_ficha,opcoes:grupoRpg.opcoes(minhaFicha,minhaFicha?.recursos,s.modo_recursos),grimorio:minhaFicha?recursosRpg.estado(minhaFicha,minhaFicha.recursos,s.modo_recursos).grimorio:null}};
  });
 }));
 app.post('/api/comunidade/campanhas/:id/membros',asyncHandler(async(req,res)=>{
  const {acao,apelido}=req.body||{};
  if(!['convidar','aceitar','sair','remover','encerrar'].includes(acao))return res.status(400).json({erro:'Ação inválida.'});
  await comCampanha(req,res,async(client,s,u,bloqueado)=>{
+ if(grupoRpg.ocupado(s))return campanhaErro('Aguarde a conclusão da narração.',409);
  if(acao==='sair'&&!s.minha){await client.query('DELETE FROM public.mesa_campanha_membros WHERE campanha_id=$1 AND usuario_id=$2',[s.id,u.id]);return {dados:{ok:true}};}
  if(acao==='encerrar'&&s.minha){await client.query('UPDATE public.mesa_campanhas_online SET encerrada=true WHERE id=$1',[s.id]);return {dados:{ok:true}};}
  if(s.encerrada)return campanhaErro('Campanha encerrada.');
@@ -606,23 +613,29 @@ app.post('/api/comunidade/campanhas/:id/membros',asyncHandler(async(req,res)=>{
  });
 }));
 app.post('/api/comunidade/campanhas/:id/personagem',asyncHandler(async(req,res)=>{
- const personagem=req.body?.personagem;
+ const personagem=req.body?.personagem,compartilhar=req.body?.compartilhar===true;
  if(personagem!==null&&!/^[1-9][0-9]{0,17}$/.test(String(personagem)))return res.status(400).json({erro:'Personagem inválido.'});
  await comCampanha(req,res,async(client,s,u,bloqueado)=>{
  if(s.estado!=='ativo'||s.encerrada||bloqueado)return campanhaErro('Campanha indisponível.');
+ if(grupoRpg.ocupado(s))return campanhaErro('Aguarde a narração.',409);
+ if(s.modo_mestre==='ia'){const m=(await client.query('SELECT personagem_id FROM public.mesa_campanha_membros WHERE campanha_id=$1 AND usuario_id=$2',[s.id,u.id])).rows[0];if(m?.personagem_id&&String(m.personagem_id)!==String(personagem))return campanhaErro('A ficha vinculada à mesa com IA não pode ser substituída, para preservar recursos e recompensas.',409);}
  if(personagem!==null){const f=await client.query('SELECT 1 FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2',[personagem,u.id]);if(!f.rowCount)return campanhaErro('Selecione uma ficha da sua própria conta.',404);}
- await client.query('UPDATE public.mesa_campanha_membros SET personagem_id=$1 WHERE campanha_id=$2 AND usuario_id=$3',[personagem,s.id,u.id]);
+ await client.query('UPDATE public.mesa_campanha_membros SET recursos=CASE WHEN personagem_id IS DISTINCT FROM $1::bigint THEN \'{}\'::jsonb ELSE recursos END,personagem_id=$1,compartilhar_ficha=$4 WHERE campanha_id=$2 AND usuario_id=$3',[personagem,s.id,u.id,compartilhar]);
  return {dados:{ok:true}};
  });
 }));
 app.post('/api/comunidade/campanhas/:id/eventos',asyncHandler(async(req,res)=>{
- const {tipo,texto='',efeito='nenhum',cor='vermelho',chave,faces,habilidadeId}=req.body||{};
+ const {tipo,texto='',efeito='nenhum',cor='vermelho',chave,faces,habilidadeId,usoRecurso=null}=req.body||{};
+ if(usoRecurso!==null&&(tipo!=='acao'||typeof usoRecurso!=='string'||usoRecurso.length>1100))return res.status(400).json({erro:'Recurso inválido.'});
  if(habilidadeId!=null&&(tipo!=='acao'||typeof habilidadeId!=='string'||habilidadeId.length>1100))return res.status(400).json({erro:'Habilidade inválida.'});
  if(!['narracao','acao','fala','dado'].includes(tipo)||typeof texto!=='string'||texto.length>2000||(tipo!=='dado'&&!texto.trim())||!campanhaEfeitos.includes(efeito)||!campanhaCores.includes(cor)||typeof chave!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(chave)||(tipo==='dado'&&![4,6,8,10,12,20,100].includes(faces)))return res.status(400).json({erro:'Evento inválido.'});
  await comCampanha(req,res,async(client,s,u,bloqueado)=>{
  if(s.estado!=='ativo'||s.encerrada||bloqueado||(!s.minha&&(tipo==='narracao'||efeito!=='nenhum'))||(tipo!=='narracao'&&efeito!=='nenhum'))return campanhaErro('Evento não autorizado.');
+ if(s.modo_mestre==='ia'&&(tipo==='narracao'||efeito!=='nenhum'||habilidadeId))return campanhaErro('A narração pertence ao Mestre IA.');
  const antigo=await client.query('SELECT campanha_id,id::text AS id FROM public.mesa_campanha_eventos WHERE autor=$1 AND chave=$2',[u.id,chave]);
  if(antigo.rowCount)return String(antigo.rows[0].campanha_id)===String(s.id)?{dados:{id:antigo.rows[0].id}}:campanhaErro('Identificador já utilizado.',409);
+ if(s.modo_mestre==='ia'){if(!s.ia_iniciada)return campanhaErro('Inicie a narração antes de enviar ações.',409);if(grupoRpg.ocupado(s))return campanhaErro('O Mestre IA está narrando. Aguarde.',409);const pend=(await client.query("SELECT 1 FROM public.mesa_campanha_eventos WHERE campanha_id=$1 AND id>$2 AND NOT narrador_ia LIMIT 1",[s.id,s.ia_cursor])).rowCount;if(pend)return campanhaErro('Existe uma ação aguardando narração. Use Narrar próxima ação.',409);
+ const p=(await client.query('SELECT f.id,f.nome,f.dados,f.xp,f.aquisicoes_rpg,m.recursos FROM public.mesa_campanha_membros m JOIN public.personagens_dnd f ON f.id=m.personagem_id AND f.usuario_id=m.usuario_id WHERE m.campanha_id=$1 AND m.usuario_id=$2',[s.id,u.id])).rows[0];try{recursosRpg.preparar(recursosRpg.estado(p,p?.recursos,s.modo_recursos),usoRecurso,tipo);}catch(e){return campanhaErro(e.message,409);}}
  const n=await client.query("SELECT count(*)::int AS n FROM public.mesa_campanha_eventos WHERE autor=$1 AND criado_em>now()-interval '1 minute'",[u.id]);
  if(n.rows[0].n>=20)return campanhaErro('Aguarde um minuto antes de enviar mais eventos.',429);
  const conteudo=tipo==='dado'?'Rolou d'+faces+': '+require('crypto').randomInt(1,faces+1):texto.trim();
@@ -635,14 +648,14 @@ app.post('/api/comunidade/campanhas/:id/eventos',asyncHandler(async(req,res)=>{
   if(!h||e.nivel<h.nivelMin)return campanhaErro('Habilidade indisponível ou acima do nível.',409);
   pratica={id:h.id,nome:h.nome,personagemId:String(p.id),status:'pendente'};
  }
- const r=await client.query('INSERT INTO public.mesa_campanha_eventos(campanha_id,autor,chave,tipo,texto,efeito,cor,personagem_nome,pratica) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb) RETURNING id::text AS id',[s.id,u.id,chave,tipo,conteudo,efeito,cor,f?.nome??null,pratica?JSON.stringify(pratica):null]);return {dados:r.rows[0]};
+ const r=await client.query('INSERT INTO public.mesa_campanha_eventos(campanha_id,autor,chave,tipo,texto,efeito,cor,personagem_nome,pratica,uso_recurso) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10) RETURNING id::text AS id',[s.id,u.id,chave,tipo,conteudo,efeito,cor,f?.nome??null,pratica?JSON.stringify(pratica):null,s.modo_mestre==='ia'?usoRecurso:null]);return {dados:r.rows[0]};
  });
 }));
 app.post('/api/comunidade/campanhas/:id/pratica',asyncHandler(async(req,res)=>{
  const evento=String(req.body?.evento||''),aprovar=req.body?.aprovar;
  if(!/^[1-9][0-9]{0,17}$/.test(evento)||typeof aprovar!=='boolean')return res.status(400).json({erro:'Solicitação inválida.'});
  await comCampanha(req,res,async(client,s,u,bloqueado)=>{
-  if(!s.minha||s.estado!=='ativo'||s.encerrada||bloqueado)return campanhaErro('Somente o mestre pode avaliar a prática.');
+  if(s.modo_mestre==='ia'||!s.minha||s.estado!=='ativo'||s.encerrada||bloqueado)return campanhaErro('Somente o mestre humano pode avaliar a prática.');
   const ev=(await client.query("SELECT id,autor,pratica,personagem_nome FROM public.mesa_campanha_eventos WHERE id=$1 AND campanha_id=$2 AND tipo='acao' FOR UPDATE",[evento,s.id])).rows[0];
   if(!ev?.pratica||String(ev.autor)===String(u.id))return campanhaErro('Prática indisponível.',404);
   if(ev.pratica.status!=='pendente')return {dados:{status:ev.pratica.status,ganho:0,duplicado:true}};
@@ -665,7 +678,7 @@ app.post('/api/comunidade/campanhas/:id/xp',asyncHandler(async(req,res)=>{
  const {apelido,quantidade,chave}=req.body||{};
  if(typeof apelido!=='string'||apelido.length>24||!Number.isInteger(quantidade)||quantidade<1||quantidade>1000||typeof chave!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(chave))return res.status(400).json({erro:'Recompensa inválida.'});
  await comCampanha(req,res,async(client,s,u,bloqueado)=>{
- if(!s.minha||s.estado!=='ativo'||s.encerrada||bloqueado)return campanhaErro('Somente o mestre pode conceder XP.');
+ if(s.modo_mestre==='ia'||!s.minha||s.estado!=='ativo'||s.encerrada||bloqueado)return campanhaErro('Somente o mestre humano pode conceder XP.');
  const m=(await client.query("SELECT m.usuario_id,m.personagem_id FROM public.mesa_campanha_membros m JOIN public.mesa_perfis p ON p.usuario_id=m.usuario_id WHERE m.campanha_id=$1 AND m.estado='ativo' AND p.apelido=$2",[s.id,apelido])).rows[0];
  if(!m?.personagem_id||String(m.usuario_id)===String(u.id))return campanhaErro('Selecione um participante ativo com ficha vinculada.');
  const xp=await xpMesa.conceder(client,{personagemId:m.personagem_id,usuarioId:m.usuario_id,origem:'multiplayer',campanhaId:s.id,chave,categoria:'mestre',quantidade});
