@@ -297,6 +297,7 @@ function mostrar(tela, restaurando=false) {
   pararJornada();
   if(mesaTelaVisivel==='solo'&&tela!=='solo'){if(tela!=='musica')soloLimparAvatar();soloFecharPaineis();fecharCinema();}
   if(tela!=='amigos'&&mesaTelaVisivel==='amigos')amigosLimpar();
+  if(tela!=='personagens'&&mesaTelaVisivel==='personagens')fecharAvatarAmpliado();
   if(tela!=='compartilhadas'&&mesaTelaVisivel==='compartilhadas')limparCompartilhadas();
   if(tela!=='mensagens'&&mesaTelaVisivel==='mensagens')limparMensagens();
   if(tela!=='campanhas'&&mesaTelaVisivel==='campanhas')limparCampanha();
@@ -367,18 +368,20 @@ async function notificacoesAtualizar(force=false){
    if(!social[k])continue;
    const card=add('article',lista,'','notificacoes-item nao-lida');
    add('strong',card,n);add('p',card,String(social[k])+' pendente(s)','suave');
+   if(k==='solicitacoes'&&Array.isArray(social.solicitantes))for(const apelido of social.solicitantes.slice(0,20))add('p',card,apelido+' enviou uma solicitação de amizade.');
    botaoAdmin(card,'Abrir',()=>{notificacoesFechar();if(k==='denuncias')adminSecao='moderacao';navegarMesa(tela);});
   }
   if(social.avisos?.length)add('h3',lista,'Avisos da sua conta');
   for(const item of social.avisos||[]){
    const card=add('article',lista,'','notificacoes-item'+(item.lido?'':' nao-lida')),concedida=item.tipo==='ia_concedida';
-   add('strong',card,concedida?'Você recebeu IA ilimitada!':'Seu privilégio de IA foi alterado');
-   add('p',card,concedida?'As cotas diárias de geração do Mesa foram liberadas para sua conta.':'Sua conta voltou aos limites padrão de geração.');
+   const d=item.dados||{};
+   const msg=concedida?['Você recebeu IA ilimitada!','As cotas diárias de geração do Mesa foram liberadas para sua conta.','perfil','Meu perfil']:item.tipo==='ia_revogada'?['Seu privilégio de IA foi alterado','Sua conta voltou aos limites padrão de geração.','perfil','Meu perfil']:item.tipo==='ia_renovada'?['Sua cota de IA foi renovada!',(d.nome||'Gerações')+' · '+(d.limite||'')+' disponíveis por dia.','perfil','Ver limite']:item.tipo==='amizade_aceita'?['Solicitação aceita',(d.apelido||'Um jogador')+' aceitou sua amizade.','amigos','Ver amigos']:item.tipo==='suporte_atualizado'?['Seu chamado foi atualizado',(d.assunto||'Chamado')+' · '+(d.status||'Atualização'),'suporte','Abrir suporte']:['Aviso da conta','Há uma atualização na sua conta.','perfil','Meu perfil'];
+   add('strong',card,msg[0]);add('p',card,msg[1]);
    add('p',card,dataBR(item.criado_em),'suave');
    const linha=add('div',card,'','notificacoes-item-acoes');
    const ler=async()=>{if(!item.lido)await api('/api/comunidade/notificacoes/'+item.id+'/ler','POST',{});};
    if(!item.lido)botaoAdmin(linha,'Marcar como lida',async()=>{try{await ler();await notificacoesAtualizar(true);}catch(e){estado.textContent=e.message;}});
-   botaoAdmin(linha,'Meu perfil',async()=>{try{await ler();notificacoesFechar();navegarMesa('perfil');notificacoesAtualizar(true);}catch(e){estado.textContent=e.message;}});
+   botaoAdmin(linha,msg[3],async()=>{try{await ler();notificacoesFechar();navegarMesa(msg[2]);notificacoesAtualizar(true);}catch(e){estado.textContent=e.message;}});
   }
   if(admin&&data.itens.length)add('h3',lista,'Suporte administrativo');
   for(const item of data.itens){
@@ -421,7 +424,7 @@ function notificacoesSessao(){
  $('notificacoes-ler-todas').hidden=!ativo;$('notificacoes-ir-suporte').hidden=eu.papel!=='admin';
  $('mesa-notificacoes').hidden=!ativo;
  if(!ativo){
-  notificacoesFechar();notificacoesUltimoCarregamento=0;
+  fecharAvatarAmpliado();notificacoesFechar();notificacoesUltimoCarregamento=0;
   $('notificacoes-contador').hidden=true;$('notificacoes-lista').replaceChildren();
  }else notificacoesAtualizar(true);
 }
@@ -1676,7 +1679,11 @@ for (const [sigla,nome] of atributosDnd) {
 }
 // Avatares ficam em um bucket privado. Somente a própria conta pode carregá-los.
 let avatarObjectUrl=null,avatarEnviando=false,avatarVersao=0;
+function fecharAvatarAmpliado(){const d=$('p-avatar-dialog');if(d?.open)d.close();$('p-avatar-grande')?.removeAttribute('src');}
+$('p-avatar-ampliar').onclick=()=>{const img=$('p-avatar-img');if(img.hidden||!avatarObjectUrl||!eu.logado||mesaTelaVisivel!=='personagens')return;$('p-avatar-grande').src=avatarObjectUrl;$('p-avatar-dialog').showModal();};
+$('p-avatar-fechar').onclick=fecharAvatarAmpliado;$('p-avatar-dialog').addEventListener('close',()=>$('p-avatar-grande').removeAttribute('src'));$('p-avatar-dialog').addEventListener('click',e=>{if(e.target===$('p-avatar-dialog'))fecharAvatarAmpliado();});
 function limparPreviewAvatar(){
+  fecharAvatarAmpliado();$('p-avatar-ampliar').disabled=true;
   avatarVersao++;
   if(avatarObjectUrl)URL.revokeObjectURL(avatarObjectUrl);
   avatarObjectUrl=null;
@@ -1711,7 +1718,7 @@ async function carregarAvatar(){
     if(String(fichaAbertaId)!==String(id)||versao!==avatarVersao)return;
     avatarObjectUrl=URL.createObjectURL(blob);
     $('p-avatar-img').src=avatarObjectUrl;
-    $('p-avatar-img').hidden=false;
+    $('p-avatar-img').hidden=false;$('p-avatar-ampliar').disabled=false;
     $('p-avatar-vazio').hidden=true;
     $('p-avatar-remover').hidden=false;
   }catch(e){
@@ -1759,7 +1766,7 @@ async function enviarAvatar(arquivo,id){
     avatarPendente=null;
     limparPreviewAvatar();
     avatarObjectUrl=URL.createObjectURL(new Blob([Uint8Array.from(atob(imagem),c=>c.charCodeAt(0))],{type:'image/webp'}));
-    $('p-avatar-img').src=avatarObjectUrl;$('p-avatar-img').hidden=false;$('p-avatar-vazio').hidden=true;$('p-avatar-remover').hidden=false;
+    $('p-avatar-img').src=avatarObjectUrl;$('p-avatar-img').hidden=false;$('p-avatar-ampliar').disabled=false;$('p-avatar-vazio').hidden=true;$('p-avatar-remover').hidden=false;
     aviso('Retrato salvo com sucesso!',true);
     $('p-avatar-info').textContent='Retrato salvo! Você pode trocar a foto quando quiser.';
     return true;
@@ -1780,7 +1787,7 @@ $('p-avatar-file').onchange=async()=>{
   if(!fichaAbertaId){
     limparPreviewAvatar();
     avatarObjectUrl=URL.createObjectURL(arquivo);
-    $('p-avatar-img').src=avatarObjectUrl;$('p-avatar-img').hidden=false;$('p-avatar-vazio').hidden=true;
+    $('p-avatar-img').src=avatarObjectUrl;$('p-avatar-img').hidden=false;$('p-avatar-ampliar').disabled=false;$('p-avatar-vazio').hidden=true;
     atualizarEstadoAvatar();return;
   }
   await enviarAvatar(arquivo,fichaAbertaId);
@@ -2223,11 +2230,12 @@ $('opcoes-restaurar').onclick=()=>{mesaPreferencias.ortografia=true;mesaPreferen
 document.addEventListener('focusin',e=>{if(e.target instanceof Element)mesaAplicarOrtografia(e.target);});
 mesaAplicarPreferencias();
 // Comunidade: o nome social é sempre o apelido, sem @.
-let amigosVersao=0;
+let amigosVersao=0,amigosIdentidadeSessao=null;
+function amigosIdentidadeBloquear(v){for(const x of $('amigos-identidade-form').querySelectorAll('input,button'))x.disabled=v;}
 function amigosLimpar(){
  amigosVersao++;
  for(const id of ['amigos-resultados','amigos-recebidas','amigos-enviadas','amigos-lista','amigos-bloqueados'])$(id).replaceChildren();
- $('amigos-termo').value='';$('amigos-status').textContent='';
+ $('amigos-termo').value='';$('amigos-status').textContent='';amigosIdentidadeSessao=null;$('amigos-meu-apelido').value='';$('amigos-visivel').checked=false;$('amigos-identidade-status').textContent='';amigosIdentidadeBloquear(true);
 }
 let denunciaAlvo=null;
 function abrirDenuncia(apelido,mensagemId=null){
@@ -2259,6 +2267,12 @@ function amigoLinha(alvo,apelido,acoes){
 async function carregarAmigos(){
  const versao=++amigosVersao;
  try{
+ const sessao=eu.perfilSessao;amigosIdentidadeBloquear(true);
+ const identidade=await api('/api/conta/perfil/social');
+ if(versao!==amigosVersao||mesaTelaVisivel!=='amigos'||eu.perfilSessao!==sessao)return;
+ $('amigos-meu-apelido').value=identidade.apelido;$('amigos-visivel').checked=identidade.encontravel;amigosIdentidadeSessao=sessao;amigosIdentidadeBloquear(false);$('amigos-copiar-apelido').disabled=!identidade.apelido;
+ $('amigos-identidade-status').textContent=!identidade.apelido?'Defina seu apelido para participar da comunidade.':identidade.encontravel?'Seu apelido pode ser encontrado por outros jogadores.':'Seu apelido está oculto na busca. Marque a opção acima se quiser receber novas solicitações.';
+ if(!identidade.apelido){for(const id of ['amigos-recebidas','amigos-enviadas','amigos-lista','amigos-bloqueados'])$(id).replaceChildren(el('p','Configure seu apelido primeiro.','suave'));return;}
  const [amigos,bloqueados]=await Promise.all([api('/api/comunidade/amigos'),api('/api/comunidade/bloqueados')]);
  if(versao!==amigosVersao||mesaTelaVisivel!=='amigos'||!eu.logado)return;
  const grupos={'amigos-recebidas':amigos.filter(a=>a.estado==='pendente'&&!a.enviada),'amigos-enviadas':amigos.filter(a=>a.estado==='pendente'&&a.enviada),'amigos-lista':amigos.filter(a=>a.estado==='aceita'),'amigos-bloqueados':bloqueados};
@@ -2271,14 +2285,16 @@ async function carregarAmigos(){
  }}
  }catch(e){if(versao===amigosVersao)$('amigos-status').textContent=e.message;}
 }
+$('amigos-identidade-form').onsubmit=async ev=>{ev.preventDefault();const sessao=amigosIdentidadeSessao;if(!sessao||sessao!==eu.perfilSessao||mesaTelaVisivel!=='amigos')return;const status=$('amigos-identidade-status'),apelido=$('amigos-meu-apelido').value.trim(),encontravel=$('amigos-visivel').checked;amigosIdentidadeBloquear(true);try{await api('/api/conta/perfil/social','PATCH',{apelido,encontravel});if(eu.perfilSessao===sessao&&mesaTelaVisivel==='amigos'){await carregarAmigos();status.textContent=encontravel?'Apelido salvo e visível para outros jogadores.':'Apelido salvo. Seu perfil permanece oculto na busca.';}}catch(e){if(eu.perfilSessao===sessao&&mesaTelaVisivel==='amigos'){status.textContent=e.message;amigosIdentidadeBloquear(false);}}};
+$('amigos-copiar-apelido').onclick=async()=>{try{await navigator.clipboard.writeText($('amigos-meu-apelido').value.trim());$('amigos-identidade-status').textContent='Apelido copiado. Compartilhe com quem quiser adicionar.';}catch{$('amigos-meu-apelido').select();$('amigos-identidade-status').textContent='Selecione e copie seu apelido.';}};
 $('amigos-atualizar').onclick=carregarAmigos;
 $('amigos-busca').onsubmit=async ev=>{
  ev.preventDefault();const b=ev.currentTarget.querySelector('button');b.disabled=true;
  const versao=amigosVersao,alvo=$('amigos-resultados');alvo.replaceChildren();
  try{const lista=await api('/api/comunidade/buscar?apelido='+encodeURIComponent($('amigos-termo').value.trim()));
  if(versao!==amigosVersao||mesaTelaVisivel!=='amigos')return;
- if(!lista.length)alvo.append(el('p','Nenhum jogador encontrado.','suave'));
- for(const a of lista)amigoLinha(alvo,a.apelido,[['Adicionar','solicitar'],['Bloquear','bloquear']]);
+ if(!lista.length)alvo.append(el('p','Nenhum jogador encontrado. Confira o apelido e peça à pessoa para salvar o apelido e permitir ser encontrada na aba Amigos.','suave'));
+ for(const a of lista){const acoes=a.estado==='aceita'?[['Remover amizade','remover']]:a.estado==='pendente'?(a.enviada?[['Cancelar solicitação','remover']]:[['Aceitar','aceitar'],['Recusar','remover']]):[['Adicionar','solicitar'],['Bloquear','bloquear']];amigoLinha(alvo,a.apelido,acoes);}
  }catch(e){if(versao===amigosVersao)$('amigos-status').textContent=e.message;}finally{b.disabled=false;}
 };
 let compartilhadasVersao=0;

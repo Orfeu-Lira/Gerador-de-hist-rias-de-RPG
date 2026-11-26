@@ -1,5 +1,6 @@
 // Mesa — backend Express preparado para Vercel com PostgreSQL/Supabase.
 const crypto = require('crypto');
+const comunidadeUtil=require('./comunidade-util');
 const perfilSessao=require('./perfil-sessao');
 const express = require('express');
 const session = require('express-session');
@@ -319,12 +320,13 @@ async function socialUsuario(req,res){
 }
 app.get('/api/comunidade/buscar',asyncHandler(async(req,res)=>{
  const u=await socialUsuario(req,res);if(!u)return;
- const termo=String(req.query.apelido||'').trim().replace(/^@/,'');
- if(!/^[A-Za-z0-9_]{3,24}$/.test(termo))return res.json([]);
- const r=await query(`SELECT p.apelido FROM public.mesa_perfis p JOIN public.usuarios v ON v.id=p.usuario_id
- WHERE lower(p.apelido) LIKE lower($2)||'%' ESCAPE '!' AND p.encontravel AND p.usuario_id<>$1 AND (v.bloqueado_ate IS NULL OR v.bloqueado_ate<=now())
+ const termo=comunidadeUtil.termoBusca(req.query.apelido);
+ if(!/^[A-Za-z0-9_]{3,24}$/.test(termo))return res.status(400).json({erro:'Busque por pelo menos 3 letras, números ou _ do apelido.'});
+ const r=await query(`SELECT p.apelido,a.estado,a.solicitante=$1 AS enviada FROM public.mesa_perfis p JOIN public.usuarios v ON v.id=p.usuario_id
+ LEFT JOIN public.mesa_amizades a ON a.a=least(p.usuario_id,$1::bigint) AND a.b=greatest(p.usuario_id,$1::bigint)
+ WHERE lower(p.apelido) LIKE '%'||lower($2)||'%' ESCAPE '!' AND (p.encontravel OR a.a IS NOT NULL) AND p.usuario_id<>$1 AND (v.bloqueado_ate IS NULL OR v.bloqueado_ate<=now())
  AND NOT EXISTS(SELECT 1 FROM public.mesa_bloqueios b WHERE (b.autor=$1 AND b.alvo=p.usuario_id) OR (b.alvo=$1 AND b.autor=p.usuario_id))
- ORDER BY p.apelido LIMIT 20`,[u.id,termo.replace(/_/g,'!_')]);res.json(r.rows);
+ ORDER BY (lower(p.apelido)=lower($3)) DESC,(lower(p.apelido) LIKE lower($2)||'%' ESCAPE '!') DESC,p.apelido LIMIT 20`,[u.id,comunidadeUtil.escapeBusca(termo),termo]);res.json(r.rows);
 }));
 app.get('/api/comunidade/amigos',asyncHandler(async(req,res)=>{
  const u=await socialUsuario(req,res);if(!u)return;
@@ -343,7 +345,7 @@ app.post('/api/comunidade/amizade',asyncHandler(async(req,res)=>{
  const {pool}=require('./postgres');const client=await pool.connect();
  try{
  await client.query('BEGIN');
- const p=(await client.query('SELECT usuario_id,encontravel FROM public.mesa_perfis WHERE lower(apelido)=lower($1)',[apelido])).rows[0];
+ const p=(await client.query('SELECT p.usuario_id,p.encontravel FROM public.mesa_perfis p JOIN public.usuarios v ON v.id=p.usuario_id WHERE lower(p.apelido)=lower($1) AND (v.bloqueado_ate IS NULL OR v.bloqueado_ate<=now())',[apelido])).rows[0];
  if(!p||String(p.usuario_id)===String(u.id)){await client.query('ROLLBACK');return res.status(404).json({erro:'Perfil indisponível.'});}
  const v=p.usuario_id;
  // Serializa operações sobre o mesmo par, inclusive bloqueio e aceitação.
@@ -363,6 +365,7 @@ app.post('/api/comunidade/amizade',asyncHandler(async(req,res)=>{
  }else if(acao==='aceitar'){
  const r=await client.query("UPDATE public.mesa_amizades SET estado='aceita' WHERE a=least($1::bigint,$2::bigint) AND b=greatest($1::bigint,$2::bigint) AND estado='pendente' AND solicitante=$2",par);
  if(!r.rowCount){await client.query('ROLLBACK');return res.status(404).json({erro:'Solicitação indisponível.'});}
+ await client.query("INSERT INTO public.mesa_avisos_conta(usuario_id,tipo,dados) SELECT $1,'amizade_aceita',jsonb_build_object('apelido',apelido) FROM public.mesa_perfis WHERE usuario_id=$2",[v,u.id]);
  }else await client.query('DELETE FROM public.mesa_amizades WHERE a=least($1::bigint,$2::bigint) AND b=greatest($1::bigint,$2::bigint)',par);
  }
  if(acao==='bloquear'||acao==='remover')await client.query('DELETE FROM public.mesa_fichas_compartilhadas f USING public.personagens_dnd p WHERE p.id=f.personagem_id AND ((p.usuario_id=$1 AND f.destinatario=$2) OR(p.usuario_id=$2 AND f.destinatario=$1))',par);
@@ -475,16 +478,32 @@ app.post('/api/comunidade/denuncias',asyncHandler(async(req,res)=>{
  }catch(e){await client.query('ROLLBACK').catch(()=>{});throw e;}finally{client.release();}
 }));
 // Avisos derivados dos registros existentes, sem duplicar eventos.
+// Cria avisos na primeira consulta após uma cota esgotada ser renovada, sem depender do navegador aberto à meia-noite UTC.
+async function avisosCotas(u){
+ if(iaIlimitada(u))return;
+ const cotas=comunidadeUtil.cotas;
+ await query(`WITH limites AS (SELECT * FROM unnest($2::text[],$3::int[],$4::text[]) AS x(prefixo,limite,nome)),
+ dias AS (SELECT ((now() AT TIME ZONE 'UTC')::date - i)::text dia FROM generate_series(1,30) i),
+ esgotadas AS (SELECT DISTINCT ON(l.prefixo) l.prefixo,l.limite,l.nome,d.dia FROM limites l CROSS JOIN dias d
+ JOIN public.geracoes_limite g ON g.identificador=l.prefixo||':'||$1::bigint::text||':'||d.dia AND g.total>=l.limite
+ LEFT JOIN public.geracoes_limite hoje ON hoje.identificador=l.prefixo||':'||$1::bigint::text||':'||(now() AT TIME ZONE 'UTC')::date::text
+ WHERE COALESCE(hoje.total,0)<l.limite ORDER BY l.prefixo,d.dia DESC)
+ INSERT INTO public.mesa_avisos_conta(usuario_id,tipo,chave_evento,dados)
+ SELECT $1,'ia_renovada','cota:'||prefixo||':'||dia,jsonb_build_object('nome',nome,'limite',limite,'dia',dia) FROM esgotadas
+ ON CONFLICT(usuario_id,chave_evento) DO NOTHING`,[u.id,cotas.map(c=>c.prefixo),cotas.map(c=>c.limite),cotas.map(c=>c.nome)]);
+}
 app.get('/api/comunidade/notificacoes',asyncHandler(async(req,res)=>{
  const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
  const r=await query(`WITH amigos AS (SELECT CASE WHEN a=$1 THEN b ELSE a END AS pessoa,estado,solicitante FROM public.mesa_amizades WHERE $1 IN(a,b)),
  permitidos AS (SELECT a.* FROM amigos a JOIN public.usuarios v ON v.id=a.pessoa WHERE (v.bloqueado_ate IS NULL OR v.bloqueado_ate<=now()) AND NOT EXISTS(SELECT 1 FROM public.mesa_bloqueios b WHERE (b.autor=$1 AND b.alvo=a.pessoa) OR(b.alvo=$1 AND b.autor=a.pessoa)))
  SELECT (SELECT count(*)::int FROM permitidos WHERE estado='pendente' AND solicitante<>$1) AS solicitacoes,
+ (SELECT COALESCE(json_agg(p.apelido ORDER BY p.apelido),'[]'::json) FROM permitidos a JOIN public.mesa_perfis p ON p.usuario_id=a.pessoa WHERE a.estado='pendente' AND a.solicitante<>$1) AS solicitantes,
  (SELECT count(*)::int FROM public.mesa_mensagens_privadas m JOIN permitidos a ON a.pessoa=m.remetente AND a.estado='aceita' WHERE m.destinatario=$1 AND m.lida_em IS NULL) AS mensagens,
  (SELECT count(*)::int FROM public.mesa_fichas_compartilhadas f JOIN public.personagens_dnd p ON p.id=f.personagem_id JOIN permitidos a ON a.pessoa=p.usuario_id AND a.estado='aceita' WHERE f.destinatario=$1 AND f.vista_em IS NULL) AS fichas,
  (SELECT count(*)::int FROM public.mesa_campanha_membros m JOIN public.mesa_campanhas_online c ON c.id=m.campanha_id JOIN permitidos a ON a.pessoa=c.mestre AND a.estado='aceita' WHERE m.usuario_id=$1 AND m.estado='convidado' AND NOT c.encerrada) AS convites,
  (SELECT CASE WHEN $2::boolean THEN count(*)::int ELSE 0 END FROM public.mesa_denuncias WHERE estado='pendente') AS denuncias`,[u.id,u.papel==='admin']);
- const avisos=await query("SELECT id::text,tipo,criado_em,lido_em IS NOT NULL AS lido FROM public.mesa_avisos_conta WHERE usuario_id=$1 ORDER BY (lido_em IS NULL) DESC,id DESC LIMIT 50",[u.id]);
+ await avisosCotas(u);
+ const avisos=await query("SELECT id::text,tipo,dados,criado_em,lido_em IS NOT NULL AS lido FROM public.mesa_avisos_conta WHERE usuario_id=$1 ORDER BY (lido_em IS NULL) DESC,id DESC LIMIT 50",[u.id]);
  const total=(await query('SELECT count(*)::int AS n FROM public.mesa_avisos_conta WHERE usuario_id=$1 AND lido_em IS NULL',[u.id])).rows[0].n;
  res.json({...r.rows[0],avisos:avisos.rows,avisosNaoLidos:total,iaIlimitada:iaIlimitada(u),restantes:await restantes(req,u)});
 }));
@@ -644,6 +663,17 @@ app.use('/api/conta/perfil',asyncHandler(async(req,res,next)=>{
  if(!u)return res.status(401).json({erro:'Entre na sua conta.',codigo:'login_obrigatorio'});
  if(!perfilSessao.confere(process.env.SESSION_SECRET,req.sessionID,u.id,req.get('X-Mesa-Perfil-Sessao')))return res.status(409).json({erro:'A sessão do perfil mudou. Reabra o Mesa antes de editar.',codigo:'perfil_sessao_alterada'});
  next();
+}));
+app.get('/api/conta/perfil/social',asyncHandler(async(req,res)=>{
+ const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
+ const p=(await query('SELECT apelido,encontravel FROM public.mesa_perfis WHERE usuario_id=$1',[u.id])).rows[0];res.json({apelido:p?.apelido||'',encontravel:!!p?.encontravel});
+}));
+app.patch('/api/conta/perfil/social',asyncHandler(async(req,res)=>{
+ const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
+ const apelido=comunidadeUtil.termoBusca(req.body?.apelido),encontravel=req.body?.encontravel;
+ if(!apelidoValido(apelido)||typeof encontravel!=='boolean')return res.status(400).json({erro:'Escolha um apelido válido de 3 a 24 letras, números ou _.'});
+ try{await query('INSERT INTO public.mesa_perfis(usuario_id,apelido,encontravel) VALUES($1,$2,$3) ON CONFLICT(usuario_id) DO UPDATE SET apelido=EXCLUDED.apelido,encontravel=EXCLUDED.encontravel,atualizado_em=now()',[u.id,apelido,encontravel]);res.json({ok:true,apelido,encontravel});}
+ catch(e){if(e.code==='23505')return res.status(409).json({erro:'Este apelido já está em uso. Escolha outro.'});throw e;}
 }));
 app.get('/api/conta/perfil',asyncHandler(async(req,res)=>{
  const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
@@ -1645,9 +1675,17 @@ app.get('/api/admin/chamados',asyncHandler(async(req,res)=>{
 app.patch('/api/admin/chamados/:id',asyncHandler(async(req,res)=>{
  const id=idPositivo(req.params.id),status=req.body?.status,resposta=typeof req.body?.resposta==='string'?req.body.resposta.trim():null;
  if(!id||!['aberto','analise','resolvido'].includes(status)||resposta===null||resposta.length>2000)return res.status(400).json({erro:'Resposta ou estado inválido.'});
- const r=await query('UPDATE public.mesa_chamados SET status=$1,resposta=$2,atualizado_em=now() WHERE id=$3 RETURNING id',[status,resposta,id]);
- if(!r.rowCount)return res.status(404).json({erro:'Chamado não encontrado.'});
- await auditoriaAdmin(req.admin,'chamado.atualizado','chamado',id,{status});res.json({ok:true});
+ const {pool}=require('./postgres'),client=await pool.connect();
+ try{await client.query('BEGIN');
+ const anterior=(await client.query('SELECT usuario_id,status,resposta,assunto FROM public.mesa_chamados WHERE id=$1 FOR UPDATE',[id])).rows[0];
+ if(!anterior){await client.query('ROLLBACK');return res.status(404).json({erro:'Chamado não encontrado.'});}
+ if(anterior.status!==status||(anterior.resposta||'')!==resposta){
+ await client.query('UPDATE public.mesa_chamados SET status=$1,resposta=$2,atualizado_em=now() WHERE id=$3',[status,resposta,id]);
+ await client.query('INSERT INTO public.mesa_auditoria(admin_id,acao,alvo_tipo,alvo_id,detalhes) VALUES($1,$2,$3,$4,$5::jsonb)',[req.admin.id,'chamado.atualizado','chamado',id,JSON.stringify({status})]);
+ await client.query("INSERT INTO public.mesa_avisos_conta(usuario_id,tipo,dados) VALUES($1,'suporte_atualizado',$2::jsonb)",[anterior.usuario_id,JSON.stringify({assunto:anterior.assunto,status})]);
+ }
+ await client.query('COMMIT');res.json({ok:true});
+ }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
 }));
 app.get('/api/admin/config',asyncHandler(async(req,res)=>{
  const r=await query('SELECT chave,valor,atualizado_em FROM public.mesa_config ORDER BY chave');res.json(r.rows);
