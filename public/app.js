@@ -15,17 +15,46 @@ function el(tag, texto, classe) {
   return e;
 }
 
+const mesaConsultas=new Map(),mesaEnvios=new Set();
+function mesaConexao(texto){
+ let p=$('mesa-conexao-status');
+ if(!p){p=el('div','','mesa-conexao-status');p.id='mesa-conexao-status';p.setAttribute('role','status');document.body.append(p);}
+ p.textContent=texto;p.hidden=!texto;
+}
+window.addEventListener('offline',()=>mesaConexao('Sem conexão. Seus textos permanecem nesta página.'));
+window.addEventListener('online',()=>mesaConexao(''));
 async function api(url, metodo = 'GET', corpo) {
-  if (!API_BASE_URL) throw new Error('Configure a URL do backend em config.js antes de usar a API.');
-  const r = await fetch(API_BASE_URL + url, {
-    method: metodo,
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: corpo ? JSON.stringify(corpo) : undefined
-  });
-  const dados = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(dados.erro || 'Algo deu errado.'), { dados });
-  return dados;
+ if (!API_BASE_URL) throw new Error('Configure a URL do backend em config.js antes de usar a API.');
+ metodo=metodo.toUpperCase();
+ const leitura=metodo==='GET',chave=metodo+' '+url;
+ if(leitura&&mesaConsultas.has(chave))return mesaConsultas.get(chave);
+ if(!leitura&&mesaEnvios.has(chave))throw Error('Uma solicitação igual já está em andamento.');
+ if(!navigator.onLine){mesaConexao('Sem conexão com a internet.');throw Error('Sem conexão. Verifique sua internet.');}
+ if(!leitura)mesaEnvios.add(chave);
+ const executar=async()=>{
+  for(let tentativa=0;tentativa<(leitura?3:1);tentativa++){
+   if(!navigator.onLine)throw Error('Sem conexão. Verifique sua internet.');
+   const controle=new AbortController();
+   const longa=!leitura&&(/gerar|\/solo\//.test(url));
+   const timer=setTimeout(()=>controle.abort(),longa?90000:15000);
+   let erro;
+   try{
+    const r=await fetch(API_BASE_URL+url,{method:metodo,credentials:'include',headers:{'Content-Type':'application/json'},body:corpo?JSON.stringify(corpo):undefined,signal:controle.signal});
+    const dados=await r.json().catch(()=>({}));
+    if(!r.ok)throw Object.assign(Error(dados.erro||'Não foi possível concluir a solicitação.'),{dados,status:r.status});
+    mesaConexao('');return dados;
+   }catch(e){erro=e;}finally{clearTimeout(timer);}
+   const rede=erro.name==='AbortError'||erro instanceof TypeError;
+   if(!leitura||!rede||tentativa===2){
+    if(rede){mesaConexao('Conexão instável. Verifique sua internet.');throw Error(leitura?'A consulta não respondeu. Tente novamente.':'Não foi possível confirmar o resultado. Confira se a ação foi concluída antes de reenviar.');}
+    throw erro;
+   }
+   await new Promise(resolve=>setTimeout(resolve,2000*(tentativa+1)));
+  }
+ };
+ const promessa=executar();
+ if(leitura)mesaConsultas.set(chave,promessa);
+ try{return await promessa;}finally{if(leitura)mesaConsultas.delete(chave);else mesaEnvios.delete(chave);}
 }
 
 function aviso(texto, bom) { const a = $('aviso'); a.textContent = texto || ''; a.className = bom ? 'bom' : ''; }
@@ -250,6 +279,7 @@ function mostrar(tela) {
   if (tela === 'suporte') suporteListar();
   if (tela === 'novidades') noticiasMesa();
   if (tela === 'perfil') carregarMeuPerfil();
+  if (tela === 'inicio') mesaSaudacao();
 }
 $('abrir-tutorial-menu').onclick=()=>navegarMesa('tutorial');
 $('solo-ir-gerador')?.addEventListener('click',()=>navegarMesa('gerador'));
@@ -1811,7 +1841,7 @@ async function carregarMeuPerfil(){
  try{
   const p=await api('/api/conta/perfil');
   if(token!==perfilRequisicao||!eu.logado||mesaTelaVisivel!=='perfil')return;
-  $('perfil-nome').value=p.nome;$('perfil-email').value=p.email;
+  $('perfil-nome').value=p.nome;$('perfil-email').value=p.email;$('perfil-tratamento').value=p.tratamento||'neutro';
   $('perfil-cota').textContent=p.limite===null?'Acesso administrativo sem limite de geração.':p.restantes+' de '+p.limite+' gerações disponíveis hoje.';
   if(p.limite!==null){$('perfil-progresso').max=p.limite;$('perfil-progresso').value=p.restantes;$('perfil-progresso').hidden=false;}
   if(p.temFoto){
@@ -1824,7 +1854,7 @@ async function carregarMeuPerfil(){
 }
 $('perfil-form').onsubmit=async ev=>{
  ev.preventDefault();const b=ev.currentTarget.querySelector('button');b.disabled=true;
- try{await api('/api/conta/perfil','POST',{nome:$('perfil-nome').value});$('perfil-status').textContent='Perfil salvo.';}
+ try{await api('/api/conta/perfil','POST',{nome:$('perfil-nome').value,tratamento:$('perfil-tratamento').value});await atualizarEu();$('perfil-status').textContent='Perfil salvo.';}
  catch(e){$('perfil-status').textContent=e.message;}finally{b.disabled=false;}
 };
 $('perfil-arquivo').onchange=async()=>{
@@ -1924,10 +1954,15 @@ $('f-redefinir').onsubmit = async ev => {
   } catch (e) { aviso(e.message); }
   finally { botao.disabled = false; }
 };
+function mesaSaudacao(){
+ const t=$('mesa-inicio-titulo');if(!t)return;
+ const frases={masculino:'Bem-vindo, aventureiro!',feminino:'Bem-vinda, aventureira!',nao_binario:'Boas-vindas, aventureire!',neutro:'Que bom ter você aqui!'};
+ t.textContent=eu.logado?(frases[eu.tratamento]||frases.neutro):'Sua próxima aventura começa aqui.';
+}
 async function entrar(url, email, senha, tokenBootstrap, manterConectado = false, aceiteTermos = false) {
   try {
-    await api(url, 'POST', { email, senha, manterConectado, aceiteTermos, ...(tokenBootstrap ? { tokenBootstrap } : {}) });
-    await atualizarEu(); mostrar('inicio'); aviso('Tudo certo!', true);
+    await api(url, 'POST', { email, senha, manterConectado, aceiteTermos, ...(url==='/api/cadastro'?{tratamento:$('c-tratamento').value}:{}), ...(tokenBootstrap ? { tokenBootstrap } : {}) });
+    await atualizarEu(); mostrar('inicio'); aviso('Sua próxima aventura começa agora.', true);
   }
   catch (e) { aviso(e.message); }
   finally { if (tokenBootstrap) $('c-token-bootstrap').value = ''; }
