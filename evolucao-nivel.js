@@ -68,7 +68,7 @@ function registrar(p,antes,depois,retroativo=false){
  const novos=[];
  for(let n=antes+1;n<=Math.min(20,depois);n++){
   if(lista.some(r=>r.nivel===n))continue;
-  const r={nivel:n,regra:dd?'dnd':'mesa',classe,escolhas:[],jaAplicadas:0,revisado:false,retroativo,limite:n===1?0:dd?(classe==='Mago'?2:0):1,notas:n===1?(dd?['Revise os atributos, espécie, antecedentes, equipamento e características iniciais da classe.'+(classe==='Mago'?' Confira também os seis feitiços iniciais do grimório.':'')]:['Revise a ficha inicial, o inventário e as habilidades antes de jogar.']):dd?notas(classe,n):['Escolha uma técnica narrativa do Mesa, sem garantir sucesso automático.']};
+  const r={nivel:n,regra:dd?'dnd':'mesa',classe,escolhas:[],jaAplicadas:0,revisado:false,retroativo,limite:n===1?(dd&&classe==='Mago'?6:0):dd?(classe==='Mago'?2:0):1,notas:n===1?(dd?['Revise os atributos, espécie, antecedentes, equipamento e características iniciais da classe.'+(classe==='Mago'?' Confira também os seis feitiços iniciais do grimório.':'')]:['Revise a ficha inicial, o inventário e as habilidades antes de jogar.']):dd?notas(classe,n):['Escolha uma técnica narrativa do Mesa, sem garantir sucesso automático.']};
   lista.push(r);novos.push(r);
  }
  return {aquisicoes:{...a,evolucaoNivel:lista},novos};
@@ -76,7 +76,7 @@ function registrar(p,antes,depois,retroativo=false){
 function registros(p){
  // Completa apenas os níveis efetivamente alcançados. A leitura não altera dados;
  // a lista se torna persistente ao resgatar ou revisar, dentro de transação.
- return registrar(p,0,nivelAtual(p),true).aquisicoes;
+ const a=registrar(p,0,nivelAtual(p),true).aquisicoes; if(p.dados?.edicao==='2024'&&p.dados?.classe==='Mago')a.evolucaoNivel=a.evolucaoNivel.map(r=>r.nivel===1&&r.classe==='Mago'&&r.limite===0?{...r,limite:6,retroativo:true}:r);return a;
 }
 function painel(p){
  if(!p)return [];
@@ -111,4 +111,4 @@ function escolher(p,nivel,id){
  }
  a.evolucaoNivel=lista;return {aquisicoes:a,escolha};
 }
-module.exports={nivelNarrativo,nivelAtual,registrar,painel,escolher};
+module.exports={nivelNarrativo,nivelAtual,registrar,painel,escolher,magias};

@@ -1,6 +1,7 @@
 'use strict';
 const xp=require('./xp');
 const evolucao=require('./evolucao-nivel');
+const grimorio=require('./grimorio');
 const vida={Bárbaro:[12,7],Guerreiro:[10,6],Paladino:[10,6],Patrulheiro:[10,6],Bardo:[8,5],Clérigo:[8,5],Druida:[8,5],Monge:[8,5],Ladino:[8,5],Bruxo:[8,5],Feiticeiro:[6,4],Mago:[6,4]};
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v)),int=(v,a,b)=>Number.isInteger(v)&&v>=a&&v<=b,txt=(v,n)=>typeof v==='string'?v.trim().slice(0,n):'';
 const faixas=[{min:0,nome:'Iniciante',desconto:0},{min:20,nome:'Aprendiz',desconto:0},{min:50,nome:'Proficiente',desconto:1},{min:100,nome:'Especialista',desconto:2},{min:200,nome:'Mestre',desconto:3}];
@@ -41,7 +42,7 @@ function estado(p,c={},modo='padrao'){
  const mod=Math.floor((Number(d.atributos?.con??10)-10)/2),[faces,fixo]=Object.hasOwn(vida,d.classe)?vida[d.classe]:[8,5];
  const pvMax=dnd?Math.max(1,faces+mod)+(nivel-1)*Math.max(1,fixo+mod):20+(nivel-1)*5,manaMax=modo==='mana'?10+(nivel-1)*5:0;
  const atual=(v,max,old)=>!int(v,0,10000)||!int(old,0,10000)?max:clamp(v+(v>0?Math.max(0,max-old):0),0,max);
- return {nivel,pv:atual(c.pv,pvMax,c.pvMax),pvMax,mana:manaMax?(c.manaMax===0?manaMax:atual(c.mana,manaMax,c.manaMax)):0,manaMax,...(({itens,habilidades})=>({itens,habilidades}))(colecao(p)),modo,dnd,praticaPendente:typeof c.praticaPendente==='string'?c.praticaPendente:null};
+ return {nivel,pv:atual(c.pv,pvMax,c.pvMax),pvMax,mana:manaMax?(c.manaMax===0?manaMax:atual(c.mana,manaMax,c.manaMax)):0,manaMax,...(({itens,habilidades})=>({itens,habilidades}))(colecao(p)),modo,dnd,grimorio:grimorio.estado(p,c,nivel,modo),praticaPendente:typeof c.praticaPendente==='string'?c.praticaPendente:null};
 }
 function erro(s){const e=Error(s);e.status=409;throw e;}
 function preparar(e,uso,tipo){
@@ -49,19 +50,20 @@ function preparar(e,uso,tipo){
  if(!e||tipo!=='acao'||typeof uso!=='string')erro('Uso de recurso inválido.');
  if(uso==='socorro')return {tipo:'socorro'};
  if(e.pv===0)erro('Sem PV: não é possível utilizar este recurso.');
- const [kind,id]=uso.split(':');if(!['item','habilidade'].includes(kind)||!id)erro('Recurso inválido.');
+ const [kind,id,circulo]=uso.split(':');if(kind==='magia')return grimorio.conjurar(e.grimorio,id,Number(circulo),e.mana);if(!['item','habilidade'].includes(kind)||!id)erro('Recurso inválido.');
  const a=(kind==='item'?e.itens:e.habilidades).find(x=>x.id===id);
- if(!a)erro('Você ainda não possui esse recurso.');if(e.nivel<a.nivelMin)erro('Requer nível '+a.nivelMin+'.');
+ if(!a)erro('Você ainda não possui esse recurso.');if(kind==='habilidade'&&e.grimorio&&a.tipo==='Magia'&&grimorio.identificar(a.nome))erro('Selecione a magia preparada no grimório.');if(e.nivel<a.nivelMin)erro('Requer nível '+a.nivelMin+'.');
  if(kind==='item'&&a.quantidade<1)erro('Item esgotado.');
  const custo=kind==='habilidade'&&e.manaMax?custoMana(a):0;if(custo>e.mana)erro('Mana insuficiente.');
  return {tipo:kind,id:a.id,nome:a.nome,custo,consumivel:kind==='item'&&a.consumivel===true,...(kind==='habilidade'?{dominio:proficiencia(a).grau}: {})};
 }
 function aplicar(p,anterior,modo,uso,efeito,conquista,tipo,turno,campanhaId,opcoes={}){
  const e=estado(p,anterior,modo),a=colecao(p),eventos=[];if(!e)return {estado:e,eventos,aquisicoes:a};if(tipo==='ajuste'){e.praticaPendente=null;return {estado:e,eventos,aquisicoes:a};}
- if(uso){const c=preparar(e,uso.tipo==='socorro'?'socorro':uso.tipo+':'+uso.id,'acao');if(c.custo){e.mana-=c.custo;eventos.push('−'+c.custo+' mana · '+c.nome);}if(c.consumivel){a.itens.find(x=>x.id===c.id).quantidade--;eventos.push('Consumido: '+c.nome);}}
+ if(uso){const c=preparar(e,uso.tipo==='socorro'?'socorro':uso.tipo+':'+uso.id+(uso.tipo==='magia'?':'+uso.circulo:''),'acao');if(c.tipo==='magia'&&e.grimorio.modo!=='mana'){e.grimorio.gastos[c.circulo-1]++;eventos.push('Espaço consumido: '+c.circulo+'º círculo · '+c.nome);}if(c.custo){e.mana-=c.custo;eventos.push('−'+c.custo+' mana · '+c.nome);}if(c.consumivel){a.itens.find(x=>x.id===c.id).quantidade--;eventos.push('Consumido: '+c.nome);}}
  const v=efeito&&typeof efeito==='object'&&!Array.isArray(efeito)?efeito:{};
  if(int(v.pv,-Math.min(100,e.pvMax),Math.min(100,e.pvMax))){const antes=e.pv;e.pv=clamp(e.pv+v.pv,0,e.pvMax);const delta=e.pv-antes;if(delta)eventos.push((delta>0?'+':'')+delta+' PV');}
  if(uso?.tipo==='socorro'&&v.descanso===true&&e.pv>0){const antes=e.mana;e.mana=e.manaMax;if(e.mana>antes)eventos.push('Mana recuperada: +'+(e.mana-antes));}
+ if(uso?.tipo==='socorro'&&v.descanso===true&&['curto','longo'].includes(v.descansoTipo)&&!opcoes.testePendente&&e.grimorio){grimorio.descanso(e.grimorio,v.descansoTipo);eventos.push(v.descansoTipo==='longo'?'Descanso longo: preparação liberada'+(e.grimorio.modo==='mana'?'':' e espaços restaurados'):'Descanso curto concluído'+(e.nivel>=5?' · uma troca de magia disponível':''));}
  const g=v.aquisicao;
  if(conquista&&g&&typeof g==='object'&&!Array.isArray(g)&&['item','habilidade'].includes(g.tipo)){
  const nome=txt(g.nome,80),descricao=txt(g.descricao,160),nivelMin=g.nivelMin;
@@ -95,8 +97,9 @@ function fichaSolo(p,e){
   nomes.add(normalizarNome(h.nome));habilidades.push({nome:txt(h.nome,80),tipo:txt(h.tipo,30)||'Narrativa',descricao:txt(h.descricao,200),origem:'ficha',utilizavel:false,nivelMin:int(h.nivelMin,1,20)?h.nivelMin:1,mana:int(h.mana,0,20)?h.mana:0});
  }
  const recompensas=evolucao.painel(p);
- const grimorio=d.edicao==='2024'&&d.classe==='Mago'?recompensas.filter(r=>r.regra==='dnd'&&r.classe==='Mago').flatMap(r=>r.escolhas.map(m=>({nome:m.nome,tipo:'Magia',descricao:'Círculo '+m.circulo+' · Inscrita no grimório por evolução. Preparação e espaços de magia devem ser conferidos nas regras oficiais.',origem:'ficha',utilizavel:false,grimorio:true,nivelMin:r.nivel}))).filter(m=>!habilidades.some(h=>normalizarNome(h.nome)===normalizarNome(m.nome))):[];
- return {inventario,feiticos:[...habilidades.filter(h=>h.tipo==='Magia'),...grimorio],habilidades:habilidades.filter(h=>h.tipo!=='Magia'),evolucao:recompensas};
+ const livro=e.grimorio;
+ const magiasLivro=livro?livro.conhecidas.map(m=>({...m,tipo:'Magia',descricao:'Círculo '+m.circulo+' · '+(livro.preparadas.includes(m.id)?'Preparada':'Não preparada'),origem:'ficha',utilizavel:false,grimorio:true,preparada:livro.preparadas.includes(m.id),nivelMin:1})):[];
+ return {inventario,feiticos:[...habilidades.filter(h=>h.tipo==='Magia'&&(!livro||!grimorio.identificar(h.nome)||!livro.conhecidas.some(m=>m.id===grimorio.identificar(h.nome)?.id))),...magiasLivro],habilidades:habilidades.filter(h=>h.tipo!=='Magia'),evolucao:recompensas,grimorio:livro};
 }
-function persistir(e){return {pv:e.pv,pvMax:e.pvMax,mana:e.mana,manaMax:e.manaMax,praticaPendente:e.praticaPendente??null};}
+function persistir(e){return {pv:e.pv,pvMax:e.pvMax,mana:e.mana,manaMax:e.manaMax,praticaPendente:e.praticaPendente??null,grimorio:grimorio.persistir(e.grimorio)};}
 module.exports={estado,preparar,aplicar,persistir,fichaSolo,colecao,armazenamento,premiar,manualId,proficiencia,custoMana,faixas};

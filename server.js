@@ -1105,6 +1105,22 @@ app.post('/api/solo/campanhas/:id/turnos',asyncHandler(async(req,res)=>{
  }catch(e){await soloDevolver(quota);if(e.status===429||e.status===409)return res.status(e.status).json({erro:e.message});console.error('Falha em turno solo',e.name);soloErroIA(res,e);}
  finally{await query('UPDATE public.mesa_solo_campanhas SET processando=false WHERE id=$1 AND usuario_id=$2 AND turno_atual=$3',[id,u.id,c.turno_atual]).catch(()=>{});}
 }));
+app.post('/api/solo/campanhas/:id/preparar-magias',asyncHandler(async(req,res)=>{
+ const u=await soloRequerConta(req,res);if(!u)return;const id=soloId(req.params.id),ids=req.body?.magias;
+ if(!id||!Array.isArray(ids)||ids.length>25||ids.some(x=>typeof x!=='string'||x.length>100))return res.status(400).json({erro:'Lista de magias inválida.'});
+ const {pool}=require('./postgres'),client=await pool.connect();
+ try{
+  await client.query('BEGIN');
+  const c=(await client.query('SELECT personagem_id,recursos,modo_recursos,processando FROM public.mesa_solo_campanhas WHERE id=$1 AND usuario_id=$2 FOR UPDATE',[id,u.id])).rows[0];
+  if(!c||!c.personagem_id||c.processando){await client.query('ROLLBACK');return res.status(409).json({erro:'Aguarde o fim da narração e vincule uma ficha.'});}
+  const p=(await client.query('SELECT id,nome,dados,xp,aquisicoes_rpg FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2 FOR UPDATE',[c.personagem_id,u.id])).rows[0];
+  if(!p){await client.query('ROLLBACK');return res.status(404).json({erro:'Ficha não encontrada.'});}
+  const recursos=recursosRpg.estado(p,c.recursos,c.modo_recursos);
+  recursos.grimorio=require('./grimorio').preparar(recursos.grimorio,ids);
+  await client.query('UPDATE public.mesa_solo_campanhas SET recursos=$2::jsonb WHERE id=$1',[id,JSON.stringify(recursosRpg.persistir(recursos))]);
+  await client.query('COMMIT');res.json({recursos,fichaSolo:recursosRpg.fichaSolo(p,recursos),xpAtual:xpMesa.estado(p)});
+ }catch(e){await client.query('ROLLBACK');if(e.status===409)return res.status(409).json({erro:e.message});throw e;}finally{client.release();}
+}));
 app.post('/api/solo/campanhas/:id/recompensa-nivel',asyncHandler(async(req,res)=>{
  const u=await soloRequerConta(req,res);if(!u)return;const id=soloId(req.params.id),nivel=req.body?.nivel,opcao=req.body?.opcao;
  if(!id||!Number.isInteger(nivel)||nivel<1||nivel>20||typeof opcao!=='string'||opcao.length>100)return res.status(400).json({erro:'Escolha inválida.'});
