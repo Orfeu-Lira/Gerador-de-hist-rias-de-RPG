@@ -2237,12 +2237,12 @@ $('opcoes-restaurar').onclick=()=>{mesaPreferencias.ortografia=true;mesaPreferen
 document.addEventListener('focusin',e=>{if(e.target instanceof Element)mesaAplicarOrtografia(e.target);});
 mesaAplicarPreferencias();
 // Comunidade: o nome social é sempre o apelido, sem @.
-let amigosVersao=0,amigosIdentidadeSessao=null;
+let amigosVersao=0,amigosIdentidadeSessao=null,amigosIdentidadeInicial=true;
 function amigosIdentidadeBloquear(v){for(const x of $('amigos-identidade-form').querySelectorAll('input,button'))x.disabled=v;}
 function amigosLimpar(){
  amigosVersao++;
  for(const id of ['amigos-resultados','amigos-recebidas','amigos-enviadas','amigos-lista','amigos-bloqueados'])$(id).replaceChildren();
- $('amigos-termo').value='';$('amigos-status').textContent='';amigosIdentidadeSessao=null;$('amigos-meu-apelido').value='';$('amigos-visivel').checked=false;$('amigos-identidade-status').textContent='';amigosIdentidadeBloquear(true);
+ $('amigos-termo').value='';$('amigos-status').textContent='';amigosIdentidadeSessao=null;amigosIdentidadeInicial=true;$('amigos-meu-apelido').value='';$('amigos-visivel').checked=false;$('amigos-identidade-status').textContent='';amigosIdentidadeBloquear(true);
 }
 let denunciaAlvo=null;
 function abrirDenuncia(apelido,mensagemId=null){
@@ -2277,7 +2277,7 @@ async function carregarAmigos(){
  const sessao=eu.perfilSessao;amigosIdentidadeBloquear(true);
  const identidade=await api('/api/conta/perfil/social');
  if(versao!==amigosVersao||mesaTelaVisivel!=='amigos'||eu.perfilSessao!==sessao)return;
- $('amigos-meu-apelido').value=identidade.apelido;$('amigos-visivel').checked=identidade.encontravel;amigosIdentidadeSessao=sessao;amigosIdentidadeBloquear(false);$('amigos-copiar-apelido').disabled=!identidade.apelido;
+ $('amigos-meu-apelido').value=identidade.apelido;$('amigos-visivel').checked=identidade.encontravel;amigosIdentidadeSessao=sessao;amigosIdentidadeBloquear(false);$('amigos-copiar-apelido').disabled=!identidade.apelido;if(amigosIdentidadeInicial){$('amigos-identidade-detalhes').open=!identidade.apelido||!identidade.encontravel;amigosIdentidadeInicial=false;}
  $('amigos-identidade-status').textContent=!identidade.apelido?'Defina seu apelido para participar da comunidade.':identidade.encontravel?'Seu apelido pode ser encontrado por outros jogadores.':'Seu apelido está oculto na busca. Marque a opção acima se quiser receber novas solicitações.';
  if(!identidade.apelido){for(const id of ['amigos-recebidas','amigos-enviadas','amigos-lista','amigos-bloqueados'])$(id).replaceChildren(el('p','Configure seu apelido primeiro.','suave'));return;}
  const [amigos,bloqueados]=await Promise.all([api('/api/comunidade/amigos'),api('/api/comunidade/bloqueados')]);
@@ -2292,7 +2292,7 @@ async function carregarAmigos(){
  }}
  }catch(e){if(versao===amigosVersao)$('amigos-status').textContent=e.message;}
 }
-$('amigos-identidade-form').onsubmit=async ev=>{ev.preventDefault();const sessao=amigosIdentidadeSessao;if(!sessao||sessao!==eu.perfilSessao||mesaTelaVisivel!=='amigos')return;const status=$('amigos-identidade-status'),apelido=$('amigos-meu-apelido').value.trim(),encontravel=$('amigos-visivel').checked;amigosIdentidadeBloquear(true);try{await api('/api/conta/perfil/social','PATCH',{apelido,encontravel});if(eu.perfilSessao===sessao&&mesaTelaVisivel==='amigos'){await carregarAmigos();status.textContent=encontravel?'Apelido salvo e visível para outros jogadores.':'Apelido salvo. Seu perfil permanece oculto na busca.';}}catch(e){if(eu.perfilSessao===sessao&&mesaTelaVisivel==='amigos'){status.textContent=e.message;amigosIdentidadeBloquear(false);}}};
+$('amigos-identidade-form').onsubmit=async ev=>{ev.preventDefault();const sessao=amigosIdentidadeSessao;if(!sessao||sessao!==eu.perfilSessao||mesaTelaVisivel!=='amigos')return;const status=$('amigos-identidade-status'),apelido=$('amigos-meu-apelido').value.trim(),encontravel=$('amigos-visivel').checked;amigosIdentidadeBloquear(true);try{await api('/api/conta/perfil/social','PATCH',{apelido,encontravel});if(eu.perfilSessao===sessao&&mesaTelaVisivel==='amigos'){await carregarAmigos();if(encontravel)$('amigos-identidade-detalhes').open=false;status.textContent=encontravel?'Apelido salvo e visível para outros jogadores.':'Apelido salvo. Seu perfil permanece oculto na busca.';}}catch(e){if(eu.perfilSessao===sessao&&mesaTelaVisivel==='amigos'){status.textContent=e.message;amigosIdentidadeBloquear(false);}}};
 $('amigos-copiar-apelido').onclick=async()=>{try{await navigator.clipboard.writeText($('amigos-meu-apelido').value.trim());$('amigos-identidade-status').textContent='Apelido copiado. Compartilhe com quem quiser adicionar.';}catch{$('amigos-meu-apelido').select();$('amigos-identidade-status').textContent='Selecione e copie seu apelido.';}};
 $('amigos-atualizar').onclick=carregarAmigos;
 $('amigos-busca').onsubmit=async ev=>{
