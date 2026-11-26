@@ -60,7 +60,7 @@ async function api(url, metodo = 'GET', corpo) {
 function aviso(texto, bom) { const a = $('aviso'); a.textContent = texto || ''; a.className = bom ? 'bom' : ''; }
 
 // ---- Navegação entre telas ----
-const TELAS = ['gerador','solo','dados','historico','personagens','assistente','tutorial','novidades','suporte','instalar','conta','admin','privacidade','termos','musica','inicio','perfil','opcoes','amigos','compartilhadas'];
+const TELAS = ['gerador','solo','dados','historico','personagens','assistente','tutorial','novidades','suporte','instalar','conta','admin','privacidade','termos','musica','inicio','perfil','opcoes','amigos','compartilhadas','mensagens'];
 // Mantém o player no mesmo documento e fora das configurações de acessibilidade.
 (function separarMusica(){
   const player=$('musica-ambiente');
@@ -258,8 +258,9 @@ function mostrar(tela) {
   pararJornada();
   if(tela!=='amigos'&&mesaTelaVisivel==='amigos')amigosLimpar();
   if(tela!=='compartilhadas'&&mesaTelaVisivel==='compartilhadas')limparCompartilhadas();
+  if(tela!=='mensagens'&&mesaTelaVisivel==='mensagens')limparMensagens();
   if(tela!=='perfil'&&mesaTelaVisivel==='perfil'){perfilRequisicao++;limparFotoPerfil();$('perfil-nome').value='';$('perfil-email').value='';}
-  if(!eu.logado&&['historico','personagens','assistente','admin','perfil','amigos','compartilhadas'].includes(tela))tela='conta';
+  if(!eu.logado&&['historico','personagens','assistente','admin','perfil','amigos','compartilhadas','mensagens'].includes(tela))tela='conta';
   if(tela==='admin'&&eu.papel!=='admin')tela='gerador';
   if(tela==='musica'&&mesaTelaVisivel&&mesaTelaVisivel!=='musica')mesaAntesDaMusica=mesaTelaVisivel;
   estadoNavegacao.gravar('tela',tela);
@@ -283,6 +284,7 @@ function mostrar(tela) {
   if (tela === 'perfil') carregarMeuPerfil();
   if (tela === 'amigos') carregarAmigos();
   if (tela === 'compartilhadas') carregarCompartilhadas();
+  if (tela === 'mensagens') iniciarMensagens();
   if (tela === 'inicio') mesaSaudacao();
 }
 $('abrir-tutorial-menu').onclick=()=>navegarMesa('tutorial');
@@ -380,7 +382,7 @@ function montarNav() {
   nav.append(item('inicio','⌂','Início'));
   grupo('Aventuras',[['gerador','✦','Gerador de histórias',false],['gerador','♙','Gerador de NPCs',true],['solo','✧','RPG Solo'],...(eu.logado?[['historico','▤','Minhas aventuras']]:[])]);
   grupo('Ferramentas',[...(eu.logado?[['personagens','♙','Personagens'],['assistente','✧','Tutor D&D']]:[]),['dados','◇','Oráculo dos dados'],['musica','♫','Música']]);
-  grupo('Comunidade',[...(eu.logado?[['amigos','♙','Amigos'],['compartilhadas','▤','Fichas compartilhadas']]:[]),['novidades','✦','Novidades'],['tutorial','❖','Tutorial'],...(eu.logado?[['suporte','✉','Suporte']]:[])]);
+  grupo('Comunidade',[...(eu.logado?[['amigos','♙','Amigos'],['compartilhadas','▤','Fichas compartilhadas'],['mensagens','✉','Mensagens']]:[]),['novidades','✦','Novidades'],['tutorial','❖','Tutorial'],...(eu.logado?[['suporte','✉','Suporte']]:[])]);
   grupo('Minha conta',[...(eu.logado?[['perfil','♙','Meu perfil']]:[['conta','↪','Entrar']]),['opcoes','⚙','Opções'],['instalar','⬇','Instalar Mesa']]);
   if(eu.papel==='admin')grupo('Administração',[['admin','⚙','Painel']]);
   const acesso=el('button','','menu-item');acesso.type='button';acesso.title='Acessibilidade';acesso.setAttribute('aria-label','Abrir acessibilidade');acesso.setAttribute('aria-controls','mesa-acessibilidade-painel');
@@ -1970,6 +1972,84 @@ $('fichas-compartilhadas-atualizar').onclick=carregarCompartilhadas;
 $('compartilhar-ficha-form').onsubmit=async ev=>{
  ev.preventDefault();const b=ev.currentTarget.querySelector('button');b.disabled=true;
  try{await api('/api/comunidade/fichas','POST',{id:$('compartilhar-personagem').value,apelido:$('compartilhar-amigo').value,acao:'compartilhar'});await carregarCompartilhadas();$('fichas-compartilhadas-status').textContent='Ficha compartilhada para visualização.';}catch(e){$('fichas-compartilhadas-status').textContent=e.message;}finally{b.disabled=false;}
+};
+// Conversas privadas: consultas periódicas somente com a aba ativa.
+let msgDestino='',msgVersao=0,msgTimer=null,msgOcupado=false,msgHistorico=[],msgMais=false,msgPendente=null;
+function limparMensagens(){
+ clearInterval(msgTimer);msgTimer=null;msgVersao++;msgDestino='';msgHistorico=[];msgMais=false;msgPendente=null;msgOcupado=false;
+ $('mensagens-amigos').replaceChildren();$('mensagens-historico').replaceChildren();$('mensagens-texto').value='';
+ $('mensagens-destino').textContent='Escolha um amigo';$('mensagens-form').hidden=true;$('mensagens-antigas').hidden=true;$('mensagens-status').textContent='';
+}
+function pintarMensagens(rolar=false){
+ const h=$('mensagens-historico'),altura=h.scrollHeight,pos=h.scrollTop;
+ h.replaceChildren();
+ if(!msgHistorico.length)h.append(el('p','Nenhuma mensagem ainda.','suave'));
+ for(const m of msgHistorico){
+ const linha=el('article','','mesa-chat-bolha'+(m.minha?' minha':''));
+ linha.append(el('strong',m.minha?'Você':msgDestino),el('p',m.texto),el('small',new Date(m.criado_em).toLocaleString('pt-BR')));h.append(linha);
+ }
+ if(rolar)h.scrollTop=h.scrollHeight;else h.scrollTop=pos+Math.max(0,h.scrollHeight-altura);
+ $('mensagens-antigas').hidden=!msgMais;
+}
+async function atualizarConversas(){
+ const v=msgVersao;
+ const lista=await api('/api/comunidade/conversas');
+ if(v!==msgVersao||mesaTelaVisivel!=='mensagens'||!eu.logado)return;
+ const alvo=$('mensagens-amigos');alvo.replaceChildren();
+ if(!lista.length)alvo.append(el('p','Adicione amigos para começar uma conversa.','suave'));
+ for(const a of lista){
+ const b=el('button',a.apelido+(a.nao_lidas?' · '+a.nao_lidas+' não lidas':''),'mesa-chat-amigo');b.type='button';b.setAttribute('aria-pressed',String(msgDestino===a.apelido));
+ b.onclick=()=>abrirConversa(a.apelido);alvo.append(b);}
+ if(msgDestino&&!lista.some(a=>a.apelido===msgDestino)){
+ msgVersao++;msgDestino='';msgHistorico=[];msgPendente=null;$('mensagens-historico').replaceChildren();$('mensagens-form').hidden=true;$('mensagens-antigas').hidden=true;$('mensagens-destino').textContent='Conversa indisponível';$('mensagens-texto').value='';
+ }
+}
+async function buscarMensagens(antigas=false){
+ if(!msgDestino||msgOcupado)return;
+ const v=msgVersao,destino=msgDestino,antes=antigas?msgHistorico[0]?.id:null;
+ if(antigas&&!antes)return;
+ msgOcupado=true;
+ try{
+ const d=await api('/api/comunidade/mensagens?apelido='+encodeURIComponent(destino)+(antes?'&antes='+encodeURIComponent(antes):''));
+ if(v!==msgVersao||destino!==msgDestino||mesaTelaVisivel!=='mensagens')return;
+ const anteriores=msgHistorico.length;
+ const map=new Map([...msgHistorico,...d.mensagens].map(m=>[m.id,m]));
+ msgHistorico=[...map.values()].sort((a,b)=>BigInt(a.id)<BigInt(b.id)?-1:BigInt(a.id)>BigInt(b.id)?1:0);
+ if(antigas||!anteriores)msgMais=d.mais;
+ if(msgHistorico.length!==anteriores||!anteriores)pintarMensagens(!antigas);
+ const ultima=d.mensagens.filter(m=>!m.minha).at(-1);
+ if(ultima&&!document.hidden&&!antigas)await api('/api/comunidade/mensagens/lidas','POST',{apelido:destino,ate:ultima.id});
+ }catch(e){if(v===msgVersao)$('mensagens-status').textContent=e.message;}finally{if(v===msgVersao)msgOcupado=false;}
+}
+async function abrirConversa(apelido){
+ if(msgDestino===apelido)return;
+ if($('mensagens-texto').value.trim()&&!confirm('Trocar de conversa e descartar o texto não enviado?'))return;
+ msgVersao++;msgDestino=apelido;msgHistorico=[];msgMais=false;msgOcupado=false;msgPendente=null;
+ $('mensagens-texto').value='';$('mensagens-status').textContent='';$('mensagens-destino').textContent=apelido;$('mensagens-form').hidden=false;pintarMensagens();
+ await buscarMensagens();await atualizarConversas().catch(()=>{});
+}
+async function atualizarMensagens(){
+ if(mesaTelaVisivel!=='mensagens'||document.hidden||!navigator.onLine)return;
+ try{await atualizarConversas();await buscarMensagens();}catch(e){if(mesaTelaVisivel==='mensagens')$('mensagens-status').textContent=e.message;}
+}
+function iniciarMensagens(){
+ if(!msgTimer)msgTimer=setInterval(atualizarMensagens,12000);
+ atualizarMensagens();
+}
+$('mensagens-atualizar').onclick=atualizarMensagens;
+$('mensagens-antigas').onclick=()=>buscarMensagens(true);
+$('mensagens-form').onsubmit=async ev=>{
+ ev.preventDefault();if(!msgDestino)return;
+ const texto=$('mensagens-texto').value.trim(),destino=msgDestino,v=msgVersao,b=ev.currentTarget.querySelector('button');
+ if(!texto)return;
+ if(!msgPendente||msgPendente.texto!==texto||msgPendente.apelido!==destino)msgPendente={apelido:destino,texto,chave:crypto.randomUUID()};
+ const envio=msgPendente;b.disabled=true;
+ try{
+ await api('/api/comunidade/mensagens','POST',envio);
+ if(v!==msgVersao)return;
+ if($('mensagens-texto').value.trim()===texto)$('mensagens-texto').value='';
+ msgPendente=null;$('mensagens-status').textContent='Mensagem enviada.';await buscarMensagens();await atualizarConversas();
+ }catch(e){if(v===msgVersao)$('mensagens-status').textContent=e.message;}finally{b.disabled=false;}
 };
 // ---- Conta e recuperação de acesso ----
 const formulariosConta = ['f-login','f-cadastro','f-recuperar','f-redefinir'];
