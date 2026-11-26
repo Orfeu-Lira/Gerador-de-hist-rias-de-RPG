@@ -1095,3 +1095,10 @@ body.mesa-alto-contraste .mesa-chat-historico,body.mesa-alto-contraste .mesa-cha
 @keyframes mesa-cinema-pulso{0%{opacity:0;transform:scale(.6)}35%,75%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.1)}}
 #campanha-historico .narracao{max-width:100%;width:100%;border-left:4px solid #aa854d}
 #campanha-efeitos{display:grid;gap:8px}#campanha-efeitos[hidden]{display:none}
+
+/* Entrada obrigatória: nenhuma ferramenta é exibida antes da sessão. */
+body.mesa-sem-sessao #menu-lateral,body.mesa-sem-sessao #menu-abrir-mobile,body.mesa-sem-sessao #menu-fundo,body.mesa-sem-sessao #mesa-mobile-nav,body.mesa-sem-sessao #musica-ambiente,body.mesa-sem-sessao #mesa-notificacoes,body.mesa-sem-sessao #aviso-publico,body.mesa-sem-sessao .mesa-legal-links a[href="/?tela=suporte"]{display:none!important}
+body.mesa-sem-sessao section[id^="v-"]:not(#v-conta):not(#v-termos):not(#v-privacidade){display:none!important}
+body.mesa-sem-sessao>main{margin:0 auto!important;width:100%!important;max-width:800px!important;padding:clamp(18px,4vw,40px) 16px 70px!important}
+body.mesa-sem-sessao .acesso-cartao{margin-inline:auto}
+body.mesa-sem-sessao .mesa-sobre-vibe{margin-inline:auto;max-width:680px}
