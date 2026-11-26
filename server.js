@@ -359,7 +359,7 @@ app.post('/api/comunidade/amizade',asyncHandler(async(req,res)=>{
 app.get('/api/comunidade/fichas',asyncHandler(async(req,res)=>{
  const u=await socialUsuario(req,res);if(!u)return;
  const enviadas=await query(`SELECT f.personagem_id AS id,p.nome AS personagem,d.apelido FROM public.mesa_fichas_compartilhadas f JOIN public.personagens_dnd p ON p.id=f.personagem_id JOIN public.mesa_perfis d ON d.usuario_id=f.destinatario WHERE p.usuario_id=$1 ORDER BY f.criado_em DESC LIMIT 200`,[u.id]);
- const recebidas=await query(`SELECT p.id,p.nome AS personagem,d.apelido,jsonb_build_object('classe',p.dados->'classe','raca',p.dados->'raca','nivel',p.dados->'nivel','cenario',p.dados->'cenario','especialidade',p.dados->'especialidade') AS ficha
+ const recebidas=await query(`SELECT p.id,p.nome AS personagem,d.apelido,jsonb_build_object('classe',p.dados->'classe','raca',p.dados->'especie','nivel',p.dados->'nivel','cenario',p.dados->'cenario','especialidade',p.dados->'especialidade') AS ficha
  FROM public.mesa_fichas_compartilhadas f JOIN public.personagens_dnd p ON p.id=f.personagem_id JOIN public.mesa_perfis d ON d.usuario_id=p.usuario_id
  JOIN public.mesa_amizades a ON a.a=least(p.usuario_id,$1::bigint) AND a.b=greatest(p.usuario_id,$1::bigint) AND a.estado='aceita'
  WHERE f.destinatario=$1 AND NOT EXISTS(SELECT 1 FROM public.mesa_bloqueios b WHERE (b.autor=$1 AND b.alvo=p.usuario_id) OR(b.alvo=$1 AND b.autor=p.usuario_id)) ORDER BY f.criado_em DESC LIMIT 200`,[u.id]);
@@ -385,6 +385,61 @@ app.post('/api/comunidade/fichas',asyncHandler(async(req,res)=>{
  }
  await client.query('COMMIT');res.json({ok:true});
  }catch(e){await client.query('ROLLBACK').catch(()=>{});throw e;}finally{client.release();}
+}));
+// Mensagens privadas: amizade ativa, bloqueios e identidade derivados da sessão.
+app.get('/api/comunidade/conversas',asyncHandler(async(req,res)=>{
+ const u=await socialUsuario(req,res);if(!u)return;
+ const r=await query(`SELECT p.apelido,(SELECT count(*)::int FROM public.mesa_mensagens_privadas m WHERE m.remetente=p.usuario_id AND m.destinatario=$1 AND m.lida_em IS NULL) AS nao_lidas
+ FROM public.mesa_amizades a JOIN public.mesa_perfis p ON p.usuario_id=CASE WHEN a.a=$1 THEN a.b ELSE a.a END
+ JOIN public.usuarios v ON v.id=p.usuario_id
+ WHERE $1 IN(a.a,a.b) AND a.estado='aceita' AND (v.bloqueado_ate IS NULL OR v.bloqueado_ate<=now())
+ AND NOT EXISTS(SELECT 1 FROM public.mesa_bloqueios b WHERE (b.autor=$1 AND b.alvo=p.usuario_id) OR(b.alvo=$1 AND b.autor=p.usuario_id))
+ ORDER BY nao_lidas DESC,p.apelido LIMIT 200`,[u.id]);res.json(r.rows);
+}));
+async function conversaPrivada(req,res,operacao){
+ const u=await socialUsuario(req,res);if(!u)return;
+ const apelido=req.method==='GET'?req.query.apelido:req.body?.apelido;
+ if(!apelidoValido(apelido))return res.status(400).json({erro:'Apelido inválido.'});
+ const {pool}=require('./postgres');const client=await pool.connect();
+ try{
+ await client.query('BEGIN');
+ const p=(await client.query('SELECT p.usuario_id FROM public.mesa_perfis p JOIN public.usuarios v ON v.id=p.usuario_id WHERE lower(p.apelido)=lower($1) AND (v.bloqueado_ate IS NULL OR v.bloqueado_ate<=now())',[apelido])).rows[0];
+ if(!p||String(p.usuario_id)===String(u.id)){await client.query('ROLLBACK');return res.status(404).json({erro:'Conversa indisponível.'});}
+ const v=p.usuario_id,par=[u.id,v];
+ await client.query("SELECT pg_advisory_xact_lock(hashtextextended('mesa-social:'||least($1::bigint,$2::bigint)::text||':'||greatest($1::bigint,$2::bigint)::text,0))",par);
+ const a=await client.query(`SELECT 1 FROM public.mesa_amizades WHERE a=least($1::bigint,$2::bigint) AND b=greatest($1::bigint,$2::bigint) AND estado='aceita' AND NOT EXISTS(SELECT 1 FROM public.mesa_bloqueios WHERE (autor=$1 AND alvo=$2) OR(autor=$2 AND alvo=$1))`,par);
+ if(!a.rowCount){await client.query('ROLLBACK');return res.status(403).json({erro:'A conversa exige uma amizade ativa.'});}
+ const resultado=await operacao(client,par);
+ await client.query('COMMIT');res.status(resultado.status||200).json(resultado.dados);
+ }catch(e){await client.query('ROLLBACK').catch(()=>{});throw e;}finally{client.release();}
+}
+app.get('/api/comunidade/mensagens',asyncHandler(async(req,res)=>{
+ const antes=req.query.antes;
+ if(antes!==undefined&&!/^[1-9][0-9]{0,17}$/.test(String(antes)))return res.status(400).json({erro:'Página inválida.'});
+ await conversaPrivada(req,res,async(client,par)=>{
+ const r=await client.query(`SELECT id::text AS id,remetente=$1 AS minha,texto,criado_em FROM public.mesa_mensagens_privadas WHERE ((remetente=$1 AND destinatario=$2) OR(remetente=$2 AND destinatario=$1)) AND ($3::bigint IS NULL OR id<$3::bigint) ORDER BY id DESC LIMIT 51`,[...par,antes??null]);
+ return {dados:{mensagens:r.rows.slice(0,50).reverse(),mais:r.rows.length>50}};
+ });
+}));
+app.post('/api/comunidade/mensagens',asyncHandler(async(req,res)=>{
+ const {texto,chave}=req.body||{};
+ if(typeof texto!=='string'||!texto.trim()||texto.length>2000||typeof chave!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(chave))return res.status(400).json({erro:'Mensagem inválida.'});
+ await conversaPrivada(req,res,async(client,par)=>{
+ const existente=await client.query('SELECT id::text AS id,destinatario,texto FROM public.mesa_mensagens_privadas WHERE remetente=$1 AND chave=$2',[par[0],chave]);
+ if(existente.rowCount){const m=existente.rows[0];return String(m.destinatario)===String(par[1])&&m.texto===texto.trim()?{dados:{id:m.id}}:{status:409,dados:{erro:'Identificador de mensagem já utilizado.'}};}
+ const limite=await client.query("SELECT count(*)::int AS n FROM public.mesa_mensagens_privadas WHERE remetente=$1 AND criado_em>now()-interval '1 minute'",[par[0]]);
+ if(limite.rows[0].n>=20)return {status:429,dados:{erro:'Muitas mensagens. Aguarde um minuto.'}};
+ const r=await client.query('INSERT INTO public.mesa_mensagens_privadas(remetente,destinatario,chave,texto) VALUES($1,$2,$3,$4) ON CONFLICT(remetente,chave) DO NOTHING RETURNING id::text AS id',[...par,chave,texto.trim()]);
+ if(!r.rowCount)return {status:409,dados:{erro:'Identificador de mensagem já utilizado.'}};
+ return {dados:{id:r.rows[0].id}};
+ });
+}));
+app.post('/api/comunidade/mensagens/lidas',asyncHandler(async(req,res)=>{
+ const ate=req.body?.ate;
+ if(!/^[1-9][0-9]{0,17}$/.test(String(ate)))return res.status(400).json({erro:'Identificador inválido.'});
+ await conversaPrivada(req,res,async(client,par)=>{
+ await client.query('UPDATE public.mesa_mensagens_privadas SET lida_em=now() WHERE destinatario=$1 AND remetente=$2 AND id<=$3 AND lida_em IS NULL',[...par,ate]);return {dados:{ok:true}};
+ });
 }));
 app.get('/api/conta/perfil',asyncHandler(async(req,res)=>{
  const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
