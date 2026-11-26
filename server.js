@@ -460,6 +460,24 @@ app.post('/api/comunidade/denuncias',asyncHandler(async(req,res)=>{
  await client.query('COMMIT');res.json({ok:true,repetida:!ins.rowCount});
  }catch(e){await client.query('ROLLBACK').catch(()=>{});throw e;}finally{client.release();}
 }));
+// Avisos derivados dos registros existentes, sem duplicar eventos.
+app.get('/api/comunidade/notificacoes',asyncHandler(async(req,res)=>{
+ const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
+ const r=await query(`WITH amigos AS (SELECT CASE WHEN a=$1 THEN b ELSE a END AS pessoa,estado,solicitante FROM public.mesa_amizades WHERE $1 IN(a,b)),
+ permitidos AS (SELECT a.* FROM amigos a JOIN public.usuarios v ON v.id=a.pessoa WHERE (v.bloqueado_ate IS NULL OR v.bloqueado_ate<=now()) AND NOT EXISTS(SELECT 1 FROM public.mesa_bloqueios b WHERE (b.autor=$1 AND b.alvo=a.pessoa) OR(b.alvo=$1 AND b.autor=a.pessoa)))
+ SELECT (SELECT count(*)::int FROM permitidos WHERE estado='pendente' AND solicitante<>$1) AS solicitacoes,
+ (SELECT count(*)::int FROM public.mesa_mensagens_privadas m JOIN permitidos a ON a.pessoa=m.remetente AND a.estado='aceita' WHERE m.destinatario=$1 AND m.lida_em IS NULL) AS mensagens,
+ (SELECT count(*)::int FROM public.mesa_fichas_compartilhadas f JOIN public.personagens_dnd p ON p.id=f.personagem_id JOIN permitidos a ON a.pessoa=p.usuario_id AND a.estado='aceita' WHERE f.destinatario=$1 AND f.vista_em IS NULL) AS fichas,
+ (SELECT CASE WHEN $2::boolean THEN count(*)::int ELSE 0 END FROM public.mesa_denuncias WHERE estado='pendente') AS denuncias`,[u.id,u.papel==='admin']);
+ res.json(r.rows[0]);
+}));
+app.post('/api/comunidade/fichas/vistas',asyncHandler(async(req,res)=>{
+ const u=await socialUsuario(req,res);if(!u)return;
+ const ids=req.body?.ids;
+ if(!Array.isArray(ids)||ids.length>200||!ids.every(id=>/^[1-9][0-9]{0,17}$/.test(String(id))))return res.status(400).json({erro:'Fichas inválidas.'});
+ await query('UPDATE public.mesa_fichas_compartilhadas SET vista_em=now() WHERE destinatario=$1 AND personagem_id=ANY($2::bigint[]) AND vista_em IS NULL',[u.id,ids]);
+ res.json({ok:true});
+}));
 app.get('/api/conta/perfil',asyncHandler(async(req,res)=>{
  const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
  const r=await query('SELECT nome, tratamento, apelido,bio,encontravel, foto IS NOT NULL AS tem_foto FROM public.mesa_perfis WHERE usuario_id=$1',[u.id]);
