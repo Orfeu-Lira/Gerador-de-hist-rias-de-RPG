@@ -1070,3 +1070,6 @@ body.mesa-alto-contraste #p-aplicar-sugestao.mesa-sugestao-aplicada:disabled,bod
 .mesa-chat-bolha small{display:block;font-size:.75rem;opacity:.9}
 body.mesa-alto-contraste .mesa-chat-historico,body.mesa-alto-contraste .mesa-chat-bolha{background:#fff;color:#000;border:2px solid #000}
 @media(max-width:740px){.mesa-chat-layout{grid-template-columns:1fr}#mensagens-amigos{max-height:190px}.mesa-chat-historico{height:clamp(220px,40vh,400px)}}
+
+/* Formulário de denúncia */
+#mesa-denuncia-dialog{width:min(520px,calc(100% - 28px));max-height:85dvh;overflow:auto;border:1px solid #b69b6d;border-radius:16px;padding:20px;background:#fff8ea;color:#392c20}#mesa-denuncia-dialog::backdrop{background:#091c19b8}#mesa-denuncia-dialog .formulario{display:grid;gap:10px}#mesa-denuncia-dialog button{min-height:44px}.mesa-denuncia-evidencia{white-space:pre-wrap;overflow-wrap:anywhere;border-left:3px solid #b69b6d;padding:12px}.mesa-chat-bolha button.link{font-size:.75rem;min-height:36px}
