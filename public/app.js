@@ -808,7 +808,7 @@ async function soloAbrir(id){
   soloCampanhaId=r.campanha.id;
   $('solo-jogo-titulo').textContent=r.campanha.titulo;
   $('solo-mensagens').replaceChildren();
-  soloXPInicio(r);for(const msg of r.mensagens){const art=soloMensagem(msg.papel,msg.texto,msg.tipo,msg.papel==='mestre'&&Number(msg.numero)===Number(r.campanha.turno_atual)?msg.teste:null,msg.numero);const g=msg.papel==='mestre'&&r.ganhos?.find(g=>Number(g.chave)===Number(msg.numero));if(g)art.append(el('p','✦ +'+g.quantidade+' XP · '+g.categoria,'mesa-xp-recompensa'));if(msg.papel==='mestre'&&Array.isArray(msg.recursos_evento))for(const ev of msg.recursos_evento)art.append(el('p',ev,'mesa-xp-recompensa'));}
+  soloXPInicio(r);for(const msg of r.mensagens){const art=soloMensagem(msg.papel,msg.texto,msg.tipo,msg.papel==='mestre'&&Number(msg.numero)===Number(r.campanha.turno_atual)?msg.teste:null,msg.numero);const g=msg.papel==='mestre'&&r.ganhos?.find(g=>Number(g.chave)===Number(msg.numero));if(g)art.append(el('p','✦ +'+g.quantidade+' XP · '+g.categoria,'mesa-xp-recompensa'));if(msg.papel==='mestre'&&Array.isArray(msg.recursos_evento))for(const ev of msg.recursos_evento)art.append(el('p',ev,'mesa-xp-recompensa'));if(msg.papel==='mestre'){const d=detectarCinema(msg.texto);if(d.efeito!=='nenhum')cinemaReplay(art,{...d,texto:d.trecho||msg.texto});}}
   soloMostrarTrilha(r.campanha.genero,r.campanha.tom);
   soloFecharPaineis();$('solo-entrada').hidden=true;$('solo-jogo').hidden=false;soloEstado('');
   $('solo-acao').value='';$('solo-tipo').value='acao';soloAtualizarCompositor();soloFimLista($('solo-mensagens').lastElementChild);window.scrollTo(0,0);
