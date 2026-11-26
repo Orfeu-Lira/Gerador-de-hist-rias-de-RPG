@@ -484,7 +484,18 @@ app.get('/api/comunidade/notificacoes',asyncHandler(async(req,res)=>{
  (SELECT count(*)::int FROM public.mesa_fichas_compartilhadas f JOIN public.personagens_dnd p ON p.id=f.personagem_id JOIN permitidos a ON a.pessoa=p.usuario_id AND a.estado='aceita' WHERE f.destinatario=$1 AND f.vista_em IS NULL) AS fichas,
  (SELECT count(*)::int FROM public.mesa_campanha_membros m JOIN public.mesa_campanhas_online c ON c.id=m.campanha_id JOIN permitidos a ON a.pessoa=c.mestre AND a.estado='aceita' WHERE m.usuario_id=$1 AND m.estado='convidado' AND NOT c.encerrada) AS convites,
  (SELECT CASE WHEN $2::boolean THEN count(*)::int ELSE 0 END FROM public.mesa_denuncias WHERE estado='pendente') AS denuncias`,[u.id,u.papel==='admin']);
- res.json(r.rows[0]);
+ const avisos=await query("SELECT id::text,tipo,criado_em,lido_em IS NOT NULL AS lido FROM public.mesa_avisos_conta WHERE usuario_id=$1 ORDER BY (lido_em IS NULL) DESC,id DESC LIMIT 50",[u.id]);
+ const total=(await query('SELECT count(*)::int AS n FROM public.mesa_avisos_conta WHERE usuario_id=$1 AND lido_em IS NULL',[u.id])).rows[0].n;
+ res.json({...r.rows[0],avisos:avisos.rows,avisosNaoLidos:total,iaIlimitada:iaIlimitada(u),restantes:await restantes(req,u)});
+}));
+app.post('/api/comunidade/notificacoes/ler-todas',asyncHandler(async(req,res)=>{
+ const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
+ await query('UPDATE public.mesa_avisos_conta SET lido_em=now() WHERE usuario_id=$1 AND lido_em IS NULL',[u.id]);res.json({ok:true});
+}));
+app.post('/api/comunidade/notificacoes/:id/ler',asyncHandler(async(req,res)=>{
+ const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
+ const id=String(req.params.id);if(!/^[1-9][0-9]{0,18}$/.test(id))return res.status(400).json({erro:'Aviso inválido.'});
+ const r=await query('UPDATE public.mesa_avisos_conta SET lido_em=COALESCE(lido_em,now()) WHERE id=$1 AND usuario_id=$2 RETURNING id',[id,u.id]);if(!r.rowCount)return res.status(404).json({erro:'Aviso não encontrado.'});res.json({ok:true});
 }));
 app.post('/api/comunidade/fichas/vistas',asyncHandler(async(req,res)=>{
  const u=await socialUsuario(req,res);if(!u)return;
@@ -987,7 +998,8 @@ app.get('/api/solo/campanhas/:id',asyncHandler(async(req,res)=>{
  const c=r.rows[0],p=c.personagem_id?(await query('SELECT id,nome,dados,xp,aquisicoes_rpg FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2',[c.personagem_id,u.id])).rows[0]:null;
  const ganhos=p?(await query("SELECT chave,quantidade,categoria FROM public.mesa_xp_historico WHERE origem='solo' AND campanha_id=$1 AND personagem_id=$2 ORDER BY id",[id,p.id])).rows:[];
  const recursos=recursosRpg.estado(p,c.recursos,c.modo_recursos);
- res.set('Cache-Control','private, no-store').json({campanha:c,mensagens:m.rows,recursos,companheiros:companheirosSolo.estado(c.recursos),fichaSolo:recursosRpg.fichaSolo(p,recursos),xp:xpMesa.estado(p),retroXP:retroXp.progresso(c.recursos,c.turno_atual),resgateRpg:resgateRpg.publico(resgateRpg.progresso(c.recursos,c.turno_atual)),ganhos:ganhos.map(g=>({...g,categoria:xpMesa.nomes[g.categoria]}))});
+ const trilha=c.aventura_id?(await query("SELECT conteudo->>'trilha' AS trilha FROM public.aventuras WHERE id=$1 AND usuario_id=$2",[c.aventura_id,u.id])).rows[0]?.trilha||'':'';
+ res.set('Cache-Control','private, no-store').json({campanha:{...c,trilha},mensagens:m.rows,recursos,companheiros:companheirosSolo.estado(c.recursos),fichaSolo:recursosRpg.fichaSolo(p,recursos),xp:xpMesa.estado(p),retroXP:retroXp.progresso(c.recursos,c.turno_atual),resgateRpg:resgateRpg.publico(resgateRpg.progresso(c.recursos,c.turno_atual)),ganhos:ganhos.map(g=>({...g,categoria:xpMesa.nomes[g.categoria]}))});
 }));
 app.post('/api/solo/campanhas',asyncHandler(async(req,res)=>{
  const u=await soloRequerConta(req,res);if(!u)return;
@@ -1232,7 +1244,7 @@ app.post('/api/solo/campanhas/:id/resgate-conquistas',asyncHandler(async(req,res
    if(fim>=s.ate){
     const p=(await client.query('SELECT id,nome,dados,xp,aquisicoes_rpg FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2 FOR UPDATE',[c.personagem_id,u.id])).rows[0];if(!p){const e=Error('Ficha não encontrada.');e.status=409;throw e;}
     const logs=(await client.query("SELECT recursos_evento FROM public.mesa_solo_mensagens WHERE campanha_id=$1 AND papel='mestre' AND recursos_evento IS NOT NULL",[id])).rows;
-    const r=resgateRpg.aplicar(p,atual.recursos,s,logs,id,atual.modo_recursos);companheiros=r.companheiros;s.resultado=r.resultado;s.concluido=true;s.pendentes=[];
+    const r=resgateRpg.aplicar(p,atual.recursos,s,logs,id,atual.modo_recursos);companheiros=r.companheiros;s.resultado=[...s.resultado,...r.resultado].slice(-200);s.concluido=true;s.pendentes=[];
     await client.query('UPDATE public.personagens_dnd SET aquisicoes_rpg=$2::jsonb,atualizado_em=now() WHERE id=$1',[p.id,JSON.stringify(r.aquisicoes)]);
    }
    await client.query('UPDATE public.mesa_solo_campanhas SET recursos=$2::jsonb,processando=false,atualizado_em=now() WHERE id=$1',[id,JSON.stringify({...atual.recursos,companheiros,resgateRpg:s})]);
@@ -1543,9 +1555,12 @@ app.patch('/api/admin/usuarios/:id/privilegios',asyncHandler(async(req,res)=>{
  if(!id||typeof ilimitada!=='boolean')return res.status(400).json({erro:'Privilégio inválido.'});
  const {pool}=require('./postgres'),client=await pool.connect();
  try{await client.query('BEGIN');
+  const anterior=(await client.query("SELECT ia_ilimitada FROM public.usuarios WHERE id=$1 AND papel<>'admin' FOR UPDATE",[id])).rows[0];
+  if(anterior&&anterior.ia_ilimitada===ilimitada){await client.query('COMMIT');return res.json({ok:true,iaIlimitada:ilimitada});}
   const r=await client.query("UPDATE public.usuarios SET ia_ilimitada=$2 WHERE id=$1 AND papel<>'admin' RETURNING id,ia_ilimitada",[id,ilimitada]);
   if(!r.rowCount){await client.query('ROLLBACK');return res.status(404).json({erro:'Conta não encontrada ou protegida.'});}
-  await client.query('INSERT INTO public.mesa_auditoria(admin_id,acao,alvo_tipo,alvo_id,detalhes) VALUES($1,$2,$3,$4,$5::jsonb)',[req.admin.id,'usuario.privilegio_ia','usuario',id,JSON.stringify({iaIlimitada:ilimitada})]);
+  const audit=await client.query('INSERT INTO public.mesa_auditoria(admin_id,acao,alvo_tipo,alvo_id,detalhes) VALUES($1,$2,$3,$4,$5::jsonb) RETURNING id',[req.admin.id,'usuario.privilegio_ia','usuario',id,JSON.stringify({iaIlimitada:ilimitada})]);
+  await client.query('INSERT INTO public.mesa_avisos_conta(usuario_id,auditoria_id,tipo) VALUES($1,$2,$3)',[id,audit.rows[0].id,ilimitada?'ia_concedida':'ia_revogada']);
   await client.query('COMMIT');res.json({ok:true,iaIlimitada:ilimitada});
  }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
 }));

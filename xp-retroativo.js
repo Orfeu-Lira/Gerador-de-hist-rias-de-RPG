@@ -1,6 +1,6 @@
 'use strict';
 const xp=require('./xp');
-function progresso(c,turno){const r=c?.retroXP||{},ate=Number.isInteger(r.ate)?Math.max(0,Math.min(Number(turno)||0,r.ate)):Number(turno)||0;return {ate,cursor:Math.max(0,Math.min(ate,Number(r.cursor)||0)),total:Math.max(0,Number(r.total)||0)};}
+function progresso(c,turno){const r=c?.retroXP||{},ate=Number.isInteger(r.ate)&&Number(r.cursor)<r.ate?Math.max(0,Math.min(Number(turno)||0,r.ate)):Number(turno)||0;return {ate,cursor:Math.max(0,Math.min(ate,Number(r.cursor)||0)),total:Math.max(0,Number(r.total)||0)};}
 function candidatos(rows,pagos){
  const ja=new Set(pagos.map(r=>Number(r.chave))),grupos=new Map();
  for(const r of rows){const n=Number(r.numero);if(!Number.isInteger(n)||n<1||ja.has(n))continue;const g=grupos.get(n)||{};g[r.papel]=r;grupos.set(n,g);}

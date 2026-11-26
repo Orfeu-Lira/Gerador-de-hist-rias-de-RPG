@@ -1311,3 +1311,18 @@ body.mesa-alto-contraste .solo-ficha-item :is(p,span,strong){color:#111}
 }
 
 .solo-resgate-item{padding:8px 0;border-bottom:1px solid #d8c9ac;overflow-wrap:anywhere}.solo-resgate-item summary{cursor:pointer;font-weight:600}.solo-resgate-item p{margin:5px 0;font-size:.85rem}
+
+/* Tema noturno: alto contraste permanece independente e tem prioridade. */
+body[data-mesa-tema=escuro]:not(.mesa-alto-contraste){color-scheme:dark;--pergaminho:#202b2c;--tinta:#e9e4d9;--suave:#b9c4bd;--borda:#455555;--lacre:#e8ae86;--latao:#dfc38b;background:#111b1d;color:#e9e4d9}
+body[data-mesa-tema=escuro]:not(.mesa-alto-contraste) :is(.folha,.acesso-cartao,.solo-dialog,.solo-ficha-item,.jornada-player,.admin-registro,.mesa-fonte-amostra,.mesa-chat-historico,.mesa-chat-bolha:not(.minha),.npc-ficha,.mesa-exportar-dados,.mesa-acessibilidade-painel,.mesa-perfil-card,.mesa-home-card,.mesa-recursos,.mesa-xp,.solo-grimorio-slots span,#mesa-denuncia-dialog){background:#202b2c;color:#e9e4d9;border-color:#455555;box-shadow:none}
+body[data-mesa-tema=escuro]:not(.mesa-alto-contraste) #solo-jogo .solo-mensagem.mestre{background:#253032;color:#e9e4d9;border-color:#455555}
+body[data-mesa-tema=escuro]:not(.mesa-alto-contraste) :is(.folha,.acesso-cartao,.solo-dialog,.jornada-player,.admin-registro,.npc-ficha,.mesa-chat-historico) :is(h1,h2,h3,h4,label,strong,.jornada-sugestao,.suave,.sobretitulo,.mesa-home-descricao){color:inherit}
+body[data-mesa-tema=escuro]:not(.mesa-alto-contraste) :is(.folha,.solo-dialog,.jornada-player,.admin-registro) .suave{color:#bac6c0}
+body[data-mesa-tema=escuro]:not(.mesa-alto-contraste) :is(input,select,textarea){background:#151f21;color:#f0eadc;border-color:#57686a}
+body[data-mesa-tema=escuro]:not(.mesa-alto-contraste) :is(.guia-abrir,.mesa-perfil-card button:not(.principal),.solo-ficha-abas button:not([aria-pressed=true]),.solo-ficha-marca,.solo-fechar-dialog){background:#303d3e;color:#f0e6d1;border-color:#586969}
+body[data-mesa-tema=escuro]:not(.mesa-alto-contraste) :is(.folha,.solo-dialog,.jornada-player,.admin-registro) a{color:#e6cb91}
+body[data-mesa-tema=escuro]:not(.mesa-alto-contraste) :is(.solo-ficha-escolha,.mesa-xp-recompensa){color:#9dd7aa}
+body[data-mesa-tema=escuro]:not(.mesa-alto-contraste) :is(.solo-resgate-item,.solo-grimorio-check){border-color:#536464}
+body[data-mesa-tema=escuro]:not(.mesa-alto-contraste) :is(.solo-mensagem,.folha,.solo-dialog) :is(button,a,input,select,textarea):focus-visible{outline:2px solid #f0c979;outline-offset:3px}
+.solo-ficha-abas{grid-template-columns:repeat(3,minmax(0,1fr))}
+#solo-revisao-painel .folha{margin:10px 0}.mesa-musica-sugestoes{display:flex;flex-wrap:wrap;gap:7px;margin:9px 0}.mesa-musica-sugestoes a{overflow-wrap:anywhere;max-width:100%;white-space:normal}.musica-contexto{max-width:850px;margin:0 auto 16px}

@@ -71,7 +71,7 @@ const TELAS = ['gerador','solo','dados','historico','personagens','assistente','
   const cabecalho=el('div','','pagina-intro');
   const titulo=el('h1','Música');titulo.id='mesa-musica-titulo';
   cabecalho.append(el('span','AMBIENTE DA AVENTURA','sobretitulo'),titulo,el('p','Escolha a trilha sonora da sua mesa. A música é opcional e independente da acessibilidade.'));
-  player.before(pagina);pagina.append(cabecalho,player);
+  player.before(pagina);const contexto=el('div','','folha musica-contexto');contexto.id='musica-historia-contexto';contexto.hidden=true;pagina.append(cabecalho,contexto,player);
   $('musica-abrir').hidden=true;
   $('musica-painel').hidden=false;
   $('musica-abrir').setAttribute('aria-expanded','true');
@@ -345,15 +345,16 @@ function notificacoesFechar(devolverFoco=false){
 async function notificacoesAtualizar(force=false){
  if(!eu.logado||!navigator.onLine)return;
  if(notificacoesEmAndamento)return;
- if(!force&&Date.now()-notificacoesUltimoCarregamento<45000)return;
+ if(!force&&Date.now()-notificacoesUltimoCarregamento<18000)return;
  notificacoesEmAndamento=true;
  try{
-  const sessao=eu.email,admin=eu.papel==='admin';
+  const sessao=eu.perfilSessao,admin=eu.papel==='admin';
   const [social,data]=await Promise.all([api('/api/comunidade/notificacoes'),admin?api('/api/admin/notificacoes'):Promise.resolve({naoLidas:0,itens:[]})]);
-  if(!eu.logado||eu.email!==sessao||admin!==(eu.papel==='admin'))return;
+  if(!eu.logado||eu.perfilSessao!==sessao||admin!==(eu.papel==='admin'))return;
   notificacoesUltimoCarregamento=Date.now();
-  const totalSuporte=Number(data.naoLidas)||0;
-  const contador=$('notificacoes-contador'),quantidade=totalSuporte+['solicitacoes','mensagens','fichas','convites','denuncias'].reduce((n,k)=>n+(Number(social[k])||0),0);
+  const totalSuporte=Number(data.naoLidas)||0,totalConta=Number(social.avisosNaoLidos)||0;
+  eu.iaIlimitada=social.iaIlimitada===true;eu.restantes=social.restantes;$('info').textContent=textoInfo();
+  const contador=$('notificacoes-contador'),quantidade=totalSuporte+totalConta+['solicitacoes','mensagens','fichas','convites','denuncias'].reduce((n,k)=>n+(Number(social[k])||0),0);
   contador.hidden=quantidade<1;
   contador.textContent=quantidade>99?'99+':String(quantidade);
   $('notificacoes-abrir').setAttribute('aria-label',quantidade?quantidade+' notificações pendentes':'Abrir notificações');
@@ -366,6 +367,17 @@ async function notificacoesAtualizar(force=false){
    const card=add('article',lista,'','notificacoes-item nao-lida');
    add('strong',card,n);add('p',card,String(social[k])+' pendente(s)','suave');
    botaoAdmin(card,'Abrir',()=>{notificacoesFechar();if(k==='denuncias')adminSecao='moderacao';navegarMesa(tela);});
+  }
+  if(social.avisos?.length)add('h3',lista,'Avisos da sua conta');
+  for(const item of social.avisos||[]){
+   const card=add('article',lista,'','notificacoes-item'+(item.lido?'':' nao-lida')),concedida=item.tipo==='ia_concedida';
+   add('strong',card,concedida?'Você recebeu IA ilimitada!':'Seu privilégio de IA foi alterado');
+   add('p',card,concedida?'As cotas diárias de geração do Mesa foram liberadas para sua conta.':'Sua conta voltou aos limites padrão de geração.');
+   add('p',card,dataBR(item.criado_em),'suave');
+   const linha=add('div',card,'','notificacoes-item-acoes');
+   const ler=async()=>{if(!item.lido)await api('/api/comunidade/notificacoes/'+item.id+'/ler','POST',{});};
+   if(!item.lido)botaoAdmin(linha,'Marcar como lida',async()=>{try{await ler();await notificacoesAtualizar(true);}catch(e){estado.textContent=e.message;}});
+   botaoAdmin(linha,'Meu perfil',async()=>{try{await ler();notificacoesFechar();navegarMesa('perfil');notificacoesAtualizar(true);}catch(e){estado.textContent=e.message;}});
   }
   if(admin&&data.itens.length)add('h3',lista,'Suporte administrativo');
   for(const item of data.itens){
@@ -384,7 +396,7 @@ async function notificacoesAtualizar(force=false){
     }catch(e){estado.textContent=e.message;}
    });
   }
-  $('notificacoes-ler-todas').disabled=totalSuporte===0;
+  $('notificacoes-ler-todas').disabled=totalSuporte+totalConta===0;
  }catch(e){
   $('notificacoes-estado').textContent='Não foi possível atualizar os avisos. '+e.message;
  }finally{notificacoesEmAndamento=false;}
@@ -397,7 +409,7 @@ $('notificacoes-abrir').onclick=()=>{
 };
 $('notificacoes-fechar').onclick=()=>notificacoesFechar(true);
 $('notificacoes-ler-todas').onclick=async()=>{
- try{await api('/api/admin/notificacoes/ler-todas','POST',{});notificacoesUltimoCarregamento=0;await notificacoesAtualizar(true);}
+ try{await api('/api/comunidade/notificacoes/ler-todas','POST',{});if(eu.papel==='admin')await api('/api/admin/notificacoes/ler-todas','POST',{});notificacoesUltimoCarregamento=0;await notificacoesAtualizar(true);}
  catch(e){$('notificacoes-estado').textContent=e.message;}
 };
 $('notificacoes-ir-suporte').onclick=()=>{notificacoesFechar();adminSecao='suporte';mostrar('admin');};
@@ -405,7 +417,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&notificacoesAberto)
 document.addEventListener('pointerdown',e=>{if(notificacoesAberto&&!e.target.closest('#mesa-notificacoes'))notificacoesFechar();});
 function notificacoesSessao(){
  const ativo=eu.logado;
- $('notificacoes-ler-todas').hidden=eu.papel!=='admin';$('notificacoes-ir-suporte').hidden=eu.papel!=='admin';
+ $('notificacoes-ler-todas').hidden=!ativo;$('notificacoes-ir-suporte').hidden=eu.papel!=='admin';
  $('mesa-notificacoes').hidden=!ativo;
  if(!ativo){
   notificacoesFechar();notificacoesUltimoCarregamento=0;
@@ -413,8 +425,8 @@ function notificacoesSessao(){
  }else notificacoesAtualizar(true);
 }
 // Consulta de 60 em 60 segundos enquanto o documento estiver visível e autenticado.
-window.setInterval(()=>{if(!document.hidden)notificacoesAtualizar();},60000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&eu.logado)notificacoesAtualizar();});
+window.setInterval(()=>{if(!document.hidden)notificacoesAtualizar();},20000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&eu.logado)notificacoesAtualizar(true);});
 function montarNav() {
   const nav=$('nav');nav.replaceChildren();
   if(!eu.logado)return;
@@ -478,7 +490,7 @@ function desenharAventura(a, alvo, aventuraId=null, genero='', tom='') {
   if (a.locais && a.locais.length) { f.appendChild(el('h3', 'Locais')); const ul = el('ul'); a.locais.forEach((l) => ul.appendChild(el('li', l))); f.appendChild(ul); }
   if (a.npcs && a.npcs.length) { f.appendChild(el('h3', 'NPCs')); const ul = el('ul'); a.npcs.forEach((n) => ul.appendChild(el('li', n.nome + ': ' + n.descricao))); f.appendChild(ul); }
   if (a.vilao) { f.appendChild(el('h3', 'Vilão')); f.appendChild(el('p', a.vilao)); }
-  playerDaHistoria(f,genero,tom,a.trilha||'');
+  musicaContextoHistoria(a.titulo,a.trilha||'');playerDaHistoria(f,genero,tom,a.trilha||'',a.titulo);
   if(eu.logado){const b=el('button','✦ Iniciar jornada com personagem','principal');b.type='button';
     b.onclick=()=>{soloOrigemPreferida=Number(aventuraId)||null;soloTituloPreferido=a.titulo||'';navegarMesa('solo');};
     const area=el('div','','jornada-inicio');area.append(b);f.append(area);
@@ -750,9 +762,10 @@ function soloPintarGrimorio(lista,g){
 }
 function soloPintarColecao(){
  const box=$('solo-ficha-colecao'),lista=$('solo-ficha-lista'),dados=soloFichaDados,e=soloResumoEstado;
- box.hidden=!dados||!e;lista.replaceChildren();const pendentes=(dados?.evolucao||[]).reduce((n,r)=>n+(r.pendentes||0),0);$('solo-personagem-abrir').setAttribute('aria-label','Abrir ficha do personagem'+(pendentes?' · '+pendentes+' recompensas disponíveis':''));$('solo-personagem-abrir').classList.toggle('solo-ficha-pendente',pendentes>0);if(box.hidden)return;
- const nomes={inventario:'Inventário',feiticos:'Feitiços',habilidades:'Habilidades',evolucao:'Evolução'};
- for(const b of box.querySelectorAll('[data-solo-colecao]')){const k=b.dataset.soloColecao;b.textContent=nomes[k]+' ('+(dados[k]?.length||0)+')';b.setAttribute('aria-pressed',String(k===soloFichaAba));}
+ box.hidden=!dados||!e;lista.replaceChildren();$('solo-revisao-painel').hidden=soloFichaAba!=='revisao';lista.hidden=soloFichaAba==='revisao';const pendentes=(dados?.evolucao||[]).reduce((n,r)=>n+(r.pendentes||0),0);$('solo-personagem-abrir').setAttribute('aria-label','Abrir ficha do personagem'+(pendentes?' · '+pendentes+' recompensas disponíveis':''));$('solo-personagem-abrir').classList.toggle('solo-ficha-pendente',pendentes>0);if(box.hidden)return;
+ const nomes={inventario:'Inventário',feiticos:'Feitiços',habilidades:'Habilidades',evolucao:'Evolução',revisao:'Revisão'};
+ for(const b of box.querySelectorAll('[data-solo-colecao]')){const k=b.dataset.soloColecao;b.textContent=k==='revisao'?'Revisão':nomes[k]+' ('+(dados[k]?.length||0)+')';b.setAttribute('aria-pressed',String(k===soloFichaAba));}
+ if(soloFichaAba==='revisao')return;
  if(soloFichaAba==='evolucao'){soloPintarEvolucao(lista,dados.evolucao||[]);return;}
  if(soloFichaAba==='feiticos'&&dados.grimorio)soloPintarGrimorio(lista,dados.grimorio);
  const itens=dados[soloFichaAba]||[];if(!itens.length){lista.append(el('p',soloFichaAba==='inventario'?'Inventário vazio.':soloFichaAba==='feiticos'?'Nenhum feitiço registrado. Cadastre uma habilidade do tipo Magia na ficha.':'Nenhuma habilidade registrada.','suave'));return;}
@@ -778,14 +791,14 @@ function soloPintarResgate(r){
  p.textContent=s.concluido?s.total+' recurso(s) recuperado(s).':Math.max(0,s.cursor+1)+'/'+(s.ate+1)+' cenas revisadas.';b.disabled=soloResgateOcupado||s.concluido;b.textContent=s.concluido?'Revisão concluída':s.cursor>=0?'Continuar revisão':'Revisar inventário e conquistas';
  if(s.concluido){for(const x of s.resultado||[]){const card=el('details','','solo-resgate-item'),sum=el('summary',x.nome+' · '+x.status);card.append(sum,el('p','Turno '+x.numero+' · '+x.tipo,'suave'),el('p',x.evidencia));lista.append(card);}if(!s.resultado?.length)lista.append(el('p','Nenhuma conquista adicional confirmada.','suave'));}
 }
-$('solo-resgate-confirmar').onclick=async()=>{const id=soloCampanhaId;if(!id||soloOcupado||soloResgateOcupado||soloRetroOcupado)return;soloResgateOcupado=true;const b=$('solo-resgate-confirmar'),p=$('solo-resgate-status');b.disabled=true;try{let d;do{p.textContent='Mestre IA conferindo conquistas, consumos e perdas…';d=await api('/api/solo/campanhas/'+id+'/resgate-conquistas','POST',{});if(String(id)!==String(soloCampanhaId)||mesaTelaVisivel!=='solo')return;p.textContent=Math.max(0,d.cursor+1)+'/'+(d.ate+1)+' cenas revisadas';}while(!d.concluido&&$('solo-personagem-dialog').open);soloResgateOcupado=false;if(String(id)===String(soloCampanhaId)&&mesaTelaVisivel==='solo'&&$('solo-personagem-dialog').open){await soloAbrir(id);soloFecharPaineis();$('solo-personagem-dialog').showModal();}}catch(e){p.textContent=e.message+' A revisão pode ser retomada.';}finally{soloResgateOcupado=false;if(String(id)===String(soloCampanhaId)&&b.textContent!=='Revisão concluída')b.disabled=false;}};
+$('solo-resgate-confirmar').onclick=async()=>{const id=soloCampanhaId;if(!id||soloOcupado||soloResgateOcupado||soloRetroOcupado)return;soloResgateOcupado=true;const b=$('solo-resgate-confirmar'),p=$('solo-resgate-status');b.disabled=true;try{let d;do{p.textContent='Mestre IA conferindo conquistas, consumos e perdas…';d=await api('/api/solo/campanhas/'+id+'/resgate-conquistas','POST',{});if(String(id)!==String(soloCampanhaId)||mesaTelaVisivel!=='solo')return;p.textContent=Math.max(0,d.cursor+1)+'/'+(d.ate+1)+' cenas revisadas';}while(!d.concluido&&$('solo-personagem-dialog').open);soloResgateOcupado=false;if(String(id)===String(soloCampanhaId)&&mesaTelaVisivel==='solo'&&$('solo-personagem-dialog').open){await soloAbrir(id);soloFichaAba='revisao';soloPintarColecao();soloFecharPaineis();$('solo-personagem-dialog').showModal();}}catch(e){p.textContent=e.message+' A revisão pode ser retomada.';}finally{soloResgateOcupado=false;if(String(id)===String(soloCampanhaId)&&b.textContent!=='Revisão concluída')b.disabled=false;}};
 function soloVinculoOpcoes(){const sel=$('solo-xp-ficha'),antes=sel.value;sel.replaceChildren(new Option('Escolha uma ficha',''));for(const p of soloPersonagens)sel.add(new Option(p.nome,String(p.id)));if([...sel.options].some(o=>o.value===antes))sel.value=antes;else if(soloPersonagens.length===1)sel.value=String(soloPersonagens[0].id);$('solo-xp-confirmar').disabled=!soloPersonagens.length;$('solo-xp-vinculo-status').textContent=soloPersonagens.length?'':'Nenhuma ficha encontrada. Crie e salve uma em Personagens e retorne à campanha.';}
 async function soloVinculoAtualizar(){const id=soloCampanhaId;try{const p=await api('/api/personagens');if(String(id)!==String(soloCampanhaId))return;soloPersonagens=p;soloVinculoOpcoes();}catch(e){$('solo-xp-vinculo-status').textContent=e.message;}}
 function soloPintarRetro(r){soloRetroDados=r.retroXP;const box=$('solo-xp-retro'),b=$('solo-xp-resgatar'),p=$('solo-xp-retro-status');box.hidden=!r.campanha.personagem_id||r.campanha.progressao!=='xp'||!r.retroXP?.ate;if(box.hidden)return;const d=r.retroXP;p.textContent=d.cursor+'/'+d.ate+' turnos revisados · '+d.total+' XP recuperados';b.disabled=soloRetroOcupado||d.cursor>=d.ate;b.textContent=d.cursor>=d.ate?'Revisão concluída':d.cursor?'Continuar revisão':'Revisar eventos anteriores';}
 function soloXPInicio(r){soloPintarResgate(r);soloPintarAliados(r.companheiros||[]);soloFichaAba='inventario';soloResumoModo=r.campanha.progressao;soloResumoXP=r.xp;soloRecursos(r);soloCarregarAvatar(r.campanha.personagem_id,r.xp?.personagem);pintarXP($('solo-xp'),r.xp,r.campanha.progressao);soloVinculoOpcoes();$('solo-xp-vincular').hidden=Boolean(r.campanha.personagem_id);if(!r.campanha.personagem_id)soloVinculoAtualizar();soloPintarRetro(r);}
 $('solo-xp-atualizar-fichas').onclick=soloVinculoAtualizar;
-$('solo-xp-confirmar').onclick=async()=>{const id=soloCampanhaId,p=$('solo-xp-ficha').value;if(!id||soloOcupado)return;if(!p){$('solo-xp-vinculo-status').textContent='Selecione uma ficha.';return;}const b=$('solo-xp-confirmar');b.disabled=true;try{await api('/api/solo/campanhas/'+id+'/personagem','POST',{personagemId:Number(p),ativarXP:soloResumoModo==='xp'||confirm('Ativar XP automático e permitir revisão retroativa nesta campanha?')});await soloAbrir(id);soloFecharPaineis();$('solo-personagem-dialog').showModal();}catch(e){$('solo-xp-vinculo-status').textContent=e.message;}finally{b.disabled=false;}};
-$('solo-xp-resgatar').onclick=async()=>{const id=soloCampanhaId;if(!id||soloOcupado||soloRetroOcupado||soloResgateOcupado)return;soloRetroOcupado=true;const b=$('solo-xp-resgatar'),p=$('solo-xp-retro-status');b.disabled=true;try{let d;do{p.textContent='Mestre IA revisando eventos anteriores…';d=await api('/api/solo/campanhas/'+id+'/xp-retroativo','POST',{});if(String(id)!==String(soloCampanhaId))return;p.textContent=d.cursor+'/'+d.ate+' turnos revisados · '+d.total+' XP recuperados';}while(!d.concluido&&$('solo-personagem-dialog').open);soloRetroOcupado=false;if(String(id)===String(soloCampanhaId)&&mesaTelaVisivel==='solo'&&$('solo-personagem-dialog').open){await soloAbrir(id);soloFecharPaineis();$('solo-personagem-dialog').showModal();}}catch(e){p.textContent=e.message+' A revisão pode ser retomada.';}finally{soloRetroOcupado=false;if(String(id)===String(soloCampanhaId)&&!b.textContent.includes('concluída'))b.disabled=false;}};
+$('solo-xp-confirmar').onclick=async()=>{const id=soloCampanhaId,p=$('solo-xp-ficha').value;if(!id||soloOcupado)return;if(!p){$('solo-xp-vinculo-status').textContent='Selecione uma ficha.';return;}const b=$('solo-xp-confirmar');b.disabled=true;try{await api('/api/solo/campanhas/'+id+'/personagem','POST',{personagemId:Number(p),ativarXP:soloResumoModo==='xp'||confirm('Ativar XP automático e permitir revisão retroativa nesta campanha?')});await soloAbrir(id);soloFichaAba='revisao';soloPintarColecao();soloFecharPaineis();$('solo-personagem-dialog').showModal();}catch(e){$('solo-xp-vinculo-status').textContent=e.message;}finally{b.disabled=false;}};
+$('solo-xp-resgatar').onclick=async()=>{const id=soloCampanhaId;if(!id||soloOcupado||soloRetroOcupado||soloResgateOcupado)return;soloRetroOcupado=true;const b=$('solo-xp-resgatar'),p=$('solo-xp-retro-status');b.disabled=true;try{let d;do{p.textContent='Mestre IA revisando eventos anteriores…';d=await api('/api/solo/campanhas/'+id+'/xp-retroativo','POST',{});if(String(id)!==String(soloCampanhaId))return;p.textContent=d.cursor+'/'+d.ate+' turnos revisados · '+d.total+' XP recuperados';}while(!d.concluido&&$('solo-personagem-dialog').open);soloRetroOcupado=false;if(String(id)===String(soloCampanhaId)&&mesaTelaVisivel==='solo'&&$('solo-personagem-dialog').open){await soloAbrir(id);soloFichaAba='revisao';soloPintarColecao();soloFecharPaineis();$('solo-personagem-dialog').showModal();}}catch(e){p.textContent=e.message+' A revisão pode ser retomada.';}finally{soloRetroOcupado=false;if(String(id)===String(soloCampanhaId)&&!b.textContent.includes('concluída'))b.disabled=false;}};
 function soloMensagem(papel,texto,tipo='acao',teste=null,numero=null){
  const art=el('article','','solo-mensagem '+(papel==='mestre'?'mestre':'jogador'));
  art.appendChild(el('strong',papel==='mestre'?'✧ Mestre IA':tipo==='ajuste'?'✎ Modificação solicitada':'♙ Você'));
@@ -965,12 +978,12 @@ async function soloAbrir(id){
   $('solo-jogo-titulo').textContent=r.campanha.titulo;
   $('solo-mensagens').replaceChildren();
   soloXPInicio(r);for(const msg of r.mensagens){const art=soloMensagem(msg.papel,msg.texto,msg.tipo,msg.papel==='mestre'&&Number(msg.numero)===Number(r.campanha.turno_atual)?msg.teste:null,msg.numero);const g=msg.papel==='mestre'&&r.ganhos?.find(g=>Number(g.chave)===Number(msg.numero));if(g)art.append(el('p','✦ +'+g.quantidade+' XP · '+g.categoria,'mesa-xp-recompensa'));if(msg.papel==='mestre'&&Array.isArray(msg.recursos_evento))for(const ev of msg.recursos_evento)art.append(el('p',ev,'mesa-xp-recompensa'));if(msg.papel==='mestre'){const d=detectarCinema(msg.texto);if(d.efeito!=='nenhum')cinemaReplay(art,{...d,texto:d.trecho||msg.texto});}}
-  soloMostrarTrilha(r.campanha.genero,r.campanha.tom);
+  soloMostrarTrilha(r.campanha.genero,r.campanha.tom,r.campanha.trilha||'',r.campanha.titulo);
   soloFecharPaineis();$('solo-entrada').hidden=true;$('solo-jogo').hidden=false;soloEstado('');
   $('solo-acao').value='';$('solo-tipo').value='acao';soloAtualizarCompositor();soloFimLista($('solo-mensagens').lastElementChild);window.scrollTo(0,0);
  }catch(e){soloEstado(e.message,true);}
 }
-function soloMostrarTrilha(genero,tom,sugestao=''){$('solo-trilha').replaceChildren();playerDaHistoria($('solo-trilha'),genero,tom,sugestao);}
+function soloMostrarTrilha(genero,tom,sugestao='',titulo=''){$('solo-trilha').replaceChildren();musicaContextoHistoria(titulo,sugestao);playerDaHistoria($('solo-trilha'),genero,tom,sugestao,titulo);}
 $('solo-voltar').onclick=()=>{
  if(soloOcupado)return;
  fecharCinema();soloAtualizarInicio();
@@ -999,7 +1012,7 @@ async function soloAbrirDepoisCriar(r){
  $('solo-jogo-titulo').textContent=r.campanha.titulo;
  $('solo-mensagens').replaceChildren();
  soloXPInicio(r);const art=soloMensagem('mestre',r.mestre,'inicio',r.teste,0);
-  soloMostrarTrilha($('solo-genero').value,$('solo-tom').value,soloOrigens.find(a=>String(a.id)===$('solo-aventura').value)?.conteudo?.trilha||'');
+  soloMostrarTrilha($('solo-genero').value,$('solo-tom').value,soloOrigens.find(a=>String(a.id)===$('solo-aventura').value)?.conteudo?.trilha||'',r.campanha.titulo);
  soloFecharPaineis();$('solo-entrada').hidden=true;$('solo-jogo').hidden=false;soloEstado('');
  $('solo-acao').value='';$('solo-tipo').value='acao';soloAtualizarCompositor();soloFimLista($('solo-mensagens').lastElementChild);window.scrollTo(0,0);if(mesaTelaVisivel==='solo')cinemaSolo(r.mestre,art);
 }
@@ -1437,6 +1450,11 @@ const sons={
  floresta:['Medieval Dream','Frank Schröter','CC BY 4.0','Medieval_Dream_by_Frank_Schr%C3%B6ter.ogg'],
  taverna:['Medieval Story','Frank Schröter','CC BY 4.0','Medieval_Story_by_Frank_Schr%C3%B6ter.ogg'],
  jornada:['Chominciamento de Gioia','Ririkuku','CC BY-SA 4.0','Chominciamento_de_Gioia1.ogg'],
+ misterio:['Snowdrop','Kevin MacLeod','CC BY 3.0 US','MacLeod%2C_Kevin_-_Snowdrop.ogg'],
+ epico:['Firesong','Kevin MacLeod','CC BY 3.0 US','Firesong_%28MacLeod%2C_Kevin%29_%28ISRC_USUAN1100598%29.oga'],
+ tensao:['Dark Times','Kevin MacLeod','CC BY 3.0','Dark_Times_%28ISRC_USUAN1100747%29.mp3'],
+ terror:['Unseen Presence','Kevin MacLeod','CC BY 4.0','Spc_X2x_%28Unseen_Presence%29_by_Kevin_MacLeod.ogg'],
+ futuro:['1984','Frank Schroeter','CC BY 4.0','1984_by_Frank_Schroeter.ogg'],
  frieren:['Frieren · trilha escolhida','YouTube','Player oficial','2E_qlyy5N-I']
 };
 // A faixa global continua tocando ao navegar entre as telas, sem autoplay.
@@ -1513,14 +1531,32 @@ musicaAtualizarFonte();
 // O botão Voltar e o menu controlam a página de música; Escape permanece reservado aos painéis.
 const audioJornada=new Audio();audioJornada.loop=true;let tocadorJornada=null;
 function pararJornada(){audioJornada.pause();audioJornada.removeAttribute('src');if(tocadorJornada){tocadorJornada.b.textContent='▶ Tocar';tocadorJornada.s.textContent='Pausado';}tocadorJornada=null;}
-function playerDaHistoria(alvo,genero='',tom='',sugestao=''){
+function musicaRecomendada(s){
+ const t=String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+ return /sci.fi|cyber|espac|space|futur|synth|electronic|tecnolog/.test(t)?'futuro':/terror|horror|eerie|macabr/.test(t)?'terror':/batalh|combat|battle|epic|epic[oa]|orquestr/.test(t)?'epico':/tens|suspense|dark|sombr/.test(t)?'tensao':/mist[eé]r|mystery|investig/.test(t)?'misterio':/tavern|taverna|alegr|folk/.test(t)?'taverna':/forest|florest|calm|relax/.test(t)?'floresta':'jornada';
+}
+function musicaSugestoes(alvo,sugestao){
+ if(!sugestao)return;
+ alvo.append(el('p','Sugestão da história: '+sugestao,'jornada-sugestao'));
+ const termos=[...String(sugestao).matchAll(/["“]([^"”]{3,120})["”]/g)].map(x=>x[1]).slice(0,3);
+ const buscas=termos.length?termos:[String(sugestao).slice(0,180)];
+ const links=el('div','','mesa-musica-sugestoes');
+ for(const termo of buscas){const a=el('a','Pesquisar: '+termo,'guia-abrir');a.href='https://www.youtube.com/results?search_query='+encodeURIComponent(termo);a.target='_blank';a.rel='noopener noreferrer';links.append(a);}
+ alvo.append(links,el('p','Links de pesquisa, não faixas verificadas ou reprodução automática.','suave'));
+}
+function musicaContextoHistoria(titulo,sugestao){
+ const box=$('musica-historia-contexto');box.replaceChildren();box.hidden=!String(sugestao||'').trim();if(box.hidden)return;
+ box.append(el('h2','Trilha de '+(titulo||'sua história')));musicaSugestoes(box,sugestao);
+ const id=musicaRecomendada(sugestao),b=el('button','Selecionar '+sons[id][0],'principal');b.type='button';b.onclick=()=>{musicaSelecionada.value=id;musicaSelecionada.onchange();};box.append(b,el('p','Faixa licenciada compatível com a atmosfera sugerida.','suave'));
+}
+function playerDaHistoria(alvo,genero='',tom='',sugestao='',titulo=''){
  const p=el('section','','jornada-player');p.append(el('span','♫ TRILHA DA JORNADA','sobretitulo'),el('h3','Música ambiente'));
- if(sugestao)p.append(el('p','Atmosfera sugerida: '+sugestao,'jornada-sugestao'));
+ if(sugestao)musicaSugestoes(p,sugestao);
  p.append(el('p','Ouça uma das gravações licenciadas que combinam com o cenário. Não são necessariamente as faixas citadas pela IA.','suave'));
  const linha=el('div','','jornada-controles'),sel=document.createElement('select');sel.setAttribute('aria-label','Música da jornada');
- for(const [id,v] of Object.entries(sons))sel.add(new Option(v[0]+' · '+v[1],id));
+ for(const [id,v] of Object.entries(sons))if(id!=='frieren')sel.add(new Option(v[0]+' · '+v[1],id));
  const texto=(genero+' '+tom+' '+sugestao).toLowerCase();
- sel.value=/terror|sombr|florest|investiga|mist[eé]r/.test(texto)?'floresta':/pirata|mar|taverna|leve|alegr/.test(texto)?'taverna':'jornada';
+ sel.value=sugestao?musicaRecomendada(sugestao):'jornada';
  const b=el('button','▶ Tocar','guia-abrir');b.type='button';
  const volume=document.createElement('input');volume.type='range';volume.min=0;volume.max=100;volume.value=30;volume.setAttribute('aria-label','Volume');
  const estado=el('p','Pronto para tocar','suave'),fonte=el('a','','jornada-fonte');fonte.target='_blank';fonte.rel='noopener noreferrer';
@@ -1535,7 +1571,7 @@ function playerDaHistoria(alvo,genero='',tom='',sugestao=''){
   catch{pararJornada();estado.textContent='Não foi possível carregar. Abra a fonte para ouvir.';}
   finally{b.disabled=false;}
  };
- linha.append(sel,b,volume);p.append(linha,estado,fonte);alvo.append(p);
+ linha.append(sel,b,volume);p.append(linha,estado,fonte);if(sugestao){const abrir=el('button','Abrir aba Música','guia-abrir');abrir.type='button';abrir.onclick=()=>{musicaContextoHistoria(titulo,sugestao);navegarMesa('musica');};p.append(abrir);}alvo.append(p);
 }
 window.addEventListener('pagehide',()=>{pararJornada();musicaParar();});
 // ---- Fichas D&D 5e 2024: atributos-base e compra com 27 pontos ----
@@ -2162,9 +2198,10 @@ $('perfil-arquivo').onchange=async()=>{
 $('perfil-remover').onclick=async()=>{const token=perfilRequisicao,sessao=perfilSessaoCarregada;if(!perfilAtual(token,sessao))return;const b=$('perfil-remover');b.disabled=true;try{await api('/api/conta/perfil/foto','DELETE');if(perfilAtual(token,sessao)){limparFotoPerfil();$('perfil-status').textContent='Foto removida.';}}catch(e){if(perfilAtual(token,sessao)){b.disabled=false;$('perfil-status').textContent=e.message;}}};
 $('perfil-opcoes').onclick=()=>navegarMesa('opcoes');
 // Preferências locais, sem alterar ou restringir as opções assistivas.
-const mesaPreferencias={ortografia:true,fonte:'padrao'};
+const mesaPreferencias={ortografia:true,fonte:'padrao',tema:'claro'};
+const temaSistema=matchMedia('(prefers-color-scheme: dark)');
 const fontesMesa=['padrao','serifada','simples','mono'];
-try{const p=JSON.parse(localStorage.getItem('mesa-preferencias-v1')||'{}');mesaPreferencias.ortografia=p.ortografia!==false;if(fontesMesa.includes(p.fonte))mesaPreferencias.fonte=p.fonte;}catch{}
+try{const p=JSON.parse(localStorage.getItem('mesa-preferencias-v1')||'{}');mesaPreferencias.ortografia=p.ortografia!==false;if(fontesMesa.includes(p.fonte))mesaPreferencias.fonte=p.fonte;if(['claro','escuro','sistema'].includes(p.tema))mesaPreferencias.tema=p.tema;}catch{}
 function mesaAplicarOrtografia(raiz=document){
  const seletor='textarea,input:not([type]),input[type="text"],input[type="search"],[contenteditable="true"]';
  const campos=raiz.matches?.(seletor)?[raiz]:[...raiz.querySelectorAll(seletor)];
@@ -2172,13 +2209,15 @@ function mesaAplicarOrtografia(raiz=document){
 }
 function mesaAplicarPreferencias(salvar=false){
  document.body.dataset.mesaFonte=mesaPreferencias.fonte;
+ document.body.dataset.mesaTema=mesaPreferencias.tema==='sistema'?(temaSistema.matches?'escuro':'claro'):mesaPreferencias.tema;$('opcoes-tema').value=mesaPreferencias.tema;
  $('opcoes-ortografia').checked=mesaPreferencias.ortografia;$('opcoes-fonte').value=mesaPreferencias.fonte;
  mesaAplicarOrtografia();
  if(salvar){try{localStorage.setItem('mesa-preferencias-v1',JSON.stringify(mesaPreferencias));}catch{}$('opcoes-status').textContent='Preferências atualizadas neste navegador.';}
 }
 $('opcoes-ortografia').onchange=()=>{mesaPreferencias.ortografia=$('opcoes-ortografia').checked;mesaAplicarPreferencias(true);};
 $('opcoes-fonte').onchange=()=>{mesaPreferencias.fonte=$('opcoes-fonte').value;mesaAplicarPreferencias(true);};
-$('opcoes-restaurar').onclick=()=>{mesaPreferencias.ortografia=true;mesaPreferencias.fonte='padrao';mesaAplicarPreferencias(true);};
+$('opcoes-tema').onchange=()=>{mesaPreferencias.tema=$('opcoes-tema').value;mesaAplicarPreferencias(true);};temaSistema.addEventListener('change',()=>{if(mesaPreferencias.tema==='sistema')mesaAplicarPreferencias();});
+$('opcoes-restaurar').onclick=()=>{mesaPreferencias.ortografia=true;mesaPreferencias.fonte='padrao';mesaPreferencias.tema='claro';mesaAplicarPreferencias(true);};
 document.addEventListener('focusin',e=>{if(e.target instanceof Element)mesaAplicarOrtografia(e.target);});
 mesaAplicarPreferencias();
 // Comunidade: o nome social é sempre o apelido, sem @.

@@ -2,7 +2,7 @@
 const recursos=require('./recursos-rpg'),aliados=require('./companheiros'),grimorio=require('./grimorio');
 const txt=(x,n)=>typeof x==='string'?x.trim().slice(0,n):'',norm=x=>txt(x,100).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' '),int=(x,a,b)=>Number.isInteger(x)&&x>=a&&x<=b;
 const tipos=['item','habilidade','magia','companheiro','pet','familiar'];
-function progresso(c,turno){const s=c?.resgateRpg||{};return {ate:Math.max(0,Number(turno)||0),cursor:Number.isInteger(s.cursor)?s.cursor:-1,pendentes:Array.isArray(s.pendentes)?s.pendentes.slice(0,160):[],resultado:Array.isArray(s.resultado)?s.resultado:[],concluido:s.concluido===true};}
+function progresso(c,turno){const s=c?.resgateRpg||{};return {ate:Math.max(0,Number(turno)||0),cursor:Number.isInteger(s.cursor)?s.cursor:-1,pendentes:Array.isArray(s.pendentes)?s.pendentes.slice(0,160):[],resultado:Array.isArray(s.resultado)?s.resultado:[],concluido:s.concluido===true&&Number(turno)<=Number(s.cursor)};}
 function publico(s){return {ate:s.ate,cursor:s.cursor,concluido:s.concluido,resultado:s.resultado,total:s.resultado.filter(x=>x.status==='resgatado').length};}
 function candidatos(rows){const grupos=new Map();for(const r of rows){const n=Number(r.numero);if(!Number.isInteger(n)||n<0)continue;const g=grupos.get(n)||{};g[r.papel]=r;grupos.set(n,g);}
  return [...grupos].flatMap(([numero,g])=>!g.mestre||g.mestre.teste||g.mestre.tipo==='ajuste'||g.jogador?.tipo==='ajuste'?[]:[{numero,acao:txt(g.jogador?.texto,1800),narracao:txt(g.mestre.texto,4700)}]);}
