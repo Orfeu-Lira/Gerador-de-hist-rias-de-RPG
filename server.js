@@ -518,8 +518,8 @@ app.get('/api/comunidade/campanhas/:id',asyncHandler(async(req,res)=>{
  const depois=req.query.depois;if(depois!==undefined&&!/^(0|[1-9][0-9]{0,17})$/.test(String(depois)))return res.status(400).json({erro:'Cursor inválido.'});
  await comCampanha(req,res,async(client,s,u,bloqueado)=>{
  if(s.estado!=='ativo'||bloqueado)return campanhaErro('Acesso à campanha indisponível.');
- const membros=await client.query(`SELECT p.apelido,m.estado,m.usuario_id=$2 AS eu,m.usuario_id=$3 AS mestre FROM public.mesa_campanha_membros m JOIN public.mesa_perfis p ON p.usuario_id=m.usuario_id WHERE m.campanha_id=$1 AND (m.estado='ativo' OR $4::boolean) ORDER BY mestre DESC,p.apelido`,[s.id,u.id,s.mestre,s.minha]);
- const eventos=await client.query(`SELECT e.id::text AS id,e.tipo,e.texto,e.efeito,e.cor,e.criado_em,p.apelido FROM public.mesa_campanha_eventos e JOIN public.mesa_perfis p ON p.usuario_id=e.autor WHERE e.campanha_id=$1 AND ($2::bigint IS NULL OR e.id>$2::bigint) ORDER BY e.id ${depois?'ASC':'DESC'} LIMIT 80`,[s.id,depois??null]);
+ const membros=await client.query(`SELECT p.apelido,m.estado,m.usuario_id=$2 AS eu,m.usuario_id=$3 AS mestre,f.nome AS personagem,CASE WHEN m.usuario_id=$2 THEN m.personagem_id::text ELSE NULL END AS personagem_id FROM public.mesa_campanha_membros m JOIN public.mesa_perfis p ON p.usuario_id=m.usuario_id LEFT JOIN public.personagens_dnd f ON f.id=m.personagem_id AND f.usuario_id=m.usuario_id WHERE m.campanha_id=$1 AND (m.estado='ativo' OR $4::boolean) ORDER BY mestre DESC,p.apelido`,[s.id,u.id,s.mestre,s.minha]);
+ const eventos=await client.query(`SELECT e.id::text AS id,e.tipo,e.texto,e.efeito,e.cor,e.criado_em,p.apelido,e.personagem_nome FROM public.mesa_campanha_eventos e JOIN public.mesa_perfis p ON p.usuario_id=e.autor WHERE e.campanha_id=$1 AND ($2::bigint IS NULL OR e.id>$2::bigint) ORDER BY e.id ${depois?'ASC':'DESC'} LIMIT 80`,[s.id,depois??null]);
  return {dados:{titulo:s.titulo,descricao:s.descricao,minha:s.minha,encerrada:s.encerrada,membros:membros.rows,eventos:depois?eventos.rows:eventos.rows.reverse()}};
  });
 }));
@@ -546,6 +546,16 @@ app.post('/api/comunidade/campanhas/:id/membros',asyncHandler(async(req,res)=>{
  await client.query("INSERT INTO public.mesa_campanha_membros(campanha_id,usuario_id,estado) VALUES($1,$2,'convidado') ON CONFLICT DO NOTHING",[s.id,p.usuario_id]);return {dados:{ok:true}};
  });
 }));
+app.post('/api/comunidade/campanhas/:id/personagem',asyncHandler(async(req,res)=>{
+ const personagem=req.body?.personagem;
+ if(personagem!==null&&!/^[1-9][0-9]{0,17}$/.test(String(personagem)))return res.status(400).json({erro:'Personagem inválido.'});
+ await comCampanha(req,res,async(client,s,u,bloqueado)=>{
+ if(s.estado!=='ativo'||s.encerrada||bloqueado)return campanhaErro('Campanha indisponível.');
+ if(personagem!==null){const f=await client.query('SELECT 1 FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2',[personagem,u.id]);if(!f.rowCount)return campanhaErro('Selecione uma ficha da sua própria conta.',404);}
+ await client.query('UPDATE public.mesa_campanha_membros SET personagem_id=$1 WHERE campanha_id=$2 AND usuario_id=$3',[personagem,s.id,u.id]);
+ return {dados:{ok:true}};
+ });
+}));
 app.post('/api/comunidade/campanhas/:id/eventos',asyncHandler(async(req,res)=>{
  const {tipo,texto='',efeito='nenhum',cor='vermelho',chave,faces}=req.body||{};
  if(!['narracao','acao','fala','dado'].includes(tipo)||typeof texto!=='string'||texto.length>2000||(tipo!=='dado'&&!texto.trim())||!campanhaEfeitos.includes(efeito)||!campanhaCores.includes(cor)||typeof chave!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(chave)||(tipo==='dado'&&![4,6,8,10,12,20,100].includes(faces)))return res.status(400).json({erro:'Evento inválido.'});
@@ -556,7 +566,8 @@ app.post('/api/comunidade/campanhas/:id/eventos',asyncHandler(async(req,res)=>{
  const n=await client.query("SELECT count(*)::int AS n FROM public.mesa_campanha_eventos WHERE autor=$1 AND criado_em>now()-interval '1 minute'",[u.id]);
  if(n.rows[0].n>=20)return campanhaErro('Aguarde um minuto antes de enviar mais eventos.',429);
  const conteudo=tipo==='dado'?'Rolou d'+faces+': '+require('crypto').randomInt(1,faces+1):texto.trim();
- const r=await client.query('INSERT INTO public.mesa_campanha_eventos(campanha_id,autor,chave,tipo,texto,efeito,cor) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id::text AS id',[s.id,u.id,chave,tipo,conteudo,efeito,cor]);return {dados:r.rows[0]};
+ const f=tipo==='narracao'?null:(await client.query('SELECT p.nome FROM public.mesa_campanha_membros m JOIN public.personagens_dnd p ON p.id=m.personagem_id AND p.usuario_id=m.usuario_id WHERE m.campanha_id=$1 AND m.usuario_id=$2',[s.id,u.id])).rows[0];
+ const r=await client.query('INSERT INTO public.mesa_campanha_eventos(campanha_id,autor,chave,tipo,texto,efeito,cor,personagem_nome) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id::text AS id',[s.id,u.id,chave,tipo,conteudo,efeito,cor,f?.nome??null]);return {dados:r.rows[0]};
  });
 }));
 app.get('/api/conta/perfil',asyncHandler(async(req,res)=>{
