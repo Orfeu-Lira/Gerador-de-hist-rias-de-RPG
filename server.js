@@ -760,7 +760,7 @@ app.post('/api/conta/excluir',asyncHandler(async(req,res)=>{
   await client.query("DELETE FROM public.sessoes WHERE sessao->>'userId'=$1::text",[String(u.id)]);
   // Remove também contadores identificados pela conta; o restante de quotas
   // anônimas por IP é tratado separadamente pelas regras de retenção.
-  await client.query('DELETE FROM public.geracoes_limite WHERE identificador LIKE $1',['usuario:'+u.id+':%']);
+  await client.query('DELETE FROM public.geracoes_limite WHERE identificador LIKE $1 OR identificador LIKE $2',['usuario:'+u.id+':%','xp-retro:'+u.id+':%']);
   const excluida=await client.query('DELETE FROM public.usuarios WHERE id=$1 RETURNING id',[u.id]);
   if(!excluida.rowCount)throw new Error('Exclusão não efetuada');
   await client.query('COMMIT');
@@ -1098,7 +1098,7 @@ app.post('/api/solo/campanhas/:id/turnos',asyncHandler(async(req,res)=>{
    const gravado=await client.query('UPDATE public.mesa_solo_campanhas SET turno_atual=turno_atual+1,resumo=$3,processando=false,atualizado_em=now() WHERE id=$1 AND usuario_id=$2 AND processando=true AND turno_atual=$4 RETURNING turno_atual',[id,u.id,resposta.resumo,c.turno_atual]);
    if(!gravado.rowCount)throw Error('Campanha foi modificada durante a narração.');
    const n=gravado.rows[0].turno_atual;
-   await client.query("INSERT INTO public.mesa_solo_mensagens(campanha_id,numero,papel,tipo,texto,teste) VALUES($1,$2,'jogador','acao',$3,NULL),($1,$2,'mestre','acao',$4,$5::jsonb)",[id,n,textoAcao,resposta.narracao,JSON.stringify(resposta.teste)]);
+   await client.query("INSERT INTO public.mesa_solo_mensagens(campanha_id,numero,papel,tipo,texto,teste) VALUES($1,$2,'jogador',$6,$3,NULL),($1,$2,'mestre',$6,$4,$5::jsonb)",[id,n,textoAcao,resposta.narracao,JSON.stringify(resposta.teste),tipo==='ajuste'?'ajuste':'acao']);
    let xp=null;const categoria=xpMesa.sugestao(resposta.conquista,tipo,rolagem,resposta.teste);
    if(c.personagem_id&&c.progressao==='xp'&&categoria)xp=await xpMesa.conceder(client,{personagemId:c.personagem_id,usuarioId:u.id,origem:'solo',campanhaId:id,chave:String(n),categoria});
    let resultado=null,xpAtual=null,fichaSolo=null;
@@ -1176,13 +1176,18 @@ app.post('/api/solo/campanhas/:id/xp-retroativo',asyncHandler(async(req,res)=>{
  const u=await soloRequerConta(req,res);if(!u)return;const id=soloId(req.params.id);if(!id)return res.status(400).json({erro:'Campanha inválida.'});
  const claim=await query("UPDATE public.mesa_solo_campanhas SET processando=true,atualizado_em=now() WHERE id=$1 AND usuario_id=$2 AND personagem_id IS NOT NULL AND progressao='xp' AND (NOT processando OR atualizado_em<now()-interval '120 seconds') RETURNING personagem_id,recursos,turno_atual,atualizado_em::text AS trava",[id,u.id]);
  if(!claim.rowCount)return res.status(409).json({erro:'Vincule uma ficha, ative XP e aguarde a narração.'});
- const c=claim.rows[0],estado=retroXp.progresso(c.recursos,c.turno_atual);
+ const c=claim.rows[0],estado=retroXp.progresso(c.recursos,c.turno_atual);let chaveRetro=null,confirmado=false;
  try{
   if(estado.cursor>=estado.ate)return res.json({...estado,ganho:0,concluido:true});
   const fim=Math.min(estado.ate,estado.cursor+10);
   const m=await query("SELECT numero,papel,tipo,texto,teste FROM public.mesa_solo_mensagens WHERE campanha_id=$1 AND numero>$2 AND numero<=$3 ORDER BY numero,CASE WHEN papel='jogador' THEN 0 ELSE 1 END",[id,estado.cursor,fim]);
   const pagos=await query("SELECT chave,categoria FROM public.mesa_xp_historico WHERE origem='solo' AND campanha_id=$1",[id]);
   const candidatos=retroXp.candidatos(m.rows,pagos.rows);
+  if(candidatos.length&&!iaIlimitada(u)){
+   const key='xp-retro:'+u.id+':'+new Date().toISOString().slice(0,10);
+   const limite=await query("INSERT INTO public.geracoes_limite(identificador,total) VALUES($1,1) ON CONFLICT(identificador) DO UPDATE SET total=public.geracoes_limite.total+1 WHERE public.geracoes_limite.total<30 RETURNING total",[key]);
+   if(!limite.rowCount)return res.status(429).json({erro:'Limite diário de revisões atingido. O progresso foi salvo; continue amanhã.'});chaveRetro=key;
+  }
   const analise=candidatos.length?await revisarXpSolo(candidatos):[];
   const {pool}=require('./postgres'),client=await pool.connect();
   try{await client.query('BEGIN');
@@ -1199,10 +1204,10 @@ app.post('/api/solo/campanhas/:id/xp-retroativo',asyncHandler(async(req,res)=>{
    if(ganho){const total=antes.total+ganho,nivel=p.dados.edicao==='2024'?xpMesa.nivelDe(total):null,ev=require('./evolucao-nivel'),reg=ev.registrar(p,antes.nivel??ev.nivelNarrativo(antes.total),nivel??ev.nivelNarrativo(total));await client.query("UPDATE public.personagens_dnd SET xp=$2,dados=CASE WHEN $3::int IS NULL THEN dados ELSE jsonb_set(dados,'{nivel}',to_jsonb($3::int)) END,aquisicoes_rpg=$4::jsonb,atualizado_em=now() WHERE id=$1",[p.id,total,nivel,JSON.stringify(reg.aquisicoes)]);}
    const progresso={ate:estado.ate,cursor:fim,total:estado.total+ganho};
    await client.query("UPDATE public.mesa_solo_campanhas SET recursos=$2::jsonb,processando=false,atualizado_em=now() WHERE id=$1",[id,JSON.stringify({...atual.recursos,retroXP:progresso})]);
-   await client.query('COMMIT');res.json({...progresso,ganho,concluido:fim>=estado.ate});
+   await client.query('COMMIT');confirmado=true;res.json({...progresso,ganho,concluido:fim>=estado.ate});
   }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
  }catch(e){if(e.status===409)return res.status(409).json({erro:e.message});return res.status(503).json({erro:'A revisão de XP não foi concluída. Nenhum XP deste lote foi registrado. Tente novamente.'});}
- finally{await query("UPDATE public.mesa_solo_campanhas SET processando=false WHERE id=$1 AND usuario_id=$2 AND atualizado_em::text=$3",[id,u.id,c.trava]).catch(()=>{});}
+ finally{if(chaveRetro&&!confirmado)await soloDevolver(chaveRetro);await query("UPDATE public.mesa_solo_campanhas SET processando=false WHERE id=$1 AND usuario_id=$2 AND atualizado_em::text=$3",[id,u.id,c.trava]).catch(()=>{});}
 }));
 app.delete('/api/solo/campanhas/:id',asyncHandler(async(req,res)=>{
  const u=await soloRequerConta(req,res);if(!u)return;

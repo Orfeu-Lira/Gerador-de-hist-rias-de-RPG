@@ -4,7 +4,7 @@ function progresso(c,turno){const r=c?.retroXP||{},ate=Number.isInteger(r.ate)?M
 function candidatos(rows,pagos){
  const ja=new Set(pagos.map(r=>Number(r.chave))),grupos=new Map();
  for(const r of rows){const n=Number(r.numero);if(!Number.isInteger(n)||n<1||ja.has(n))continue;const g=grupos.get(n)||{};g[r.papel]=r;grupos.set(n,g);}
- return [...grupos].flatMap(([numero,g])=>{if(!g.jogador||!g.mestre||g.mestre.teste||g.jogador.tipo==='ajuste'||g.mestre.tipo==='ajuste'||/\b(?:falha|fracasso)\.\]$/.test(g.jogador.texto))return [];
+ return [...grupos].flatMap(([numero,g])=>{if(!g.jogador||!g.mestre||g.mestre.teste||g.jogador.tipo==='ajuste'||g.mestre.tipo==='ajuste'||(/^\[Rolagem validada pelo servidor:/.test(g.jogador.texto)&&/; falha\.|1 natural, falha no ataque/.test(g.jogador.texto)))return [];
  return [{numero,acao:String(g.jogador.texto).slice(0,1800),narracao:String(g.mestre.texto).slice(0,4700)}];});
 }
 function validar(candidatos,respostas,pagos){
