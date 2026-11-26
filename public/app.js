@@ -454,7 +454,7 @@ function montarNav() {
 }
 function textoInfo() {
   if (!eu.logado) return 'Entre ou crie uma conta para acessar o Mesa.';
-  return eu.restantes === null ? 'Acesso total (administrador).' : 'Gerações restantes hoje: ' + eu.restantes;
+  return eu.restantes === null ? (eu.papel==='admin'?'Acesso total (administrador).':'Gerações de IA ilimitadas.') : 'Gerações restantes hoje: ' + eu.restantes;
 }
 
 async function atualizarEu() {
@@ -772,8 +772,14 @@ function soloRecursos(r,art){
  if(e.grimorio){const g=e.grimorio;for(const m of g.conhecidas.filter(m=>g.preparadas.includes(m.id)))for(let c=m.circulo;c<=g.max.length;c++){const o=new Option(m.nome+' · '+c+'º círculo'+(g.modo==='mana'?' · '+c+' MP':' · '+(g.max[c-1]-g.gastos[c-1])+' espaços'),'magia:'+m.id+':'+c);o.disabled=e.pv===0||(g.modo==='mana'?e.mana<c:g.gastos[c-1]>=g.max[c-1]);sel.add(o);}}
  if(e.pv===0)sel.value='socorro';soloAtualizarCompositor();soloPintarColecao();if(art&&r.eventosRecursos?.length)for(const ev of r.eventosRecursos)art.append(el('p',ev,'mesa-xp-recompensa'));
 }
-function soloXPInicio(r){soloPintarAliados(r.companheiros||[]);soloFichaAba='inventario';soloResumoModo=r.campanha.progressao;soloResumoXP=r.xp;soloRecursos(r);soloCarregarAvatar(r.campanha.personagem_id,r.xp?.personagem);pintarXP($('solo-xp'),r.xp,r.campanha.progressao);const sel=$('solo-xp-ficha');sel.replaceChildren(new Option('Escolha uma ficha',''));for(const p of soloPersonagens)sel.add(new Option(p.nome,String(p.id)));$('solo-xp-vincular').hidden=Boolean(r.campanha.personagem_id)||!soloPersonagens.length;}
-$('solo-xp-confirmar').onclick=async()=>{const id=soloCampanhaId,p=$('solo-xp-ficha').value;if(!id||!p||soloOcupado)return;const b=$('solo-xp-confirmar');b.disabled=true;try{await api('/api/solo/campanhas/'+id+'/personagem','POST',{personagemId:Number(p)});await soloAbrir(id);}catch(e){soloEstado(e.message,true);}finally{b.disabled=false;}};
+let soloRetroOcupado=false,soloRetroDados=null;
+function soloVinculoOpcoes(){const sel=$('solo-xp-ficha'),antes=sel.value;sel.replaceChildren(new Option('Escolha uma ficha',''));for(const p of soloPersonagens)sel.add(new Option(p.nome,String(p.id)));if([...sel.options].some(o=>o.value===antes))sel.value=antes;else if(soloPersonagens.length===1)sel.value=String(soloPersonagens[0].id);$('solo-xp-confirmar').disabled=!soloPersonagens.length;$('solo-xp-vinculo-status').textContent=soloPersonagens.length?'':'Nenhuma ficha encontrada. Crie e salve uma em Personagens e retorne à campanha.';}
+async function soloVinculoAtualizar(){const id=soloCampanhaId;try{const p=await api('/api/personagens');if(String(id)!==String(soloCampanhaId))return;soloPersonagens=p;soloVinculoOpcoes();}catch(e){$('solo-xp-vinculo-status').textContent=e.message;}}
+function soloPintarRetro(r){soloRetroDados=r.retroXP;const box=$('solo-xp-retro'),b=$('solo-xp-resgatar'),p=$('solo-xp-retro-status');box.hidden=!r.campanha.personagem_id||r.campanha.progressao!=='xp'||!r.retroXP?.ate;if(box.hidden)return;const d=r.retroXP;p.textContent=d.cursor+'/'+d.ate+' turnos revisados · '+d.total+' XP recuperados';b.disabled=soloRetroOcupado||d.cursor>=d.ate;b.textContent=d.cursor>=d.ate?'Revisão concluída':d.cursor?'Continuar revisão':'Revisar eventos anteriores';}
+function soloXPInicio(r){soloPintarAliados(r.companheiros||[]);soloFichaAba='inventario';soloResumoModo=r.campanha.progressao;soloResumoXP=r.xp;soloRecursos(r);soloCarregarAvatar(r.campanha.personagem_id,r.xp?.personagem);pintarXP($('solo-xp'),r.xp,r.campanha.progressao);soloVinculoOpcoes();$('solo-xp-vincular').hidden=Boolean(r.campanha.personagem_id);if(!r.campanha.personagem_id)soloVinculoAtualizar();soloPintarRetro(r);}
+$('solo-xp-atualizar-fichas').onclick=soloVinculoAtualizar;
+$('solo-xp-confirmar').onclick=async()=>{const id=soloCampanhaId,p=$('solo-xp-ficha').value;if(!id||soloOcupado)return;if(!p){$('solo-xp-vinculo-status').textContent='Selecione uma ficha.';return;}const b=$('solo-xp-confirmar');b.disabled=true;try{await api('/api/solo/campanhas/'+id+'/personagem','POST',{personagemId:Number(p),ativarXP:soloResumoModo==='xp'||confirm('Ativar XP automático e permitir revisão retroativa nesta campanha?')});await soloAbrir(id);soloFecharPaineis();$('solo-personagem-dialog').showModal();}catch(e){$('solo-xp-vinculo-status').textContent=e.message;}finally{b.disabled=false;}};
+$('solo-xp-resgatar').onclick=async()=>{const id=soloCampanhaId;if(!id||soloOcupado||soloRetroOcupado)return;soloRetroOcupado=true;const b=$('solo-xp-resgatar'),p=$('solo-xp-retro-status');b.disabled=true;try{let d;do{p.textContent='Mestre IA revisando eventos anteriores…';d=await api('/api/solo/campanhas/'+id+'/xp-retroativo','POST',{});if(String(id)!==String(soloCampanhaId))return;p.textContent=d.cursor+'/'+d.ate+' turnos revisados · '+d.total+' XP recuperados';}while(!d.concluido&&$('solo-personagem-dialog').open);soloRetroOcupado=false;await soloAbrir(id);soloFecharPaineis();$('solo-personagem-dialog').showModal();}catch(e){p.textContent=e.message+' A revisão pode ser retomada.';}finally{soloRetroOcupado=false;if(String(id)===String(soloCampanhaId)&&!b.textContent.includes('concluída'))b.disabled=false;}};
 function soloMensagem(papel,texto,tipo='acao',teste=null,numero=null){
  const art=el('article','','solo-mensagem '+(papel==='mestre'?'mestre':'jogador'));
  art.appendChild(el('strong',papel==='mestre'?'✧ Mestre IA':tipo==='ajuste'?'✎ Modificação solicitada':'♙ Você'));
@@ -2125,7 +2131,7 @@ async function carregarMeuPerfil(){
   if(!perfilAtual(token,sessao))return;
   if(p.email!==eu.email){perfilLimparCampos();location.replace('/');return;}
   $('perfil-nome').value=p.nome;$('perfil-email').value=p.email;$('perfil-tratamento').value=p.tratamento||'neutro';$('perfil-apelido').value=p.apelido||'';$('perfil-bio').value=p.bio||'';$('perfil-encontravel').checked=!!p.encontravel;perfilSessaoCarregada=sessao;perfilControles(true);
-  $('perfil-cota').textContent=p.limite===null?'Acesso administrativo sem limite de geração.':p.restantes+' de '+p.limite+' gerações disponíveis hoje.';
+  $('perfil-cota').textContent=p.limite===null?'Sua conta possui gerações de IA ilimitadas.':p.restantes+' de '+p.limite+' gerações disponíveis hoje.';
   if(p.limite!==null){$('perfil-progresso').max=p.limite;$('perfil-progresso').value=p.restantes;$('perfil-progresso').hidden=false;}
   if(p.temFoto){
    const resp=await fetch(API_BASE_URL+'/api/conta/perfil/foto',{credentials:'include',cache:'no-store',headers:{'X-Mesa-Perfil-Sessao':sessao}});
@@ -2695,6 +2701,14 @@ async function adminExibirRelatorios(alvo){
   a.href=url;a.download='mesa-relatorios.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);
  });
 }
+async function adminExibirPrivilegios(alvo,pagina=1,busca=''){
+ adminTitulo(alvo,'Privilégios individuais','Autorize ou revogue gerações de IA ilimitadas sem conceder acesso administrativo. O consumo do provedor continua sujeito aos limites e custos externos.');
+ const form=add('form',alvo,'','admin-busca'),input=campoAdmin(form,'Buscar por e-mail','search',busca),submit=add('button',form,'Buscar','principal');submit.type='submit';form.onsubmit=e=>{e.preventDefault();const termo=input.value;alvo.replaceChildren();adminExibirPrivilegios(alvo,1,termo).catch(x=>mensagemAdmin(x.message,true));};
+ const r=await api('/api/admin/usuarios?pagina='+pagina+'&busca='+encodeURIComponent(busca));if(adminSecao!=='privilegios')return;
+ for(const u of r.usuarios){const card=add('article',alvo,'','admin-registro');add('strong',card,u.email);add('p',card,u.papel==='admin'?'Administrador · já ilimitado':u.ia_ilimitada?'IA ilimitada ativa':'Limites padrão','suave');if(u.papel==='admin')continue;
+ const b=botaoAdmin(card,u.ia_ilimitada?'Revogar IA ilimitada':'Conceder IA ilimitada',async()=>{if(!confirm((u.ia_ilimitada?'Revogar':'Conceder')+' gerações ilimitadas para '+u.email+'?'))return;b.disabled=true;try{await api('/api/admin/usuarios/'+u.id+'/privilegios','PATCH',{iaIlimitada:!u.ia_ilimitada});mensagemAdmin('Privilégio atualizado.');alvo.replaceChildren();await adminExibirPrivilegios(alvo,pagina,busca);}catch(e){mensagemAdmin(e.message,true);b.disabled=false;}});}
+ if(!r.usuarios.length)add('p',alvo,'Nenhuma conta encontrada.');const paginas=Math.max(1,Math.ceil(r.total/20));add('p',alvo,'Página '+pagina+' de '+paginas,'suave');if(pagina>1)botaoAdmin(alvo,'Anterior',()=>{alvo.replaceChildren();adminExibirPrivilegios(alvo,pagina-1,busca).catch(e=>mensagemAdmin(e.message,true));});if(pagina<paginas)botaoAdmin(alvo,'Próxima',()=>{alvo.replaceChildren();adminExibirPrivilegios(alvo,pagina+1,busca).catch(e=>mensagemAdmin(e.message,true));});
+}
 async function adminExibirUsuarios(alvo,pagina=1,busca=''){
  adminTitulo(alvo,'Gerenciamento de usuários','Consulte contas e aplique suspensões temporárias. Contas administrativas são protegidas.');
  const buscaForm=add('form',alvo,'','admin-busca');const buscaInput=campoAdmin(buscaForm,'Buscar por e-mail','search',busca);const submit=add('button',buscaForm,'Buscar','principal');submit.type='submit';
@@ -2833,6 +2847,7 @@ async function carregarResumo(){
   if(adminSecao==='geral')await adminExibirGeral(alvo);
   else if(adminSecao==='relatorios')await adminExibirRelatorios(alvo);
   else if(adminSecao==='usuarios')await adminExibirUsuarios(alvo);
+  else if(adminSecao==='privilegios')await adminExibirPrivilegios(alvo);
   else if(adminSecao==='novidades'||adminSecao==='conteudos')await adminExibirPublicacoes(alvo,adminSecao==='novidades'?'comunicados':'conteudos');
   else if(adminSecao==='suporte')await adminExibirSuporte(alvo);
   else if(adminSecao==='moderacao')await adminExibirModeracao(alvo);

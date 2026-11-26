@@ -1,0 +1,5 @@
+'use strict';const test=require('node:test'),a=require('node:assert/strict'),r=require('./xp-retroativo');
+const c=[{numero:1,acao:'ação',narracao:'O jogador encontrou a pista antiga.'},{numero:2,acao:'ação',narracao:'O jogador encontrou outra pista.'},{numero:5,acao:'ação',narracao:'O inimigo foi derrotado em combate.'}];
+test('recompensa exige turno e evidência literal e evita repetição',()=>{const v=r.validar(c,[{numero:1,categoria:'pista',evidencia:'encontrou a pista antiga'},{numero:2,categoria:'pista',evidencia:'encontrou outra pista'},{numero:5,categoria:'combate',evidencia:'texto inventado'}],[]);a.equal(v.length,1);a.equal(v[0].numero,1);});
+test('ignora turnos pagos e testes pendentes',()=>{const rows=[{numero:1,papel:'jogador',texto:'ação'},{numero:1,papel:'mestre',texto:'narracao'},{numero:2,papel:'jogador',texto:'ação'},{numero:2,papel:'mestre',texto:'narracao',teste:{}}];a.equal(r.candidatos(rows,[{chave:'1'}]).length,0);});
+test('progresso persistente não expande corte histórico',()=>{const p=r.progresso({retroXP:{ate:12,cursor:10,total:75}},30);a.equal(p.ate,12);a.equal(p.cursor,10);a.equal(p.total,75);});

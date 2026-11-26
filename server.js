@@ -8,7 +8,8 @@ const bcrypt = require('bcryptjs');
 const { query } = require('./postgres');
 const xpMesa=require('./xp');
 const recursosRpg=require('./recursos-rpg');
-const { gerarAventura, gerarNpc, narrarSolo } = require('./ia');
+const { gerarAventura, gerarNpc, narrarSolo, revisarXpSolo } = require('./ia');
+const retroXp=require('./xp-retroativo');
 const companheirosSolo=require('./companheiros');
 const {rolar: calcularDadosRpg}=require('./public/dice-rules.js');
 
@@ -94,7 +95,7 @@ const senhaValida = s => typeof s === 'string' && s.length >= 8 && s.length <= 7
 const asyncHandler = f => (req,res,next) => Promise.resolve(f(req,res,next)).catch(next);
 const atual = async req => {
   if (!req.session.userId) return null;
-  const r = await query('SELECT id,email,papel,bloqueado_ate FROM public.usuarios WHERE id=$1', [req.session.userId]);
+  const r = await query('SELECT id,email,papel,bloqueado_ate,ia_ilimitada FROM public.usuarios WHERE id=$1', [req.session.userId]);
   const u=r.rows[0] || null;
   return u && u.bloqueado_ate && new Date(u.bloqueado_ate)>new Date() ? null : u;
 };
@@ -102,7 +103,8 @@ const quotaKey = (req,u) => u
   ? 'usuario:' + u.id + ':' + new Date().toISOString().slice(0,10)
   : 'visitante:' + (req.ip || 'desconhecido');
 const usadas = async chave => Number((await query('SELECT total FROM public.geracoes_limite WHERE identificador=$1',[chave])).rows[0]?.total || 0);
-const restantes = async (req,u) => !u ? 0 : u.papel === 'admin' ? null : Math.max(0,5 - await usadas(quotaKey(req,u)));
+const iaIlimitada=u=>Boolean(u&&(u.papel==='admin'||u.ia_ilimitada===true));
+const restantes = async (req,u) => !u ? 0 : iaIlimitada(u) ? null : Math.max(0,5 - await usadas(quotaKey(req,u)));
 // A duração precisa estar definida ANTES da primeira gravação no PostgreSQL.
 // Cadastro usa cookie de sessão; login oferece a opção persistente de 30 dias.
 const refreshSession = (req, userId, manterConectado = false) => new Promise((resolve,reject) => req.session.regenerate(err => {
@@ -296,7 +298,7 @@ app.post('/api/logout', (req,res,next) => {
 app.get('/api/eu',asyncHandler(async(req,res) => {
   const u = await atual(req);
   const perfil=u?(await query('SELECT nome,tratamento FROM public.mesa_perfis WHERE usuario_id=$1',[u.id])).rows[0]:null;
-  res.json({logado:!!u,email:u?.email||null,perfilSessao:u?perfilSessao.chave(process.env.SESSION_SECRET,req.sessionID,u.id):null,papel:u?.papel||null,restantes:await restantes(req,u),nome:perfil?.nome||'',tratamento:perfil?.tratamento||'neutro'});
+  res.json({logado:!!u,email:u?.email||null,perfilSessao:u?perfilSessao.chave(process.env.SESSION_SECRET,req.sessionID,u.id):null,papel:u?.papel||null,iaIlimitada:iaIlimitada(u),restantes:await restantes(req,u),nome:perfil?.nome||'',tratamento:perfil?.tratamento||'neutro'});
 }));
 // Todas as funcionalidades da plataforma exigem sessão confirmada.
 // Rotas públicas de login, cadastro, recuperação e saúde ficam acima deste ponto.
@@ -634,7 +636,7 @@ app.use('/api/conta/perfil',asyncHandler(async(req,res,next)=>{
 app.get('/api/conta/perfil',asyncHandler(async(req,res)=>{
  const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
  const r=await query('SELECT nome, tratamento, apelido,bio,encontravel, foto IS NOT NULL AS tem_foto FROM public.mesa_perfis WHERE usuario_id=$1',[u.id]);
- res.json({apelido:r.rows[0]?.apelido||'',bio:r.rows[0]?.bio||'',encontravel:!!r.rows[0]?.encontravel,nome:r.rows[0]?.nome||'',tratamento:r.rows[0]?.tratamento||'neutro',temFoto:!!r.rows[0]?.tem_foto,email:u.email,restantes:await restantes(req,u),limite:u.papel==='admin'?null:5});
+ res.json({apelido:r.rows[0]?.apelido||'',bio:r.rows[0]?.bio||'',encontravel:!!r.rows[0]?.encontravel,nome:r.rows[0]?.nome||'',tratamento:r.rows[0]?.tratamento||'neutro',temFoto:!!r.rows[0]?.tem_foto,email:u.email,restantes:await restantes(req,u),limite:iaIlimitada(u)?null:5});
 }));
 app.post('/api/conta/perfil',asyncHandler(async(req,res)=>{
  const u=await atual(req);if(!u)return res.status(401).json({erro:'Entre na sua conta.'});
@@ -788,6 +790,7 @@ app.use(['/api/gerar','/api/npcs/gerar','/api/dnd/ajuda'],modoManutencao);
 // Manutenção bloqueia somente novas narrações, não consultas e exclusões de campanhas salvas.
 app.post('/api/solo/campanhas',modoManutencao);
 app.post('/api/solo/campanhas/:id/turnos',modoManutencao);
+app.post('/api/solo/campanhas/:id/xp-retroativo',modoManutencao);
 app.post('/api/gerar',asyncHandler(async(req,res) => {
   const {genero,tom,ideia} = req.body || {};
   const jogadores=Number(req.body?.jogadores);
@@ -797,7 +800,7 @@ app.post('/api/gerar',asyncHandler(async(req,res) => {
   const u=await atual(req);
   const key=quotaKey(req,u);
   const limit=5;
-  const bypass=u?.papel==='admin';
+  const bypass=iaIlimitada(u);
   if (!bypass) {
     const claimed=await query(
       'INSERT INTO public.geracoes_limite(identificador,total) VALUES($1,1) ON CONFLICT(identificador) DO UPDATE SET total=public.geracoes_limite.total+1 WHERE public.geracoes_limite.total<$2 RETURNING total',
@@ -834,7 +837,7 @@ app.post('/api/musicas',musicaLimite,asyncHandler(async(req,res)=>{
     (titulo!==undefined && (typeof titulo!=='string'||titulo.length>120)))
     return res.status(400).json({erro:'Informe uma descrição musical válida.'});
   const chave='musica:'+u.id+':'+new Date().toISOString().slice(0,10);
-  const admin=u.papel==='admin';
+  const admin=iaIlimitada(u);
   if(!admin){
     const uso=await query(
       'INSERT INTO public.geracoes_limite(identificador,total) VALUES($1,1) ON CONFLICT(identificador) DO UPDATE SET total=public.geracoes_limite.total+1 WHERE public.geracoes_limite.total<$2 RETURNING total',
@@ -911,7 +914,7 @@ app.post('/api/npcs/gerar',asyncHandler(async(req,res)=>{
  }
  if(!descricao.trim()&&!resumo.trim()&&!tematica.trim()&&!situacao.trim()&&!id)
    return res.status(400).json({erro:'Descreva o NPC ou informe o contexto da cena, ou selecione uma aventura salva.'});
- const key=quotaKey(req,u),limit=5,bypass=u?.papel==='admin';
+ const key=quotaKey(req,u),limit=5,bypass=iaIlimitada(u);
  if(!bypass){
    const claimed=await query(
      'INSERT INTO public.geracoes_limite(identificador,total) VALUES($1,1) ON CONFLICT(identificador) DO UPDATE SET total=public.geracoes_limite.total+1 WHERE public.geracoes_limite.total<$2 RETURNING total',
@@ -953,7 +956,7 @@ const soloRequerConta=async(req,res)=>{
  return u;
 };
 const soloCota=async u=>{
- if(u.papel==='admin')return null;
+ if(iaIlimitada(u))return null;
  const key='solo:'+u.id+':'+new Date().toISOString().slice(0,10);
  const r=await query(
  'INSERT INTO public.geracoes_limite(identificador,total) VALUES($1,1) ON CONFLICT(identificador) DO UPDATE SET total=public.geracoes_limite.total+1 WHERE public.geracoes_limite.total<30 RETURNING total',[key]);
@@ -982,7 +985,7 @@ app.get('/api/solo/campanhas/:id',asyncHandler(async(req,res)=>{
  const c=r.rows[0],p=c.personagem_id?(await query('SELECT id,nome,dados,xp,aquisicoes_rpg FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2',[c.personagem_id,u.id])).rows[0]:null;
  const ganhos=p?(await query("SELECT chave,quantidade,categoria FROM public.mesa_xp_historico WHERE origem='solo' AND campanha_id=$1 AND personagem_id=$2 ORDER BY id",[id,p.id])).rows:[];
  const recursos=recursosRpg.estado(p,c.recursos,c.modo_recursos);
- res.set('Cache-Control','private, no-store').json({campanha:c,mensagens:m.rows,recursos,companheiros:companheirosSolo.estado(c.recursos),fichaSolo:recursosRpg.fichaSolo(p,recursos),xp:xpMesa.estado(p),ganhos:ganhos.map(g=>({...g,categoria:xpMesa.nomes[g.categoria]}))});
+ res.set('Cache-Control','private, no-store').json({campanha:c,mensagens:m.rows,recursos,companheiros:companheirosSolo.estado(c.recursos),fichaSolo:recursosRpg.fichaSolo(p,recursos),xp:xpMesa.estado(p),retroXP:retroXp.progresso(c.recursos,c.turno_atual),ganhos:ganhos.map(g=>({...g,categoria:xpMesa.nomes[g.categoria]}))});
 }));
 app.post('/api/solo/campanhas',asyncHandler(async(req,res)=>{
  const u=await soloRequerConta(req,res);if(!u)return;
@@ -1156,9 +1159,50 @@ app.post('/api/solo/campanhas/:id/mana',asyncHandler(async(req,res)=>{
  if(!r.rowCount)return res.status(409).json({erro:'Não foi possível ativar mana nesta campanha.'});res.json({ok:true});
 }));
 app.post('/api/solo/campanhas/:id/personagem',asyncHandler(async(req,res)=>{
- const u=await soloRequerConta(req,res);if(!u)return;const id=soloId(req.params.id),p=soloId(req.body?.personagemId);if(!id||!p)return res.status(400).json({erro:'Ficha inválida.'});
- const r=await query('UPDATE public.mesa_solo_campanhas c SET personagem_id=$3 WHERE c.id=$1 AND c.usuario_id=$2 AND c.personagem_id IS NULL AND NOT c.processando AND EXISTS(SELECT 1 FROM public.personagens_dnd p WHERE p.id=$3 AND p.usuario_id=$2) RETURNING c.id',[id,u.id,p]);
- if(!r.rowCount)return res.status(409).json({erro:'Não foi possível vincular a ficha.'});res.json({ok:true});
+ const u=await soloRequerConta(req,res);if(!u)return;const id=soloId(req.params.id),p=soloId(req.body?.personagemId);if(!id||!p)return res.status(400).json({erro:'Escolha uma ficha válida.'});
+ const {pool}=require('./postgres'),client=await pool.connect();
+ try{await client.query('BEGIN');
+  const c=(await client.query('SELECT personagem_id,progressao,processando,atualizado_em,turno_atual,recursos FROM public.mesa_solo_campanhas WHERE id=$1 AND usuario_id=$2 FOR UPDATE',[id,u.id])).rows[0];
+  if(!c){await client.query('ROLLBACK');return res.status(404).json({erro:'Campanha não encontrada.'});}
+  if(c.processando&&Date.now()-new Date(c.atualizado_em).getTime()<120000){await client.query('ROLLBACK');return res.status(409).json({erro:'O Mestre IA está narrando. Tente vincular após a conclusão.'});}
+  if(c.personagem_id&&String(c.personagem_id)!==String(p)){await client.query('ROLLBACK');return res.status(409).json({erro:'Já existe outra ficha vinculada. A troca não é permitida para preservar a progressão.'});}
+  const ficha=(await client.query('SELECT id FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2',[p,u.id])).rows[0];
+  if(!ficha){await client.query('ROLLBACK');return res.status(404).json({erro:'A ficha precisa estar salva na sua própria conta.'});}
+  if(!c.personagem_id){const recursos={...c.recursos};if(!recursos.retroXP)recursos.retroXP={ate:Number(c.turno_atual),cursor:0,total:0};await client.query("UPDATE public.mesa_solo_campanhas SET personagem_id=$3,progressao=CASE WHEN $4::boolean THEN 'xp' ELSE progressao END,recursos=$5::jsonb,processando=false,atualizado_em=now() WHERE id=$1 AND usuario_id=$2",[id,u.id,p,req.body?.ativarXP===true,JSON.stringify(recursos)]);}
+  await client.query('COMMIT');res.json({ok:true});
+ }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
+}));
+app.post('/api/solo/campanhas/:id/xp-retroativo',asyncHandler(async(req,res)=>{
+ const u=await soloRequerConta(req,res);if(!u)return;const id=soloId(req.params.id);if(!id)return res.status(400).json({erro:'Campanha inválida.'});
+ const claim=await query("UPDATE public.mesa_solo_campanhas SET processando=true,atualizado_em=now() WHERE id=$1 AND usuario_id=$2 AND personagem_id IS NOT NULL AND progressao='xp' AND (NOT processando OR atualizado_em<now()-interval '120 seconds') RETURNING personagem_id,recursos,turno_atual,atualizado_em::text AS trava",[id,u.id]);
+ if(!claim.rowCount)return res.status(409).json({erro:'Vincule uma ficha, ative XP e aguarde a narração.'});
+ const c=claim.rows[0],estado=retroXp.progresso(c.recursos,c.turno_atual);
+ try{
+  if(estado.cursor>=estado.ate)return res.json({...estado,ganho:0,concluido:true});
+  const fim=Math.min(estado.ate,estado.cursor+10);
+  const m=await query("SELECT numero,papel,tipo,texto,teste FROM public.mesa_solo_mensagens WHERE campanha_id=$1 AND numero>$2 AND numero<=$3 ORDER BY numero,CASE WHEN papel='jogador' THEN 0 ELSE 1 END",[id,estado.cursor,fim]);
+  const pagos=await query("SELECT chave,categoria FROM public.mesa_xp_historico WHERE origem='solo' AND campanha_id=$1",[id]);
+  const candidatos=retroXp.candidatos(m.rows,pagos.rows);
+  const analise=candidatos.length?await revisarXpSolo(candidatos):[];
+  const {pool}=require('./postgres'),client=await pool.connect();
+  try{await client.query('BEGIN');
+   const atual=(await client.query('SELECT personagem_id,recursos,progressao,processando,atualizado_em::text AS trava FROM public.mesa_solo_campanhas WHERE id=$1 AND usuario_id=$2 FOR UPDATE',[id,u.id])).rows[0];
+   if(!atual||!atual.processando||atual.trava!==c.trava||String(atual.personagem_id)!==String(c.personagem_id)||atual.progressao!=='xp'){const e=Error('A campanha mudou durante a análise. Tente novamente.');e.status=409;throw e;}
+   const p=(await client.query('SELECT id,nome,dados,xp,aquisicoes_rpg FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2 FOR UPDATE',[c.personagem_id,u.id])).rows[0];
+   if(!p){const e=Error('Ficha indisponível.');e.status=409;throw e;}
+   const historico=(await client.query("SELECT chave,categoria FROM public.mesa_xp_historico WHERE origem='solo' AND campanha_id=$1",[id])).rows;
+   const recompensas=retroXp.validar(candidatos,analise,historico);
+   const antes=xpMesa.estado(p),max=p.dados.edicao==='2024'?355000:1000000000;let ganho=0;
+   for(const r of recompensas){const quantidade=Math.min(xpMesa.categorias[r.categoria],max-antes.total-ganho);if(quantidade<=0)break;
+    const inserido=await client.query("INSERT INTO public.mesa_xp_historico(personagem_id,origem,campanha_id,chave,categoria,quantidade) VALUES($1,'solo',$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING id",[p.id,id,String(r.numero),r.categoria,quantidade]);if(inserido.rowCount)ganho+=quantidade;
+   }
+   if(ganho){const total=antes.total+ganho,nivel=p.dados.edicao==='2024'?xpMesa.nivelDe(total):null,ev=require('./evolucao-nivel'),reg=ev.registrar(p,antes.nivel??ev.nivelNarrativo(antes.total),nivel??ev.nivelNarrativo(total));await client.query("UPDATE public.personagens_dnd SET xp=$2,dados=CASE WHEN $3::int IS NULL THEN dados ELSE jsonb_set(dados,'{nivel}',to_jsonb($3::int)) END,aquisicoes_rpg=$4::jsonb,atualizado_em=now() WHERE id=$1",[p.id,total,nivel,JSON.stringify(reg.aquisicoes)]);}
+   const progresso={ate:estado.ate,cursor:fim,total:estado.total+ganho};
+   await client.query("UPDATE public.mesa_solo_campanhas SET recursos=$2::jsonb,processando=false,atualizado_em=now() WHERE id=$1",[id,JSON.stringify({...atual.recursos,retroXP:progresso})]);
+   await client.query('COMMIT');res.json({...progresso,ganho,concluido:fim>=estado.ate});
+  }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
+ }catch(e){if(e.status===409)return res.status(409).json({erro:e.message});return res.status(503).json({erro:'A revisão de XP não foi concluída. Nenhum XP deste lote foi registrado. Tente novamente.'});}
+ finally{await query("UPDATE public.mesa_solo_campanhas SET processando=false WHERE id=$1 AND usuario_id=$2 AND atualizado_em::text=$3",[id,u.id,c.trava]).catch(()=>{});}
 }));
 app.delete('/api/solo/campanhas/:id',asyncHandler(async(req,res)=>{
  const u=await soloRequerConta(req,res);if(!u)return;
@@ -1365,7 +1409,7 @@ app.post('/api/dnd/ajuda',asyncHandler(async(req,res)=>{
   if(typeof pergunta !== 'string' || pergunta.trim().length<5 || pergunta.length>450)
     return res.status(400).json({erro:'Digite uma pergunta sobre D&D com até 450 caracteres.'});
   const chave='dnd-ajuda:'+u.id+':'+new Date().toISOString().slice(0,10);
-  const admin=u.papel==='admin';
+  const admin=iaIlimitada(u);
   if(!admin){
     const uso=await query(
       'INSERT INTO public.geracoes_limite(identificador,total) VALUES($1,1) ON CONFLICT(identificador) DO UPDATE SET total=public.geracoes_limite.total+1 WHERE public.geracoes_limite.total<$2 RETURNING total',
@@ -1453,9 +1497,20 @@ app.get('/api/admin/usuarios',asyncHandler(async(req,res)=>{
  const pagina=Math.min(100,Math.max(1,parseInt(req.query.pagina,10)||1));
  const [count,lista]=await Promise.all([
    query('SELECT COUNT(*)::int total FROM public.usuarios WHERE email ILIKE $1',['%'+busca+'%']),
-   query('SELECT id,email,papel,criado_em,ultimo_login_em,bloqueado_ate FROM public.usuarios WHERE email ILIKE $1 ORDER BY id DESC LIMIT 20 OFFSET $2',['%'+busca+'%',(pagina-1)*20])
+   query('SELECT id,email,papel,criado_em,ultimo_login_em,bloqueado_ate,ia_ilimitada FROM public.usuarios WHERE email ILIKE $1 ORDER BY id DESC LIMIT 20 OFFSET $2',['%'+busca+'%',(pagina-1)*20])
  ]);
  res.json({total:count.rows[0].total,pagina,usuarios:lista.rows});
+}));
+app.patch('/api/admin/usuarios/:id/privilegios',asyncHandler(async(req,res)=>{
+ const id=idPositivo(req.params.id),ilimitada=req.body?.iaIlimitada;
+ if(!id||typeof ilimitada!=='boolean')return res.status(400).json({erro:'Privilégio inválido.'});
+ const {pool}=require('./postgres'),client=await pool.connect();
+ try{await client.query('BEGIN');
+  const r=await client.query("UPDATE public.usuarios SET ia_ilimitada=$2 WHERE id=$1 AND papel<>'admin' RETURNING id,ia_ilimitada",[id,ilimitada]);
+  if(!r.rowCount){await client.query('ROLLBACK');return res.status(404).json({erro:'Conta não encontrada ou protegida.'});}
+  await client.query('INSERT INTO public.mesa_auditoria(admin_id,acao,alvo_tipo,alvo_id,detalhes) VALUES($1,$2,$3,$4,$5::jsonb)',[req.admin.id,'usuario.privilegio_ia','usuario',id,JSON.stringify({iaIlimitada:ilimitada})]);
+  await client.query('COMMIT');res.json({ok:true,iaIlimitada:ilimitada});
+ }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
 }));
 app.patch('/api/admin/usuarios/:id/suspensao',asyncHandler(async(req,res)=>{
  const id=idPositivo(req.params.id),dias=req.body?.dias;
