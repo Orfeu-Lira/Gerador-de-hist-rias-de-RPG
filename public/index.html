@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./style.css?v=portal21">
+<link rel="stylesheet" href="./style.css?v=portal22">
 </head>
 <body class="mesa-sem-sessao tela-acesso">
 <div id="mesa-abertura" class="mesa-intro" aria-hidden="true" inert>
@@ -146,7 +146,7 @@
         </fieldset>
         <fieldset class="solo-iniciacao"><legend>Protagonista da jornada</legend>
           <label for="solo-personagem">Escolher personagem</label><select id="solo-personagem"><option value="">Sem ficha por enquanto</option></select>
-          <label for="solo-progressao">Progressão</label><select id="solo-progressao"><option value="xp">Experiência automática (XP)</option><option value="marcos">Marcos narrativos (nível manual)</option><option value="nenhuma">Sem progressão automática</option></select><p id="solo-personagem-info" class="suave">Use uma ficha salva ou crie outra para esta história.</p>
+          <label for="solo-progressao">Progressão</label><select id="solo-progressao"><option value="xp">Experiência automática (XP)</option><option value="marcos">Marcos narrativos (nível manual)</option><option value="nenhuma">Sem progressão automática</option></select><label for="solo-modo-recursos">Regras de recursos</label><select id="solo-modo-recursos"><option value="padrao">PV — sem mana automática</option><option value="mana">PV + mana (regra personalizada)</option></select><p class="suave">D&amp;D normalmente utiliza espaços de magia, não mana. O modo mana é uma regra alternativa do Mesa.</p><p id="solo-personagem-info" class="suave">Use uma ficha salva ou crie outra para esta história.</p>
           <button type="button" id="solo-criar-personagem" class="guia-abrir">+ Criar personagem para esta jornada</button></fieldset>
         <label for="solo-ideia">Minha ideia ou modificações da história</label>
         <textarea id="solo-ideia" maxlength="3000" rows="5" placeholder="Descreva onde começa, quem é seu personagem e o que gostaria de viver. Se escolher uma aventura salva, use este espaço para personalizá-la."></textarea>
@@ -161,7 +161,7 @@
         <button id="solo-voltar" type="button" class="guia-abrir">← Minhas campanhas</button>
         <div><span class="sobretitulo">CAMPANHA SOLO</span><h2 id="solo-jogo-titulo"></h2></div>
       </div>
-      <div id="solo-xp" class="mesa-xp folha" aria-live="polite"></div><div id="solo-xp-vincular" class="folha" hidden><label for="solo-xp-ficha">Vincular ficha a esta campanha</label><select id="solo-xp-ficha"></select><button type="button" id="solo-xp-confirmar">Vincular personagem</button><p class="suave">Somente recompensas futuras serão registradas.</p></div><div id="solo-trilha"></div><div class="folha"><label><input id="solo-cinema-som" type="checkbox"> Sons cinematográficos</label><label><input id="solo-cinema-visual" type="checkbox" checked> Animações cinematográficas</label><p class="suave">Efeitos de cenas novas, sem alterar os resultados da narrativa.</p></div>
+      <div id="solo-xp" class="mesa-xp folha" aria-live="polite"></div><div id="solo-recursos" class="mesa-recursos folha" aria-live="polite" hidden></div><div id="solo-xp-vincular" class="folha" hidden><label for="solo-xp-ficha">Vincular ficha a esta campanha</label><select id="solo-xp-ficha"></select><button type="button" id="solo-xp-confirmar">Vincular personagem</button><p class="suave">Somente recompensas futuras serão registradas.</p></div><div id="solo-trilha"></div><div class="folha"><label><input id="solo-cinema-som" type="checkbox"> Sons cinematográficos</label><label><input id="solo-cinema-visual" type="checkbox" checked> Animações cinematográficas</label><p class="suave">Efeitos de cenas novas, sem alterar os resultados da narrativa.</p></div>
       <div id="solo-mensagens" class="solo-mensagens" role="log" aria-label="Narração e ações da campanha" aria-live="polite"></div>
       <form id="solo-acao-form" class="folha solo-compositor">
         <label for="solo-tipo">O que deseja fazer?</label>
@@ -169,7 +169,7 @@
           <option value="acao">Ação do meu personagem</option>
           <option value="ajuste">Pedir modificação da história</option>
         </select>
-        <label for="solo-acao">Escreva sua ação ou modificação</label>
+        <div id="solo-uso-campo" hidden><label for="solo-uso">Usar item ou habilidade conquistada (opcional)</label><select id="solo-uso"><option value="">Ação livre</option></select><p class="suave">Selecione o recurso para validar nível, quantidade e custo de mana.</p></div><label for="solo-acao">Escreva sua ação ou modificação</label>
         <textarea id="solo-acao" maxlength="1600" required rows="4" placeholder="Eu me aproximo da porta e tento escutar o que acontece lá dentro..."></textarea>
         <div class="solo-acoes">
           <span class="suave">Cada ação gera uma nova resposta do Mestre IA. Limite: 30 narrações por dia para contas comuns.</span>
@@ -302,7 +302,7 @@
     <div class="ficha-layout">
       <div class="folha"><div class="painel-titulo"><h2>Minha biblioteca</h2><button id="nova-ficha" class="guia-abrir" type="button">+ Nova ficha</button></div><div id="personagens-lista"></div><p class="suave">As fichas são privadas e ficam vinculadas à sua conta.</p></div>
       <form id="f-personagem" class="folha" autocomplete="off">
-        <h2 id="ficha-form-titulo">Nova personagem</h2><div id="ficha-xp" class="mesa-xp" hidden></div>
+        <h2 id="ficha-form-titulo">Nova personagem</h2><div id="ficha-xp" class="mesa-xp" hidden></div><div id="ficha-aquisicoes" class="mesa-recursos" hidden></div>
         <nav class="ficha-abas" role="tablist" aria-label="Seções da ficha">
           <button type="button" class="ficha-aba ativa" id="aba-identidade" data-ficha-aba="identidade" role="tab" aria-selected="true" aria-controls="painel-identidade">Identidade</button>
           <button type="button" class="ficha-aba" id="aba-atributos" data-ficha-aba="atributos" role="tab" aria-selected="false" aria-controls="painel-atributos">Atributos</button>
@@ -628,7 +628,7 @@
 <script src="./email-validation.js"></script>
 <dialog id="mesa-denuncia-dialog" aria-labelledby="mesa-denuncia-titulo"><form id="mesa-denuncia-form" class="formulario"><h2 id="mesa-denuncia-titulo">Enviar denúncia</h2><p id="mesa-denuncia-alvo"></p><label for="mesa-denuncia-motivo">Motivo</label><select id="mesa-denuncia-motivo" required><option value="assedio">Assédio</option><option value="ameaca">Ameaça</option><option value="spam">Spam</option><option value="discriminacao">Discriminação</option><option value="outro">Outro</option></select><label for="mesa-denuncia-detalhes">Detalhes (opcional)</label><textarea id="mesa-denuncia-detalhes" maxlength="1000" rows="4"></textarea><p class="suave">A denúncia e, se selecionada, a mensagem denunciada serão encaminhadas à moderação. Nenhuma punição é automática.</p><p id="mesa-denuncia-status" role="status" aria-live="polite"></p><button type="submit" class="principal">Enviar denúncia</button><button id="mesa-denuncia-cancelar" type="button">Cancelar</button></form></dialog>
   <div id="campanha-cinema" class="mesa-cinema" hidden aria-live="polite"><div id="campanha-cinema-arte" aria-hidden="true"></div><p id="campanha-cinema-texto"></p><button id="campanha-cinema-fechar" type="button">Pular efeito</button></div>
-<script src="./app.js?v=portal21"></script>
+<script src="./app.js?v=portal22"></script>
 
 </body>
 </html>

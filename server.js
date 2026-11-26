@@ -6,6 +6,7 @@ const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
 const { query } = require('./postgres');
 const xpMesa=require('./xp');
+const recursosRpg=require('./recursos-rpg');
 const { gerarAventura, gerarNpc, narrarSolo } = require('./ia');
 const {rolar: calcularDadosRpg}=require('./public/dice-rules.js');
 
@@ -934,12 +935,12 @@ app.get('/api/solo/campanhas',asyncHandler(async(req,res)=>{
 app.get('/api/solo/campanhas/:id',asyncHandler(async(req,res)=>{
  const u=await soloRequerConta(req,res);if(!u)return;
  const id=soloId(req.params.id);if(!id)return res.status(400).json({erro:'Campanha inválida.'});
- const r=await query('SELECT id,titulo,genero,tom,premissa,aventura_id,turno_atual,atualizado_em,personagem_id,progressao FROM public.mesa_solo_campanhas WHERE id=$1 AND usuario_id=$2',[id,u.id]);
+ const r=await query('SELECT id,titulo,genero,tom,premissa,aventura_id,turno_atual,atualizado_em,personagem_id,progressao,recursos,modo_recursos FROM public.mesa_solo_campanhas WHERE id=$1 AND usuario_id=$2',[id,u.id]);
  if(!r.rowCount)return res.status(404).json({erro:'Campanha não encontrada.'});
- const m=await query('SELECT id,numero,papel,tipo,texto,teste,criado_em FROM public.mesa_solo_mensagens WHERE campanha_id=$1 ORDER BY numero ASC,CASE WHEN papel=\'jogador\' THEN 0 ELSE 1 END ASC',[id]);
- const c=r.rows[0],p=c.personagem_id?(await query('SELECT id,nome,dados,xp FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2',[c.personagem_id,u.id])).rows[0]:null;
+ const m=await query('SELECT id,numero,papel,tipo,texto,teste,criado_em,recursos_evento FROM public.mesa_solo_mensagens WHERE campanha_id=$1 ORDER BY numero ASC,CASE WHEN papel=\'jogador\' THEN 0 ELSE 1 END ASC',[id]);
+ const c=r.rows[0],p=c.personagem_id?(await query('SELECT id,nome,dados,xp,aquisicoes_rpg FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2',[c.personagem_id,u.id])).rows[0]:null;
  const ganhos=p?(await query("SELECT chave,quantidade,categoria FROM public.mesa_xp_historico WHERE origem='solo' AND campanha_id=$1 AND personagem_id=$2 ORDER BY id",[id,p.id])).rows:[];
- res.set('Cache-Control','private, no-store').json({campanha:c,mensagens:m.rows,xp:xpMesa.estado(p),ganhos:ganhos.map(g=>({...g,categoria:xpMesa.nomes[g.categoria]}))});
+ res.set('Cache-Control','private, no-store').json({campanha:c,mensagens:m.rows,recursos:recursosRpg.estado(p,c.recursos,c.modo_recursos),xp:xpMesa.estado(p),ganhos:ganhos.map(g=>({...g,categoria:xpMesa.nomes[g.categoria]}))});
 }));
 app.post('/api/solo/campanhas',asyncHandler(async(req,res)=>{
  const u=await soloRequerConta(req,res);if(!u)return;
@@ -947,9 +948,12 @@ app.post('/api/solo/campanhas',asyncHandler(async(req,res)=>{
  if(!GENEROS.includes(genero)||!TONS.includes(tom)||typeof titulo!=='string'||!titulo.trim()||titulo.length>140||
     typeof ideia!=='string'||ideia.length>3000||(origemId!==null&&origemId!==undefined&&!soloId(origemId)))
   return res.status(400).json({erro:'Preencha o título, gênero, tom e uma premissa válida.'});
- const personagemId=req.body?.personagemId==null?null:soloId(req.body.personagemId),progressao=req.body?.progressao??'xp';
+ const personagemId=req.body?.personagemId==null?null:soloId(req.body.personagemId),progressao=req.body?.progressao??'xp',modoRecursos=req.body?.modoRecursos??'padrao';
+ if(!['padrao','mana'].includes(modoRecursos))return res.status(400).json({erro:'Modo de recursos inválido.'});
  if((req.body?.personagemId!=null&&!personagemId)||!['xp','marcos','nenhuma'].includes(progressao))return res.status(400).json({erro:'Progressão inválida.'});
- if(personagemId&&!(await query('SELECT 1 FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2',[personagemId,u.id])).rowCount)return res.status(404).json({erro:'Personagem não encontrado.'});
+ const personagem=personagemId?(await query('SELECT id,nome,dados,xp,aquisicoes_rpg FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2',[personagemId,u.id])).rows[0]:null;
+ if(personagemId&&!personagem)return res.status(404).json({erro:'Personagem não encontrado.'});
+ const recursosIniciais=recursosRpg.estado(personagem,{},modoRecursos);
  let aventuraId=null,base='';
  if(origemId!==null&&origemId!==undefined){
   aventuraId=soloId(origemId);
@@ -963,18 +967,17 @@ app.post('/api/solo/campanhas',asyncHandler(async(req,res)=>{
  let quota=null;
  try{quota=await soloCota(u);}catch(e){return res.status(e.status||500).json({erro:e.message});}
  try{
-  const resposta=await narrarSolo({genero,tom,premissa,resumo:'',historico:[],acao:'',tipo:'inicio',inicio:true});
+  const resposta=await narrarSolo({genero,tom,premissa,resumo:'',historico:[],acao:'',tipo:'inicio',inicio:true,recursos:recursosIniciais});
   const {pool}=require('./postgres'),client=await pool.connect();
   let campanha;
   try{
    await client.query('BEGIN');
-   const r=await client.query('INSERT INTO public.mesa_solo_campanhas(usuario_id,aventura_id,titulo,genero,tom,premissa,resumo,personagem_id,progressao) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id,titulo,turno_atual,personagem_id,progressao',[u.id,aventuraId,titulo.trim(),genero,tom,premissa,resposta.resumo,personagemId,progressao]);
+   const r=await client.query('INSERT INTO public.mesa_solo_campanhas(usuario_id,aventura_id,titulo,genero,tom,premissa,resumo,personagem_id,progressao,modo_recursos,recursos) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb) RETURNING id,titulo,turno_atual,personagem_id,progressao,modo_recursos',[u.id,aventuraId,titulo.trim(),genero,tom,premissa,resposta.resumo,personagemId,progressao,modoRecursos,JSON.stringify(recursosIniciais?recursosRpg.persistir(recursosIniciais):{})]);
    campanha=r.rows[0];
    await client.query("INSERT INTO public.mesa_solo_mensagens(campanha_id,numero,papel,tipo,texto,teste) VALUES($1,0,'mestre','inicio',$2,$3::jsonb)",[campanha.id,resposta.narracao,JSON.stringify(resposta.teste)]);
    await client.query('COMMIT');
   }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
-  const p=personagemId?(await query('SELECT id,nome,dados,xp FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2',[personagemId,u.id])).rows[0]:null;
- res.status(201).json({campanha,mestre:resposta.narracao,teste:resposta.teste,xp:xpMesa.estado(p)});
+  res.status(201).json({campanha,mestre:resposta.narracao,teste:resposta.teste,xp:xpMesa.estado(personagem),recursos:recursosIniciais});
  }catch(e){await soloDevolver(quota);console.error('Falha ao iniciar solo',e.name);soloErroIA(res,e);}
 }));
 app.post('/api/solo/campanhas/:id/turnos',asyncHandler(async(req,res)=>{
@@ -988,7 +991,7 @@ app.post('/api/solo/campanhas/:id/turnos',asyncHandler(async(req,res)=>{
   return res.status(400).json({erro:'Informe uma ação, modificação ou solicitação de rolagem válida.'});
  // Evita turnos concorrentes na mesma campanha; recupera locks de funções expiradas.
  const claim=await query(
- "UPDATE public.mesa_solo_campanhas SET processando=true,atualizado_em=now() WHERE id=$1 AND usuario_id=$2 AND (processando=false OR atualizado_em<now()-interval '90 seconds') AND turno_atual<300 RETURNING id,titulo,genero,tom,premissa,resumo,turno_atual,personagem_id,progressao",[id,u.id]);
+ "UPDATE public.mesa_solo_campanhas SET processando=true,atualizado_em=now() WHERE id=$1 AND usuario_id=$2 AND (processando=false OR atualizado_em<now()-interval '90 seconds') AND turno_atual<300 RETURNING id,titulo,genero,tom,premissa,resumo,turno_atual,personagem_id,progressao,recursos,modo_recursos",[id,u.id]);
  if(!claim.rowCount){
   const own=await query('SELECT turno_atual,processando FROM public.mesa_solo_campanhas WHERE id=$1 AND usuario_id=$2',[id,u.id]);
   if(!own.rowCount)return res.status(404).json({erro:'Campanha não encontrada.'});
@@ -998,6 +1001,10 @@ app.post('/api/solo/campanhas/:id/turnos',asyncHandler(async(req,res)=>{
  let textoAcao=rolando?'':acao.trim(),rolagem=null;
  let quota=null;
  try{
+  const personagem=c.personagem_id?(await query('SELECT id,nome,dados,xp,aquisicoes_rpg FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2',[c.personagem_id,u.id])).rows[0]:null;
+  const recursos=recursosRpg.estado(personagem,c.recursos,c.modo_recursos);
+  const uso=recursosRpg.preparar(recursos,req.body?.uso,tipo);
+  if(uso)textoAcao='[Recurso escolhido e validado pelo servidor: '+JSON.stringify(uso)+']\n'+textoAcao;
   if(rolando){
    const pedido=await query("SELECT numero,teste FROM public.mesa_solo_mensagens WHERE campanha_id=$1 AND papel='mestre' ORDER BY numero DESC LIMIT 1",[id]);
    const ultima=pedido.rows[0],teste=ultima?.teste;
@@ -1038,7 +1045,7 @@ app.post('/api/solo/campanhas/:id/turnos',asyncHandler(async(req,res)=>{
   quota=await soloCota(u);
   const h=await query('SELECT papel,tipo,texto FROM public.mesa_solo_mensagens WHERE campanha_id=$1 ORDER BY numero DESC,CASE WHEN papel=\'mestre\' THEN 0 ELSE 1 END ASC LIMIT 16',[id]);
   const historico=h.rows.reverse();
-  const resposta=await narrarSolo({genero:c.genero,tom:c.tom,premissa:c.premissa,resumo:c.resumo,historico,acao:textoAcao,tipo:rolando?'rolagem':tipo,inicio:false});
+  const resposta=await narrarSolo({genero:c.genero,tom:c.tom,premissa:c.premissa,resumo:c.resumo,historico,acao:textoAcao,tipo:rolando?'rolagem':tipo,inicio:false,recursos,uso});
   const {pool}=require('./postgres'),client=await pool.connect();
   try{
    await client.query('BEGIN');
@@ -1048,8 +1055,17 @@ app.post('/api/solo/campanhas/:id/turnos',asyncHandler(async(req,res)=>{
    await client.query("INSERT INTO public.mesa_solo_mensagens(campanha_id,numero,papel,tipo,texto,teste) VALUES($1,$2,'jogador','acao',$3,NULL),($1,$2,'mestre','acao',$4,$5::jsonb)",[id,n,textoAcao,resposta.narracao,JSON.stringify(resposta.teste)]);
    let xp=null;const categoria=xpMesa.sugestao(resposta.conquista,tipo,rolagem,resposta.teste);
    if(c.personagem_id&&c.progressao==='xp'&&categoria)xp=await xpMesa.conceder(client,{personagemId:c.personagem_id,usuarioId:u.id,origem:'solo',campanhaId:id,chave:String(n),categoria});
+   let resultado=null;
+   if(personagem){
+    const p=(await client.query('SELECT id,nome,dados,xp,aquisicoes_rpg FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2 FOR UPDATE',[personagem.id,u.id])).rows[0];
+    if(!p){const e=Error('A ficha não está mais disponível.');e.status=409;throw e;}
+    resultado=recursosRpg.aplicar(p,c.recursos,c.modo_recursos,uso,resposta.teste?null:resposta.efeitos,categoria,tipo,n,id);
+    await client.query('UPDATE public.mesa_solo_campanhas SET recursos=$2::jsonb WHERE id=$1',[id,JSON.stringify(recursosRpg.persistir(resultado.estado))]);
+    await client.query('UPDATE public.personagens_dnd SET aquisicoes_rpg=$2::jsonb WHERE id=$1',[p.id,JSON.stringify(resultado.aquisicoes)]);
+    await client.query("UPDATE public.mesa_solo_mensagens SET recursos_evento=$3::jsonb WHERE campanha_id=$1 AND numero=$2 AND papel='mestre'",[id,n,JSON.stringify(resultado.eventos)]);
+   }
    await client.query('COMMIT');
-   res.json({numero:n,narracao:resposta.narracao,teste:resposta.teste,rolagem,xp});
+   res.json({numero:n,narracao:resposta.narracao,teste:resposta.teste,rolagem,xp,recursos:resultado?.estado??null,eventosRecursos:resultado?.eventos??[]});
   }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
  }catch(e){await soloDevolver(quota);if(e.status===429||e.status===409)return res.status(e.status).json({erro:e.message});console.error('Falha em turno solo',e.name);soloErroIA(res,e);}
  finally{await query('UPDATE public.mesa_solo_campanhas SET processando=false WHERE id=$1 AND usuario_id=$2 AND turno_atual=$3',[id,u.id,c.turno_atual]).catch(()=>{});}
@@ -1217,7 +1233,7 @@ app.delete('/api/personagens/:id/avatar',asyncHandler(async(req,res)=>{
 }));
 app.get('/api/personagens',asyncHandler(async(req,res)=>{
   const u=await atual(req);if(!u) return res.status(401).json({erro:'Entre na sua conta para consultar suas fichas.'});
-  const r=await query('SELECT id,nome,dados,xp,atualizado_em FROM public.personagens_dnd WHERE usuario_id=$1 ORDER BY atualizado_em DESC LIMIT 50',[u.id]);
+  const r=await query('SELECT id,nome,dados,xp,aquisicoes_rpg,atualizado_em FROM public.personagens_dnd WHERE usuario_id=$1 ORDER BY atualizado_em DESC LIMIT 50',[u.id]);
   res.json(r.rows.map(p=>({...p,progressao:xpMesa.estado(p)})));
 }));
 app.get('/api/personagens/:id/xp',asyncHandler(async(req,res)=>{

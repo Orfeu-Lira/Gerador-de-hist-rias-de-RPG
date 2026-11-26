@@ -1,0 +1,3 @@
+alter table public.mesa_solo_campanhas add column if not exists recursos jsonb not null default '{}'::jsonb, add column if not exists modo_recursos text not null default 'padrao' check (modo_recursos in ('padrao','mana'));
+alter table public.personagens_dnd add column if not exists aquisicoes_rpg jsonb not null default '{"itens":[],"habilidades":[]}'::jsonb;
+alter table public.mesa_solo_mensagens add column if not exists recursos_evento jsonb;
