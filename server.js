@@ -8,8 +8,9 @@ const bcrypt = require('bcryptjs');
 const { query } = require('./postgres');
 const xpMesa=require('./xp');
 const recursosRpg=require('./recursos-rpg');
-const { gerarAventura, gerarNpc, narrarSolo, revisarXpSolo } = require('./ia');
+const { gerarAventura, gerarNpc, narrarSolo, revisarXpSolo, revisarConquistasSolo } = require('./ia');
 const retroXp=require('./xp-retroativo');
+const resgateRpg=require('./resgate-rpg');
 const companheirosSolo=require('./companheiros');
 const {rolar: calcularDadosRpg}=require('./public/dice-rules.js');
 
@@ -791,6 +792,7 @@ app.use(['/api/gerar','/api/npcs/gerar','/api/dnd/ajuda'],modoManutencao);
 app.post('/api/solo/campanhas',modoManutencao);
 app.post('/api/solo/campanhas/:id/turnos',modoManutencao);
 app.post('/api/solo/campanhas/:id/xp-retroativo',modoManutencao);
+app.post('/api/solo/campanhas/:id/resgate-conquistas',modoManutencao);
 app.post('/api/gerar',asyncHandler(async(req,res) => {
   const {genero,tom,ideia} = req.body || {};
   const jogadores=Number(req.body?.jogadores);
@@ -985,7 +987,7 @@ app.get('/api/solo/campanhas/:id',asyncHandler(async(req,res)=>{
  const c=r.rows[0],p=c.personagem_id?(await query('SELECT id,nome,dados,xp,aquisicoes_rpg FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2',[c.personagem_id,u.id])).rows[0]:null;
  const ganhos=p?(await query("SELECT chave,quantidade,categoria FROM public.mesa_xp_historico WHERE origem='solo' AND campanha_id=$1 AND personagem_id=$2 ORDER BY id",[id,p.id])).rows:[];
  const recursos=recursosRpg.estado(p,c.recursos,c.modo_recursos);
- res.set('Cache-Control','private, no-store').json({campanha:c,mensagens:m.rows,recursos,companheiros:companheirosSolo.estado(c.recursos),fichaSolo:recursosRpg.fichaSolo(p,recursos),xp:xpMesa.estado(p),retroXP:retroXp.progresso(c.recursos,c.turno_atual),ganhos:ganhos.map(g=>({...g,categoria:xpMesa.nomes[g.categoria]}))});
+ res.set('Cache-Control','private, no-store').json({campanha:c,mensagens:m.rows,recursos,companheiros:companheirosSolo.estado(c.recursos),fichaSolo:recursosRpg.fichaSolo(p,recursos),xp:xpMesa.estado(p),retroXP:retroXp.progresso(c.recursos,c.turno_atual),resgateRpg:resgateRpg.publico(resgateRpg.progresso(c.recursos,c.turno_atual)),ganhos:ganhos.map(g=>({...g,categoria:xpMesa.nomes[g.categoria]}))});
 }));
 app.post('/api/solo/campanhas',asyncHandler(async(req,res)=>{
  const u=await soloRequerConta(req,res);if(!u)return;
@@ -1208,6 +1210,36 @@ app.post('/api/solo/campanhas/:id/xp-retroativo',asyncHandler(async(req,res)=>{
   }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
  }catch(e){if(e.status===409)return res.status(409).json({erro:e.message});return res.status(503).json({erro:'A revisão de XP não foi concluída. Nenhum XP deste lote foi registrado. Tente novamente.'});}
  finally{if(chaveRetro&&!confirmado)await soloDevolver(chaveRetro);await query("UPDATE public.mesa_solo_campanhas SET processando=false WHERE id=$1 AND usuario_id=$2 AND atualizado_em::text=$3",[id,u.id,c.trava]).catch(()=>{});}
+}));
+app.post('/api/solo/campanhas/:id/resgate-conquistas',asyncHandler(async(req,res)=>{
+ const u=await soloRequerConta(req,res);if(!u)return;const id=soloId(req.params.id);if(!id)return res.status(400).json({erro:'Campanha inválida.'});
+ const claim=await query("UPDATE public.mesa_solo_campanhas SET processando=true,atualizado_em=now() WHERE id=$1 AND usuario_id=$2 AND personagem_id IS NOT NULL AND (NOT processando OR atualizado_em<now()-interval '120 seconds') RETURNING personagem_id,recursos,turno_atual,modo_recursos,atualizado_em::text AS trava",[id,u.id]);
+ if(!claim.rowCount)return res.status(409).json({erro:'Vincule sua ficha e aguarde a narração.'});
+ const c=claim.rows[0],s=resgateRpg.progresso(c.recursos,c.turno_atual);let quota=null,confirmado=false;
+ try{
+  if(s.concluido)return res.json(resgateRpg.publico(s));
+  const fim=Math.min(s.ate,s.cursor+8);
+  const m=await query("SELECT numero,papel,tipo,texto,teste FROM public.mesa_solo_mensagens WHERE campanha_id=$1 AND numero>$2 AND numero<=$3 ORDER BY numero,CASE WHEN papel='jogador' THEN 0 ELSE 1 END",[id,s.cursor,fim]);
+  const candidatos=resgateRpg.candidatos(m.rows);
+  if(candidatos.length&&!iaIlimitada(u)){const key='xp-retro:'+u.id+':'+new Date().toISOString().slice(0,10),q=await query("INSERT INTO public.geracoes_limite(identificador,total) VALUES($1,1) ON CONFLICT(identificador) DO UPDATE SET total=public.geracoes_limite.total+1 WHERE public.geracoes_limite.total<30 RETURNING total",[key]);if(!q.rowCount)return res.status(429).json({erro:'Limite diário de revisões atingido. Continue amanhã.'});quota=key;}
+  const retorno=candidatos.length?await revisarConquistasSolo(candidatos,s.pendentes):[];
+  s.pendentes=resgateRpg.revisar(s,candidatos,retorno);s.cursor=fim;
+  const {pool}=require('./postgres'),client=await pool.connect();
+  try{await client.query('BEGIN');
+   const atual=(await client.query('SELECT personagem_id,recursos,processando,modo_recursos,atualizado_em::text AS trava FROM public.mesa_solo_campanhas WHERE id=$1 AND usuario_id=$2 FOR UPDATE',[id,u.id])).rows[0];
+   if(!atual||!atual.processando||atual.trava!==c.trava||String(atual.personagem_id)!==String(c.personagem_id)){const e=Error('A campanha mudou durante a revisão. Tente novamente.');e.status=409;throw e;}
+   let companheiros=companheirosSolo.estado(atual.recursos);
+   if(fim>=s.ate){
+    const p=(await client.query('SELECT id,nome,dados,xp,aquisicoes_rpg FROM public.personagens_dnd WHERE id=$1 AND usuario_id=$2 FOR UPDATE',[c.personagem_id,u.id])).rows[0];if(!p){const e=Error('Ficha não encontrada.');e.status=409;throw e;}
+    const logs=(await client.query("SELECT recursos_evento FROM public.mesa_solo_mensagens WHERE campanha_id=$1 AND papel='mestre' AND recursos_evento IS NOT NULL",[id])).rows;
+    const r=resgateRpg.aplicar(p,atual.recursos,s,logs,id,atual.modo_recursos);companheiros=r.companheiros;s.resultado=r.resultado;s.concluido=true;s.pendentes=[];
+    await client.query('UPDATE public.personagens_dnd SET aquisicoes_rpg=$2::jsonb,atualizado_em=now() WHERE id=$1',[p.id,JSON.stringify(r.aquisicoes)]);
+   }
+   await client.query('UPDATE public.mesa_solo_campanhas SET recursos=$2::jsonb,processando=false,atualizado_em=now() WHERE id=$1',[id,JSON.stringify({...atual.recursos,companheiros,resgateRpg:s})]);
+   await client.query('COMMIT');confirmado=true;res.json(resgateRpg.publico(s));
+  }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
+ }catch(e){return res.status(e.status===409?409:503).json({erro:e.status===409?e.message:'A revisão não foi concluída. Nenhum resgate deste lote foi registrado; tente novamente.'});}
+ finally{if(quota&&!confirmado)await soloDevolver(quota);await query("UPDATE public.mesa_solo_campanhas SET processando=false WHERE id=$1 AND usuario_id=$2 AND atualizado_em::text=$3",[id,u.id,c.trava]).catch(()=>{});}
 }));
 app.delete('/api/solo/campanhas/:id',asyncHandler(async(req,res)=>{
  const u=await soloRequerConta(req,res);if(!u)return;

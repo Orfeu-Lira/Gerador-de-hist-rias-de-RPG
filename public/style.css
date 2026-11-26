@@ -1309,3 +1309,5 @@ body.mesa-alto-contraste .solo-ficha-item :is(p,span,strong){color:#111}
  #solo-personagem-dialog .solo-ficha-item{max-width:100%}
  #solo-personagem-abrir span{display:inline}
 }
+
+.solo-resgate-item{padding:8px 0;border-bottom:1px solid #d8c9ac;overflow-wrap:anywhere}.solo-resgate-item summary{cursor:pointer;font-weight:600}.solo-resgate-item p{margin:5px 0;font-size:.85rem}

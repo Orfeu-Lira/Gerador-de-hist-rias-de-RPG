@@ -10,6 +10,7 @@ function estado(p,c,nivel,modo){
  const max=slots[nivel-1].slice(),mapa=new Map(),g=c?.grimorio||{};
  const add=m=>{if(m&&m.circulo<=max.length)mapa.set(m.id,{id:m.id,nome:m.nome,circulo:m.circulo});};
  for(const r of p.aquisicoes_rpg?.evolucaoNivel||[])if(r.regra==='dnd'&&r.classe==='Mago'&&r.nivel<=nivel)for(const x of r.escolhas||[])add(evolucao.magias.find(m=>m.id===x.id));
+ for(const h of p.aquisicoes_rpg?.habilidades||[])if(h.tipo==='Magia'&&h.grimorioRetro===true)add(identificar(h.nome));
  for(const h of p.dados?.habilidades||[])if(h.tipo==='Magia'&&h.treinavel!==false&&!String(h.descricao||'').startsWith('Ideia narrativa para discutir com o mestre;'))add(identificar(h.nome));
  const conhecidas=[...mapa.values()].sort((a,b)=>a.circulo-b.circulo||a.nome.localeCompare(b.nome));
  const preparadas=[...new Set(Array.isArray(g.preparadas)?g.preparadas.filter(id=>mapa.has(id)):[])].slice(0,limites[nivel-1]);
