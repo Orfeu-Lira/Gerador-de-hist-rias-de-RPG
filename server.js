@@ -514,7 +514,7 @@ async function comCampanha(req,res,fn){
 }
 const campanhaErro=(erro,status=403)=>({status,dados:{erro}});
 app.get('/api/comunidade/campanhas/:id',asyncHandler(async(req,res)=>{
- const depois=req.query.depois;if(depois!==undefined&&!/^[1-9][0-9]{0,17}$/.test(String(depois)))return res.status(400).json({erro:'Cursor inválido.'});
+ const depois=req.query.depois;if(depois!==undefined&&!/^(0|[1-9][0-9]{0,17})$/.test(String(depois)))return res.status(400).json({erro:'Cursor inválido.'});
  await comCampanha(req,res,async(client,s,u,bloqueado)=>{
  if(s.estado!=='ativo'||bloqueado)return campanhaErro('Acesso à campanha indisponível.');
  const membros=await client.query(`SELECT p.apelido,m.estado,m.usuario_id=$2 AS eu,m.usuario_id=$3 AS mestre FROM public.mesa_campanha_membros m JOIN public.mesa_perfis p ON p.usuario_id=m.usuario_id WHERE m.campanha_id=$1 AND (m.estado='ativo' OR $4::boolean) ORDER BY mestre DESC,p.apelido`,[s.id,u.id,s.mestre,s.minha]);
