@@ -1901,6 +1901,22 @@ function amigosLimpar(){
  for(const id of ['amigos-resultados','amigos-recebidas','amigos-enviadas','amigos-lista','amigos-bloqueados'])$(id).replaceChildren();
  $('amigos-termo').value='';$('amigos-status').textContent='';
 }
+let denunciaAlvo=null;
+function abrirDenuncia(apelido,mensagemId=null){
+ denunciaAlvo={apelido,mensagemId};$('mesa-denuncia-form').reset();
+ $('mesa-denuncia-alvo').textContent='Denunciar '+apelido+(mensagemId?' — mensagem recebida':'');
+ $('mesa-denuncia-status').textContent='';$('mesa-denuncia-dialog').showModal();
+}
+$('mesa-denuncia-cancelar').onclick=()=>$('mesa-denuncia-dialog').close();
+$('mesa-denuncia-dialog').addEventListener('close',()=>{denunciaAlvo=null;$('mesa-denuncia-form').reset();});
+$('mesa-denuncia-form').onsubmit=async ev=>{
+ ev.preventDefault();if(!denunciaAlvo)return;
+ const b=ev.currentTarget.querySelector('button[type="submit"]');b.disabled=true;
+ try{
+ const r=await api('/api/comunidade/denuncias','POST',{...denunciaAlvo,motivo:$('mesa-denuncia-motivo').value,detalhes:$('mesa-denuncia-detalhes').value.trim()});
+ $('mesa-denuncia-dialog').close();aviso(r.repetida?'Esta denúncia já foi registrada.':'Denúncia encaminhada à moderação.',true);
+ }catch(e){$('mesa-denuncia-status').textContent=e.message;}finally{b.disabled=false;}
+};
 function amigoLinha(alvo,apelido,acoes){
  const linha=el('div','','mesa-amigo-linha');linha.append(el('strong',apelido));
  const botoes=el('div','','mesa-amigo-acoes');
@@ -1909,6 +1925,7 @@ function amigoLinha(alvo,apelido,acoes){
  b.disabled=true;
  try{await api('/api/comunidade/amizade','POST',{apelido,acao});await carregarAmigos();$('amigos-resultados').replaceChildren();$('amigos-status').textContent='Operação concluída.';}catch(e){$('amigos-status').textContent=e.message;}finally{b.disabled=false;}
  };botoes.append(b);}
+ const denunciar=el('button','Denunciar');denunciar.type='button';denunciar.onclick=()=>abrirDenuncia(apelido);botoes.append(denunciar);
  linha.append(botoes);alvo.append(linha);
 }
 async function carregarAmigos(){
@@ -1986,7 +2003,7 @@ function pintarMensagens(rolar=false){
  if(!msgHistorico.length)h.append(el('p','Nenhuma mensagem ainda.','suave'));
  for(const m of msgHistorico){
  const linha=el('article','','mesa-chat-bolha'+(m.minha?' minha':''));
- linha.append(el('strong',m.minha?'Você':msgDestino),el('p',m.texto),el('small',new Date(m.criado_em).toLocaleString('pt-BR')));h.append(linha);
+ linha.append(el('strong',m.minha?'Você':msgDestino),el('p',m.texto),el('small',new Date(m.criado_em).toLocaleString('pt-BR')));if(!m.minha){const destino=msgDestino,b=el('button','Denunciar mensagem','link');b.type='button';b.onclick=()=>abrirDenuncia(destino,m.id);linha.append(b);}h.append(linha);
  }
  if(rolar)h.scrollTop=h.scrollHeight;else h.scrollTop=pos+Math.max(0,h.scrollHeight-altura);
  $('mensagens-antigas').hidden=!msgMais;
@@ -2306,6 +2323,26 @@ async function adminExibirAuditoria(alvo){
  const area=add('div',alvo,'','admin-lista');
  r.forEach(item=>{const art=add('article',area,'','admin-registro');add('strong',art,item.acao);add('p',art,(item.administrador||'Administrador removido')+' · '+new Date(item.criado_em).toLocaleString('pt-BR')+' · '+(item.alvo_tipo||'sistema')+' #'+(item.alvo_id||'—'),'suave');});
 }
+async function adminExibirModeracao(alvo){
+ adminTitulo(alvo,'Moderação da comunidade','Denúncias são analisadas individualmente. Apenas a mensagem explicitamente denunciada é exibida, não a conversa inteira.');
+ const lista=await api('/api/admin/denuncias');
+ if(!lista.length)add('p',alvo,'Nenhuma denúncia registrada.','suave');
+ const rotulos={assedio:'Assédio',ameaca:'Ameaça',spam:'Spam',discriminacao:'Discriminação',outro:'Outro'};
+ for(const d of lista){
+ const art=add('article',alvo,'','admin-registro');
+ add('h3',art,'#'+d.id+' · '+(rotulos[d.motivo]||d.motivo));
+ add('p',art,'Denunciado: '+d.denunciado+' · Denunciante: '+d.denunciante+' · Estado: '+d.estado);
+ add('p',art,new Date(d.criado_em).toLocaleString('pt-BR'),'suave');
+ if(d.detalhes)add('p',art,'Detalhes: '+d.detalhes);
+ if(d.mensagem)add('p',art,'Mensagem denunciada: '+d.mensagem,'mesa-denuncia-evidencia');
+ if(d.estado==='pendente'){
+ for(const estado of ['procedente','improcedente'])botaoAdmin(art,estado==='procedente'?'Considerar procedente':'Considerar improcedente',()=>acaoAdmin(async()=>{
+ if(!confirm('Registrar decisão '+estado+'?'))return;
+ await api('/api/admin/denuncias/'+d.id,'PATCH',{estado});await carregarResumo();
+ },'Decisão registrada.'));
+ }
+ }
+}
 async function carregarResumo(){
  const alvo=$('resumo');alvo.replaceChildren();
  if(eu.papel!=='admin')return;
@@ -2316,6 +2353,7 @@ async function carregarResumo(){
   else if(adminSecao==='usuarios')await adminExibirUsuarios(alvo);
   else if(adminSecao==='novidades'||adminSecao==='conteudos')await adminExibirPublicacoes(alvo,adminSecao==='novidades'?'comunicados':'conteudos');
   else if(adminSecao==='suporte')await adminExibirSuporte(alvo);
+  else if(adminSecao==='moderacao')await adminExibirModeracao(alvo);
   else if(adminSecao==='config')await adminExibirConfig(alvo);
   else if(adminSecao==='auditoria')await adminExibirAuditoria(alvo);
  }catch(e){add('p',alvo,'Não foi possível carregar esta seção: '+e.message,'admin-atencao');}
