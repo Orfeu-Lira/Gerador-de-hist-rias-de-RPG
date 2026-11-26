@@ -468,6 +468,7 @@ app.get('/api/comunidade/notificacoes',asyncHandler(async(req,res)=>{
  SELECT (SELECT count(*)::int FROM permitidos WHERE estado='pendente' AND solicitante<>$1) AS solicitacoes,
  (SELECT count(*)::int FROM public.mesa_mensagens_privadas m JOIN permitidos a ON a.pessoa=m.remetente AND a.estado='aceita' WHERE m.destinatario=$1 AND m.lida_em IS NULL) AS mensagens,
  (SELECT count(*)::int FROM public.mesa_fichas_compartilhadas f JOIN public.personagens_dnd p ON p.id=f.personagem_id JOIN permitidos a ON a.pessoa=p.usuario_id AND a.estado='aceita' WHERE f.destinatario=$1 AND f.vista_em IS NULL) AS fichas,
+ (SELECT count(*)::int FROM public.mesa_campanha_membros m JOIN public.mesa_campanhas_online c ON c.id=m.campanha_id JOIN permitidos a ON a.pessoa=c.mestre AND a.estado='aceita' WHERE m.usuario_id=$1 AND m.estado='convidado' AND NOT c.encerrada) AS convites,
  (SELECT CASE WHEN $2::boolean THEN count(*)::int ELSE 0 END FROM public.mesa_denuncias WHERE estado='pendente') AS denuncias`,[u.id,u.papel==='admin']);
  res.json(r.rows[0]);
 }));
@@ -602,21 +603,25 @@ app.delete('/api/conta/perfil/foto',asyncHandler(async(req,res)=>{
 app.get('/api/conta/meus-dados',asyncHandler(async(req,res)=>{
  const u=await atual(req);
  if(!u)return res.status(401).json({erro:'Entre na sua conta para exportar seus dados.'});
- const [perfil,aventuras,personagens,npcs,campanhas,mensagens,suporte]=await Promise.all([
+ const [perfil,aventuras,personagens,npcs,campanhas,mensagens,suporte,sociais,online,eventosOnline,denuncias]=await Promise.all([
   query('SELECT u.email,u.papel,u.criado_em,u.ultimo_login_em,u.termos_aceitos_em,u.termos_versao,p.nome AS nome_exibicao,p.tratamento,p.apelido,p.bio,p.encontravel FROM public.usuarios u LEFT JOIN public.mesa_perfis p ON p.usuario_id=u.id WHERE u.id=$1',[u.id]),
   query('SELECT id,genero,tom,jogadores,conteudo,criado_em FROM public.aventuras WHERE usuario_id=$1 ORDER BY id DESC LIMIT 1000',[u.id]),
   query('SELECT id,nome,dados,criado_em,atualizado_em FROM public.personagens_dnd WHERE usuario_id=$1 ORDER BY id DESC LIMIT 1000',[u.id]),
   query('SELECT id,aventura_id,conteudo,criado_em FROM public.mesa_npcs WHERE usuario_id=$1 ORDER BY id DESC LIMIT 1000',[u.id]),
   query('SELECT id,aventura_id,titulo,genero,tom,premissa,resumo,turno_atual,criado_em,atualizado_em FROM public.mesa_solo_campanhas WHERE usuario_id=$1 ORDER BY id DESC LIMIT 1000',[u.id]),
   query('SELECT m.id,m.campanha_id,m.numero,m.papel,m.tipo,m.texto,m.teste,m.criado_em FROM public.mesa_solo_mensagens m JOIN public.mesa_solo_campanhas c ON c.id=m.campanha_id WHERE c.usuario_id=$1 ORDER BY m.id DESC LIMIT 1000',[u.id]),
-  query('SELECT id,assunto,mensagem,resposta,status,criado_em,atualizado_em FROM public.mesa_chamados WHERE usuario_id=$1 ORDER BY id DESC LIMIT 1000',[u.id])
+  query('SELECT id,assunto,mensagem,resposta,status,criado_em,atualizado_em FROM public.mesa_chamados WHERE usuario_id=$1 ORDER BY id DESC LIMIT 1000',[u.id]),
+  query('SELECT id,texto,criado_em,lida_em FROM public.mesa_mensagens_privadas WHERE remetente=$1 ORDER BY id DESC LIMIT 1000',[u.id]),
+  query('SELECT c.id,c.titulo,c.descricao,c.encerrada,m.estado,c.mestre=$1 AS mestre FROM public.mesa_campanha_membros m JOIN public.mesa_campanhas_online c ON c.id=m.campanha_id WHERE m.usuario_id=$1 ORDER BY c.id DESC LIMIT 1000',[u.id]),
+  query('SELECT id,campanha_id,tipo,texto,efeito,cor,criado_em FROM public.mesa_campanha_eventos WHERE autor=$1 ORDER BY id DESC LIMIT 1000',[u.id]),
+  query('SELECT id,motivo,detalhes,estado,criado_em,revisado_em FROM public.mesa_denuncias WHERE autor=$1 ORDER BY id DESC LIMIT 1000',[u.id])
  ]);
  res.set({'Cache-Control':'private, no-store','Content-Disposition':'attachment; filename="mesa-meus-dados.json"','X-Content-Type-Options':'nosniff'});
  res.type('application/json').send(JSON.stringify({
   exportadoEm:new Date().toISOString(),tipo:'exportacao_autosservico_limitada',
   observacao:'Até 1000 registros por coleção. Fotos originais, sessões, logs técnicos e outros registros não integram este arquivo. Solicite acesso adicional pelo Suporte (LGPD).',
   conta:perfil.rows[0],aventuras:aventuras.rows,personagens:personagens.rows,npcs:npcs.rows,
-  campanhasSolo:campanhas.rows,mensagensSolo:mensagens.rows,chamadosSuporte:suporte.rows
+  campanhasSolo:campanhas.rows,mensagensSolo:mensagens.rows,chamadosSuporte:suporte.rows,mensagensPrivadasEnviadas:sociais.rows,campanhasOnline:online.rows,eventosOnlineProprios:eventosOnline.rows,denunciasEnviadas:denuncias.rows
  }));
 }));
 // Limpeza recuperável: somente caminhos previamente enfileirados em transação,
