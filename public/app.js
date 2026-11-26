@@ -60,7 +60,7 @@ async function api(url, metodo = 'GET', corpo) {
 function aviso(texto, bom) { const a = $('aviso'); a.textContent = texto || ''; a.className = bom ? 'bom' : ''; }
 
 // ---- Navegação entre telas ----
-const TELAS = ['gerador','solo','dados','historico','personagens','assistente','tutorial','novidades','suporte','instalar','conta','admin','privacidade','termos','musica','inicio','perfil','opcoes','amigos','compartilhadas','mensagens'];
+const TELAS = ['gerador','solo','dados','historico','personagens','assistente','tutorial','novidades','suporte','instalar','conta','admin','privacidade','termos','musica','inicio','perfil','opcoes','amigos','compartilhadas','mensagens','campanhas'];
 // Mantém o player no mesmo documento e fora das configurações de acessibilidade.
 (function separarMusica(){
   const player=$('musica-ambiente');
@@ -259,8 +259,9 @@ function mostrar(tela) {
   if(tela!=='amigos'&&mesaTelaVisivel==='amigos')amigosLimpar();
   if(tela!=='compartilhadas'&&mesaTelaVisivel==='compartilhadas')limparCompartilhadas();
   if(tela!=='mensagens'&&mesaTelaVisivel==='mensagens')limparMensagens();
+  if(tela!=='campanhas'&&mesaTelaVisivel==='campanhas')limparCampanha();
   if(tela!=='perfil'&&mesaTelaVisivel==='perfil'){perfilRequisicao++;limparFotoPerfil();$('perfil-nome').value='';$('perfil-email').value='';}
-  if(!eu.logado&&['historico','personagens','assistente','admin','perfil','amigos','compartilhadas','mensagens'].includes(tela))tela='conta';
+  if(!eu.logado&&['historico','personagens','assistente','admin','perfil','amigos','compartilhadas','mensagens','campanhas'].includes(tela))tela='conta';
   if(tela==='admin'&&eu.papel!=='admin')tela='gerador';
   if(tela==='musica'&&mesaTelaVisivel&&mesaTelaVisivel!=='musica')mesaAntesDaMusica=mesaTelaVisivel;
   estadoNavegacao.gravar('tela',tela);
@@ -285,6 +286,7 @@ function mostrar(tela) {
   if (tela === 'amigos') carregarAmigos();
   if (tela === 'compartilhadas') carregarCompartilhadas();
   if (tela === 'mensagens') iniciarMensagens();
+  if (tela === 'campanhas') iniciarCampanhas();
   if (tela === 'inicio') mesaSaudacao();
 }
 $('abrir-tutorial-menu').onclick=()=>navegarMesa('tutorial');
@@ -389,7 +391,7 @@ function montarNav() {
    const corpo=el('div','','mesa-nav-itens');for(const x of itens)corpo.append(item(...x));d.append(corpo);nav.append(d);
   }
   nav.append(item('inicio','⌂','Início'));
-  grupo('Aventuras',[['gerador','✦','Gerador de histórias',false],['gerador','♙','Gerador de NPCs',true],['solo','✧','RPG Solo'],...(eu.logado?[['historico','▤','Minhas aventuras']]:[])]);
+  grupo('Aventuras',[['gerador','✦','Gerador de histórias',false],['gerador','♙','Gerador de NPCs',true],['solo','✧','RPG Solo'],...(eu.logado?[['campanhas','⚔','Campanhas online'],['historico','▤','Minhas aventuras']]:[])]);
   grupo('Ferramentas',[...(eu.logado?[['personagens','♙','Personagens'],['assistente','✧','Tutor D&D']]:[]),['dados','◇','Oráculo dos dados'],['musica','♫','Música']]);
   grupo('Comunidade',[...(eu.logado?[['amigos','♙','Amigos'],['compartilhadas','▤','Fichas compartilhadas'],['mensagens','✉','Mensagens']]:[]),['novidades','✦','Novidades'],['tutorial','❖','Tutorial'],...(eu.logado?[['suporte','✉','Suporte']]:[])]);
   grupo('Minha conta',[...(eu.logado?[['perfil','♙','Meu perfil']]:[['conta','↪','Entrar']]),['opcoes','⚙','Opções'],['instalar','⬇','Instalar Mesa']]);
@@ -2078,6 +2080,123 @@ $('mensagens-form').onsubmit=async ev=>{
  msgPendente=null;$('mensagens-status').textContent='Mensagem enviada.';await buscarMensagens();await atualizarConversas();
  }catch(e){if(v===msgVersao)$('mensagens-status').textContent=e.message;}finally{b.disabled=false;}
 };
+// Campanhas compartilhadas e biblioteca audiovisual local.
+let campanhaId=null,campanhaVersao=0,campanhaTimer=null,campanhaCursor=null,campanhaCarregando=false,campanhaMestre=false,campanhaEncerrada=false,campanhaPendente=null,cinemaTimer=null,cinemaAudio=null,cinemaNos=[];
+const campanhaBase='/api/comunidade/campanhas';
+const campanhaStatus=t=>{$('campanha-status').textContent=t;};
+function fecharCinema(){clearTimeout(cinemaTimer);$('campanha-cinema').hidden=true;$('campanha-cinema-arte').replaceChildren();for(const n of cinemaNos){try{n.stop();}catch{}}cinemaNos=[];}
+$('campanha-cinema-fechar').onclick=fecharCinema;
+$('campanha-som').onchange=async()=>{if(!$('campanha-som').checked){fecharCinema();return;}try{cinemaAudio=cinemaAudio||new(window.AudioContext||window.webkitAudioContext)();await cinemaAudio.resume();campanhaStatus('Sons cinematográficos ativados.');}catch{ $('campanha-som').checked=false;campanhaStatus('Não foi possível ativar o áudio.');}};
+function somCinema(efeito){
+ if(!$('campanha-som').checked||!cinemaAudio||cinemaAudio.state!=='running')return;
+ const ctx=cinemaAudio,t=ctx.currentTime;
+ const dur=efeito==='dragao_fogo'?2.8:efeito==='dragao'?1.7:efeito==='tempestade'?2.2:1.3;
+ const gain=ctx.createGain();gain.gain.setValueAtTime(.001,t);gain.gain.exponentialRampToValueAtTime(.13,t+.09);gain.gain.exponentialRampToValueAtTime(.001,t+dur);gain.connect(ctx.destination);
+ const buf=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*dur),ctx.sampleRate),arr=buf.getChannelData(0);for(let i=0;i<arr.length;i++)arr[i]=Math.random()*2-1;
+ const noise=ctx.createBufferSource();noise.buffer=buf;
+ const filter=ctx.createBiquadFilter();filter.type='lowpass';filter.frequency.setValueAtTime(efeito==='dragao_fogo'?1500:efeito==='magia'?2400:240,t);filter.frequency.exponentialRampToValueAtTime(efeito==='dragao_fogo'?300:80,t+dur);noise.connect(filter);filter.connect(gain);noise.start(t);cinemaNos.push(noise);
+ const osc=ctx.createOscillator();osc.type=efeito==='magia'?'sine':'sawtooth';osc.frequency.setValueAtTime(efeito==='magia'?280:95,t);osc.frequency.exponentialRampToValueAtTime(efeito==='magia'?880:35,t+dur);const g=ctx.createGain();g.gain.value=.15;osc.connect(g);g.connect(gain);osc.start(t);osc.stop(t+dur);cinemaNos.push(osc);
+}
+function arteDragao(cor,fogo){
+ const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 600 300');svg.setAttribute('class','mesa-dragao');
+ const paleta={vermelho:'#bd4936',verde:'#4d9862',azul:'#477bc4',preto:'#45465b',branco:'#e6e6e1',dourado:'#cba652'},base=paleta[cor]||paleta.vermelho;
+ function path(d,fill,classe){const p=document.createElementNS(ns,'path');p.setAttribute('d',d);p.setAttribute('fill',fill);p.setAttribute('stroke','#1d242a');p.setAttribute('stroke-width','3');if(classe)p.setAttribute('class',classe);svg.append(p);}
+ path('M280 154 Q185 38 85 30 L116 90 68 96 150 136 124 169 270 193Z',base,'mesa-asa');
+ path('M310 160 Q392 28 491 26 L462 86 512 105 432 143 455 167 320 194Z',base,'mesa-asa direita');
+ path('M220 202 Q147 217 74 178 Q34 164 24 202 Q74 240 144 241 L260 229Z',base);
+ path('M160 213 Q185 151 272 151 Q324 144 346 111 L361 69 392 61 420 83 447 99 430 118 389 124 Q380 185 341 215 L350 263 318 261 296 219 249 225 228 262 194 260 204 223Z',base);
+ path('M354 75 L349 39 376 63 391 39 398 66Z','#e3c68e');
+ path('M402 93 L418 96 408 102Z','#ffe984');
+ path('M390 120 L429 118 410 129Z','#25252b');
+ if(fogo){path('M433 118 Q477 82 526 122 L591 112 548 145 588 163 Q503 180 433 130Z','#ea7332','mesa-fogo');path('M439 123 Q478 109 545 139 Q501 154 439 129Z','#ffe090','mesa-fogo nucleo');}
+ return svg;
+}
+function exibirCinema(e){
+ if(e.efeito==='nenhum'||document.hidden)return;
+ fecharCinema();somCinema(e.efeito);
+ if(!$('campanha-visual').checked)return;
+ const painel=$('campanha-cinema'),arte=$('campanha-cinema-arte');
+ painel.className='mesa-cinema efeito-'+e.efeito+(mesaMovimentoReduzido()?' sem-movimento':'');
+ if(e.efeito.startsWith('dragao'))arte.append(arteDragao(e.cor,e.efeito==='dragao_fogo'));
+ else {const simbolo=el('div',{trovao:'ϟ',explosao:'✹',magia:'✧',tempestade:'☁'}[e.efeito]||'✦','mesa-cinema-simbolo');arte.append(simbolo);}
+ $('campanha-cinema-texto').textContent=e.texto.slice(0,300);painel.hidden=false;cinemaTimer=setTimeout(fecharCinema,4200);
+}
+function detectarCinema(texto){
+ const t=texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+ const dragao=/\bdrag(?:ao|oes)\b/.test(t),fogo=/\b(cospe|cuspiu|cuspindo|sopro|sopra|lanca)\b.{0,45}\b(fogo|chamas)\b/.test(t);
+ let efeito=dragao?(fogo?'dragao_fogo':'dragao'):/\btrovao\b/.test(t)?'trovao':/\bexplosao\b/.test(t)?'explosao':/\btempestade\b/.test(t)?'tempestade':/\b(magia|feitico)\b/.test(t)?'magia':'nenhum';
+ const cor=[['vermelh','vermelho'],['verd','verde'],['azul','azul'],['negr|pret','preto'],['branc','branco'],['dourad','dourado']].find(([k])=>new RegExp(k).test(t))?.[1]||'vermelho';
+ return {efeito,cor};
+}
+function limparCampanha(){
+ clearInterval(campanhaTimer);campanhaTimer=null;campanhaVersao++;campanhaId=null;campanhaCursor=null;campanhaCarregando=false;campanhaPendente=null;
+ fecharCinema();$('campanha-historico').replaceChildren();$('campanha-membros').replaceChildren();$('campanha-amigo').replaceChildren();$('campanhas-lista').replaceChildren();$('campanha-texto').value='';$('campanha-sala').hidden=true;$('campanhas-lobby').hidden=false;campanhaStatus('');
+}
+async function carregarCampanhas(){
+ const v=campanhaVersao;
+ try{const lista=await api(campanhaBase);if(v!==campanhaVersao||mesaTelaVisivel!=='campanhas')return;
+ const alvo=$('campanhas-lista');alvo.replaceChildren();
+ if(!lista.length)alvo.append(el('p','Nenhuma mesa ou convite por enquanto.','suave'));
+ for(const s of lista){const card=el('article','','mesa-amigo-linha');const info=el('div');info.append(el('strong',s.titulo),el('p','Mestre: '+s.mestre+(s.encerrada?' · Encerrada':s.estado==='convidado'?' · Convite pendente':''),'suave'));card.append(info);
+ const b=el('button',s.estado==='convidado'?'Aceitar convite':'Abrir mesa');b.type='button';b.disabled=s.encerrada&&s.estado==='convidado';b.onclick=async()=>{try{if(s.estado==='convidado')await api(campanhaBase+'/'+s.id+'/membros','POST',{acao:'aceitar'});await abrirCampanha(s.id);}catch(e){campanhaStatus(e.message);}};card.append(b);
+ if(s.estado==='convidado'){const rec=el('button','Recusar');rec.type='button';rec.onclick=async()=>{try{await api(campanhaBase+'/'+s.id+'/membros','POST',{acao:'sair'});await carregarCampanhas();}catch(e){campanhaStatus(e.message);}};card.append(rec);}
+ alvo.append(card);}
+ }catch(e){if(v===campanhaVersao)campanhaStatus(e.message);}
+}
+async function preencherConvites(){
+ const v=campanhaVersao;const lista=await api('/api/comunidade/amigos');if(v!==campanhaVersao)return;
+ const sel=$('campanha-amigo');sel.replaceChildren(new Option('Escolha um amigo',''));for(const a of lista.filter(a=>a.estado==='aceita'))sel.append(new Option(a.apelido,a.apelido));
+}
+function atualizarTipoCampanha(){$('campanha-efeitos').hidden=!campanhaMestre||$('campanha-tipo').value!=='narracao';}
+$('campanha-tipo').onchange=atualizarTipoCampanha;
+async function abrirCampanha(id){
+ campanhaVersao++;campanhaId=String(id);campanhaCursor=null;campanhaPendente=null;campanhaCarregando=false;$('campanha-historico').replaceChildren();$('campanha-texto').value='';$('campanhas-lobby').hidden=true;$('campanha-sala').hidden=false;
+ await atualizarCampanha();if(campanhaMestre&&!campanhaEncerrada)await preencherConvites().catch(e=>campanhaStatus(e.message));
+}
+async function atualizarCampanha(){
+ if(!campanhaId||campanhaCarregando||document.hidden||!navigator.onLine)return;
+ const v=campanhaVersao,id=campanhaId,cursor=campanhaCursor;
+ campanhaCarregando=true;
+ try{
+ const d=await api(campanhaBase+'/'+id+(cursor?'?depois='+cursor:''));
+ if(v!==campanhaVersao||mesaTelaVisivel!=='campanhas')return;
+ campanhaMestre=d.minha;campanhaEncerrada=d.encerrada;
+ $('campanha-sala-titulo').textContent=d.titulo;$('campanha-sala-desc').textContent=d.descricao;
+ $('campanha-convidar').hidden=!d.minha||d.encerrada;$('campanha-evento').hidden=d.encerrada;$('campanha-rolar').disabled=d.encerrada;
+ $('campanha-sair').textContent=d.minha?'Encerrar campanha':'Sair da campanha';$('campanha-sair').disabled=d.minha&&d.encerrada;
+ $('campanha-narracao').disabled=!d.minha;if(!d.minha&&$('campanha-tipo').value==='narracao')$('campanha-tipo').value='acao';atualizarTipoCampanha();
+ const membros=$('campanha-membros');membros.replaceChildren();
+ for(const m of d.membros){const linha=el('div','','mesa-amigo-linha');linha.append(el('strong',m.apelido+(m.mestre?' · Mestre':m.estado==='convidado'?' · Convidado':'')));
+ if(d.minha&&!m.eu&&!d.encerrada){const b=el('button','Remover');b.type='button';b.onclick=()=>acaoMembroCampanha('remover',m.apelido);linha.append(b);}membros.append(linha);}
+ const h=$('campanha-historico'),nomes={narracao:'Narração',acao:'Ação',fala:'Fala',dado:'Dado'};
+ let cinema=null;
+ for(const e of d.eventos){const item=el('article','','mesa-chat-bolha'+(e.tipo==='narracao'?' narracao':''));item.append(el('strong',e.apelido+' · '+nomes[e.tipo]),el('p',e.texto),el('small',new Date(e.criado_em).toLocaleTimeString('pt-BR')));h.append(item);campanhaCursor=e.id;
+ if(cursor&&e.efeito!=='nenhum')cinema=e;}
+ // Uma sala vazia não deve reproduzir efeitos históricos ao entrar.
+ if(!campanhaCursor)campanhaCursor='0';
+ if(cinema)exibirCinema(cinema);
+ if(d.eventos.length){while(h.children.length>300)h.firstChild.remove();h.scrollTop=h.scrollHeight;}
+ }catch(e){if(v===campanhaVersao){campanhaStatus(e.message);if([403,404].includes(e.status)){limparCampanha();campanhaStatus(e.message);await carregarCampanhas();}}}
+ finally{if(v===campanhaVersao)campanhaCarregando=false;}
+}
+async function acaoMembroCampanha(acao,apelido){
+ if(!campanhaId)return;if(['sair','remover','encerrar'].includes(acao)&&!confirm('Confirma '+acao+'?'))return;
+ try{await api(campanhaBase+'/'+campanhaId+'/membros','POST',{acao,apelido});if(acao==='sair'||acao==='encerrar'){limparCampanha();iniciarCampanhas();}else await atualizarCampanha();campanhaStatus('Operação concluída.');}catch(e){campanhaStatus(e.message);}
+}
+async function enviarEventoCampanha(d){
+ if(!campanhaId||campanhaEncerrada)return;
+ const id=campanhaId,v=campanhaVersao,assinatura=JSON.stringify(d);
+ if(!campanhaPendente||campanhaPendente.assinatura!==assinatura)campanhaPendente={assinatura,corpo:{...d,chave:crypto.randomUUID()}};
+ try{await api(campanhaBase+'/'+id+'/eventos','POST',campanhaPendente.corpo);if(v!==campanhaVersao)return;campanhaPendente=null;if(d.tipo!=='dado'&&$('campanha-texto').value.trim()===d.texto)$('campanha-texto').value='';if(d.tipo==='dado')acessibilidadeSomDado();await atualizarCampanha();}catch(e){if(v===campanhaVersao)campanhaStatus(e.message);}
+}
+$('campanhas-criar').onsubmit=async ev=>{ev.preventDefault();const b=ev.currentTarget.querySelector('button');b.disabled=true;try{const s=await api(campanhaBase,'POST',{titulo:$('campanha-nome').value.trim(),descricao:$('campanha-desc').value.trim()});ev.target.reset();await abrirCampanha(s.id);}catch(e){campanhaStatus(e.message);}finally{b.disabled=false;}};
+$('campanha-convidar').onsubmit=ev=>{ev.preventDefault();acaoMembroCampanha('convidar',$('campanha-amigo').value);};
+$('campanha-sair').onclick=()=>acaoMembroCampanha(campanhaMestre?'encerrar':'sair');
+$('campanha-voltar').onclick=()=>{limparCampanha();iniciarCampanhas();};
+$('campanhas-atualizar').onclick=carregarCampanhas;
+$('campanha-evento').onsubmit=async ev=>{ev.preventDefault();const b=ev.currentTarget.querySelector('button');b.disabled=true;const tipo=$('campanha-tipo').value,texto=$('campanha-texto').value.trim(),det=detectarCinema(texto),efeito=tipo==='narracao'?($('campanha-efeito').value==='auto'?det.efeito:$('campanha-efeito').value):'nenhum',cor=$('campanha-cor').value==='auto'?det.cor:$('campanha-cor').value;try{await enviarEventoCampanha({tipo,texto,efeito,cor});}finally{b.disabled=false;}};
+$('campanha-rolar').onclick=async()=>{const b=$('campanha-rolar');b.disabled=true;try{await enviarEventoCampanha({tipo:'dado',faces:Number($('campanha-dado').value)});}finally{b.disabled=campanhaEncerrada;}};
+function iniciarCampanhas(){if(!campanhaTimer)campanhaTimer=setInterval(()=>{if(mesaTelaVisivel==='campanhas'&&!document.hidden&&campanhaId)atualizarCampanha();},5000);if(!campanhaId)carregarCampanhas();}
 // ---- Conta e recuperação de acesso ----
 const formulariosConta = ['f-login','f-cadastro','f-recuperar','f-redefinir'];
 // Feedback de formato local, sem enviar o endereço enquanto a pessoa digita.
