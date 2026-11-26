@@ -8,7 +8,7 @@ function estado(p,c={},modo='padrao'){
  const mod=Math.floor((Number(d.atributos?.con??10)-10)/2),[faces,fixo]=Object.hasOwn(vida,d.classe)?vida[d.classe]:[8,5];
  const pvMax=dnd?Math.max(1,faces+mod)+(nivel-1)*Math.max(1,fixo+mod):20+(nivel-1)*5,manaMax=modo==='mana'?10+(nivel-1)*5:0;
  const atual=(v,max,old)=>!int(v,0,10000)||!int(old,0,10000)?max:clamp(v+(v>0?Math.max(0,max-old):0),0,max);
- return {nivel,pv:atual(c.pv,pvMax,c.pvMax),pvMax,mana:manaMax?atual(c.mana,manaMax,c.manaMax):0,manaMax,...colecao(p),modo,dnd};
+ return {nivel,pv:atual(c.pv,pvMax,c.pvMax),pvMax,mana:manaMax?(c.manaMax===0?manaMax:atual(c.mana,manaMax,c.manaMax)):0,manaMax,...colecao(p),modo,dnd};
 }
 function erro(s){const e=Error(s);e.status=409;throw e;}
 function preparar(e,uso,tipo){

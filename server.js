@@ -1070,6 +1070,11 @@ app.post('/api/solo/campanhas/:id/turnos',asyncHandler(async(req,res)=>{
  }catch(e){await soloDevolver(quota);if(e.status===429||e.status===409)return res.status(e.status).json({erro:e.message});console.error('Falha em turno solo',e.name);soloErroIA(res,e);}
  finally{await query('UPDATE public.mesa_solo_campanhas SET processando=false WHERE id=$1 AND usuario_id=$2 AND turno_atual=$3',[id,u.id,c.turno_atual]).catch(()=>{});}
 }));
+app.post('/api/solo/campanhas/:id/mana',asyncHandler(async(req,res)=>{
+ const u=await soloRequerConta(req,res);if(!u)return;const id=soloId(req.params.id);if(!id)return res.status(400).json({erro:'Campanha inválida.'});
+ const r=await query("UPDATE public.mesa_solo_campanhas SET modo_recursos='mana' WHERE id=$1 AND usuario_id=$2 AND personagem_id IS NOT NULL AND modo_recursos='padrao' AND NOT processando RETURNING id",[id,u.id]);
+ if(!r.rowCount)return res.status(409).json({erro:'Não foi possível ativar mana nesta campanha.'});res.json({ok:true});
+}));
 app.post('/api/solo/campanhas/:id/personagem',asyncHandler(async(req,res)=>{
  const u=await soloRequerConta(req,res);if(!u)return;const id=soloId(req.params.id),p=soloId(req.body?.personagemId);if(!id||!p)return res.status(400).json({erro:'Ficha inválida.'});
  const r=await query('UPDATE public.mesa_solo_campanhas c SET personagem_id=$3 WHERE c.id=$1 AND c.usuario_id=$2 AND c.personagem_id IS NULL AND NOT c.processando AND EXISTS(SELECT 1 FROM public.personagens_dnd p WHERE p.id=$3 AND p.usuario_id=$2) RETURNING c.id',[id,u.id,p]);
