@@ -1293,3 +1293,19 @@ body.mesa-alto-contraste .solo-ficha-item :is(p,span,strong){color:#111}
 .solo-aliado-recurso progress::-webkit-progress-bar{background:#ffffff24}.solo-aliado-recurso progress::-webkit-progress-value{background:var(--aliado-cor);border-radius:9px}.solo-aliado-recurso progress::-moz-progress-bar{background:var(--aliado-cor)}
 .solo-aliado-detalhe-topo{display:flex;gap:12px;align-items:center}.solo-aliado-detalhe .solo-retrato-aliado{width:78px;height:78px}.solo-aliado-detalhe .solo-aliado-recurso{font-size:.8rem;margin-top:8px}.solo-aliado-detalhe progress{height:8px;background:#ccbda7}
 @media(max-width:550px){.solo-aliado-card{min-width:155px}.solo-retrato-aliado{width:38px;height:38px}}
+
+/* Mobile Solo: mantenha a mochila e as abas acessíveis antes dos recursos. */
+@media(max-width:850px){
+ #solo-personagem-dialog[open]{display:flex;flex-direction:column;box-sizing:border-box;width:calc(100% - 16px);max-width:520px;max-height:90vh;max-height:calc(100dvh - 24px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));padding:12px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y}
+ #solo-personagem-dialog[open]>*{flex-shrink:0;min-width:0}
+ #solo-personagem-dialog .solo-dialog-topo{position:sticky;top:-12px;z-index:2;background:inherit;padding:8px 0;margin:0 0 4px;order:0}
+ #solo-personagem-dialog #solo-ficha-colecao{order:1;margin:6px 0 12px}
+ #solo-personagem-dialog #solo-xp{order:2}
+ #solo-personagem-dialog #solo-recursos{order:3}
+ #solo-personagem-dialog #solo-xp-vincular{order:4}
+ #solo-personagem-dialog .solo-ficha-abas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;align-items:stretch}
+ #solo-personagem-dialog .solo-ficha-abas button{font-size:.86rem;white-space:normal;line-height:1.25;min-height:46px;padding:8px 6px}
+ #solo-personagem-dialog .solo-ficha-item-topo strong{min-width:0;overflow-wrap:anywhere}
+ #solo-personagem-dialog .solo-ficha-item{max-width:100%}
+ #solo-personagem-abrir span{display:inline}
+}
