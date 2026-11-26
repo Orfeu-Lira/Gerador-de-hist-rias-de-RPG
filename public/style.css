@@ -1047,3 +1047,5 @@ body[data-mesa-fonte]:not([data-mesa-fonte=padrao]),body[data-mesa-fonte]:not([d
 body[data-mesa-fonte]:not([data-mesa-fonte=padrao]) :is(h1,h2,h3){font-family:var(--mesa-fonte-preferida)}
 body.mesa-alto-contraste .mesa-fonte-amostra{background:#fff;color:#000;border-color:#000}
 @media(max-width:480px){.mesa-perfil-identidade{grid-template-columns:1fr}.mesa-perfil-identidade .avatar-moldura{width:90px;height:90px}}
+
+.mesa-conexao-status{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:1200;width:max-content;max-width:calc(100vw - 32px);padding:12px 18px;background:#fff1d2;color:#542f13;border:1px solid #bd9253;border-radius:12px;box-shadow:0 6px 20px #0005;font-weight:700;font-size:.9rem;text-align:center}.mesa-conexao-status[hidden]{display:none!important}
