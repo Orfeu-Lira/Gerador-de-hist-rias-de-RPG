@@ -292,7 +292,7 @@ window.addEventListener('popstate',ev=>{
 function mostrar(tela, restaurando=false) {
   if(!TELAS.includes(tela))return;
   pararJornada();
-  if(mesaTelaVisivel==='solo'&&tela!=='solo'){soloFecharPaineis();fecharCinema();}
+  if(mesaTelaVisivel==='solo'&&tela!=='solo'){soloLimparAvatar();soloFecharPaineis();fecharCinema();}
   if(tela!=='amigos'&&mesaTelaVisivel==='amigos')amigosLimpar();
   if(tela!=='compartilhadas'&&mesaTelaVisivel==='compartilhadas')limparCompartilhadas();
   if(tela!=='mensagens'&&mesaTelaVisivel==='mensagens')limparMensagens();
@@ -621,7 +621,7 @@ let soloCampanhaId=null;
 let soloOrigens=[];
 let soloOcupado=false;
 let soloOrigemPreferida=null,soloTituloPreferido='',soloPersonagemPreferido=null,soloRetomarFicha=false,soloPersonagens=[];
-$('solo-personagem').onchange=()=>{$('solo-personagem-info').textContent=$('solo-personagem').value?'A ficha orienta o Mestre IA, que não decide as ações do protagonista.':'Use uma ficha já criada ou faça outra.';};
+$('solo-personagem').onchange=()=>{$('solo-personagem-info').textContent=$('solo-personagem').value?'A ficha orienta o Mestre IA. XP, PV e mana são acompanhados automaticamente nas regras padrão do Mesa, salvo se você mudar as opções.':'Use uma ficha já criada ou faça outra.';};
 $('solo-criar-personagem').onclick=()=>{
  if(!eu.logado){navegarMesa('conta');return;}
  soloOrigemPreferida=Number($('solo-aventura').value)||soloOrigemPreferida;
@@ -637,7 +637,7 @@ function soloEstado(mensagem,erro=false){
  if(jogo&&erro&&$('solo-personagem-dialog').open){$('solo-personagem-dialog').close();}
 }
 async function soloAtualizarInicio(){
- soloFecharPaineis();$('solo-entrada').hidden=false;$('solo-jogo').hidden=true;soloCampanhaId=null;soloEstado('');
+ soloLimparAvatar();soloFecharPaineis();$('solo-entrada').hidden=false;$('solo-jogo').hidden=true;soloCampanhaId=null;soloResumoXP=null;soloResumoEstado=null;soloResumoModo='xp';$('solo-progressao').value='xp';$('solo-modo-recursos').value='mana';soloEstado('');
  const lista=$('solo-lista');lista.replaceChildren();
  const select=$('solo-aventura'),anterior=select.value;select.replaceChildren(new Option('Criar com uma ideia minha',''));
  if(!eu.logado){
@@ -685,20 +685,21 @@ $('solo-aventura').onchange=()=>{
   $('solo-ajuda-origem').textContent='Você pode adicionar novas ideias abaixo. A IA usará a história salva como ponto de partida.';
  }else $('solo-ajuda-origem').textContent='Escreva uma ideia própria para iniciar uma campanha nova.';
 };
-let soloResumoXP=null,soloResumoEstado=null;
+let soloResumoXP=null,soloResumoEstado=null,soloResumoModo='xp',soloAvatarUrl=null,soloAvatarPedido=null,soloAvatarVersao=0;
 function pintarXP(alvo,xp,modo='xp'){
  alvo.replaceChildren();if(!xp){alvo.append(el('p','Vincule uma ficha para registrar experiência.','suave'));return;}
  alvo.append(el('strong',xp.personagem+' · '+(xp.nivel===null?'Perfil narrativo':'Nível '+xp.nivel)),el('p',xp.total.toLocaleString('pt-BR')+' XP'+(xp.proximo===null?'':' / '+xp.proximo.toLocaleString('pt-BR')+' XP')));
  if(xp.proximo!==null){const p=el('progress');p.max=xp.proximo-xp.base;p.value=Math.max(0,xp.total-xp.base);p.setAttribute('aria-label','Experiência para o próximo nível');alvo.append(p);}
  if(modo!=='xp')alvo.append(el('p',modo==='marcos'?'Marcos narrativos: evolução manual.':'Progressão automática desativada.','suave'));
 }
-function soloXP(xp,art){if(!xp)return;soloResumoXP=xp;soloAtualizarResumo();pintarXP($('solo-xp'),xp);if(xp.ganho>0&&art){art.append(el('p','✦ +'+xp.ganho+' XP · '+xp.categoria+(xp.subiu?' · Você subiu para o nível '+xp.nivel+'!':''),'mesa-xp-recompensa'));if(xp.subiu){if(!mesaMovimentoReduzido()&&!acessibilidadeMovimentoReduzido())art.animate([{opacity:.6},{opacity:1}],{duration:650});try{if(cinemaAudio?.state==='running'&&$('solo-cinema-som').checked){const t=cinemaAudio.currentTime;for(const [i,f] of [523,659,784].entries()){const o=cinemaAudio.createOscillator(),g=cinemaAudio.createGain();o.frequency.value=f;g.gain.setValueAtTime(.07,t+i*.13);g.gain.exponentialRampToValueAtTime(.001,t+i*.13+.22);o.connect(g);g.connect(cinemaAudio.destination);o.start(t+i*.13);o.stop(t+i*.13+.23);}}}catch{}}}}
+function soloXP(xp,art){if(!xp)return;soloResumoXP=xp;soloAtualizarResumo();pintarXP($('solo-xp'),xp,soloResumoModo);if(xp.ganho>0&&art){art.append(el('p','✦ +'+xp.ganho+' XP · '+xp.categoria+(xp.subiu?' · Você subiu para o nível '+xp.nivel+'!':''),'mesa-xp-recompensa'));if(xp.subiu){if(!mesaMovimentoReduzido()&&!acessibilidadeMovimentoReduzido())art.animate([{opacity:.6},{opacity:1}],{duration:650});try{if(cinemaAudio?.state==='running'&&$('solo-cinema-som').checked){const t=cinemaAudio.currentTime;for(const [i,f] of [523,659,784].entries()){const o=cinemaAudio.createOscillator(),g=cinemaAudio.createGain();o.frequency.value=f;g.gain.setValueAtTime(.07,t+i*.13);g.gain.exponentialRampToValueAtTime(.001,t+i*.13+.22);o.connect(g);g.connect(cinemaAudio.destination);o.start(t+i*.13);o.stop(t+i*.13+.23);}}}catch{}}}}
 function barraRecurso(alvo,nome,atual,max,classe){const linha=el('div','','mesa-recurso-linha');linha.append(el('strong',nome+' · '+atual+' / '+max));const p=el('progress');p.max=max;p.value=atual;p.className=classe;p.setAttribute('aria-label',nome);linha.append(p);alvo.append(linha);}
 function dominioHabilidade(h){const pontos=Math.min(200,Math.max(0,Number(h.proficiencia)||0)),faixas=[[0,'Iniciante',0],[20,'Aprendiz',0],[50,'Proficiente',1],[100,'Especialista',2],[200,'Mestre',3]];let i=0;while(i+1<faixas.length&&pontos>=faixas[i+1][0])i++;const [base,grau,desconto]=faixas[i];const custo=Math.max(h.mana?1:0,(Number(h.mana)||0)-Math.min(Math.floor((Number(h.mana)||0)/2),desconto));return {pontos,base,grau,custo,proximo:faixas[i+1]?.[0]??null};}
 function listarAquisicoes(alvo,a,nivel){
  for(const [titulo,lista] of [['Itens conquistados',a?.itens||[]],['Habilidades e proficiência',a?.habilidades||[]]]){const d=el('details');d.append(el('summary',titulo+' ('+lista.length+')'));for(const x of lista){const item=x.quantidade!==undefined,h=item?null:dominioHabilidade(x),card=el('div','','mesa-dominio');card.append(el('p',x.nome+' · Nível mínimo '+x.nivelMin+(item?' · ×'+x.quantidade:' · '+h.grau+' · custo de mana '+h.custo)+(nivel<x.nivelMin?' · Bloqueado':'')+(x.manual?' · Cadastrada':'')+' — '+x.descricao));if(h){barraRecurso(card,'Proficiência',h.pontos,200,'mesa-proficiencia');if(h.proximo!==null)card.append(el('p','Próximo grau: '+h.proximo+' pontos','suave'));else card.append(el('p','Domínio máximo','suave'));}d.append(card);}if(!lista.length)d.append(el('p','Nenhum ainda.','suave'));alvo.append(d);}
 }
 function soloRecursos(r,art){
+ if(r.xpAtual){soloResumoXP=r.xpAtual;pintarXP($('solo-xp'),r.xpAtual,soloResumoModo);}
  soloResumoEstado=r.recursos;soloAtualizarResumo();
  const e=r.recursos,alvo=$('solo-recursos'),sel=$('solo-uso');alvo.hidden=!e;$('solo-uso-campo').hidden=!e;alvo.replaceChildren();sel.replaceChildren(new Option('Ação livre',''));if(!e){soloAtualizarCompositor();return;}
  barraRecurso(alvo,'PV',e.pv,e.pvMax,'mesa-pv');if(e.manaMax)barraRecurso(alvo,'Mana',e.mana,e.manaMax,'mesa-mana');else{const ativar=el('button','Ativar mana (regra alternativa)','guia-abrir');ativar.type='button';ativar.onclick=async()=>{if(soloOcupado||!soloCampanhaId||!confirm('Ativar mana nesta campanha? Esta escolha é permanente e não faz parte das regras padrão de D&D.'))return;const id=soloCampanhaId;ativar.disabled=true;try{await api('/api/solo/campanhas/'+id+'/mana','POST',{});await soloAbrir(id);}catch(err){soloEstado(err.message,true);}finally{ativar.disabled=false;}};alvo.append(ativar);}if(!e.dnd)alvo.append(el('p','Nível narrativo Mesa: '+e.nivel,'suave'));
@@ -706,7 +707,7 @@ function soloRecursos(r,art){
  for(const [tipo,lista] of [['item',e.itens],['habilidade',e.habilidades]])for(const x of lista){const custo=tipo==='habilidade'&&e.manaMax?dominioHabilidade(x).custo:0;const o=new Option(x.nome+(tipo==='item'?' · ×'+x.quantidade:' · '+dominioHabilidade(x).grau+(custo?' · '+custo+' mana':''))+(e.nivel<x.nivelMin?' · requer nível '+x.nivelMin:''),tipo+':'+x.id);o.disabled=e.pv===0||e.nivel<x.nivelMin||(tipo==='item'&&x.quantidade<1)||custo>e.mana;sel.add(o);}
  if(e.pv===0)sel.value='socorro';soloAtualizarCompositor();listarAquisicoes(alvo,e,e.nivel);if(art&&r.eventosRecursos?.length)for(const ev of r.eventosRecursos)art.append(el('p',ev,'mesa-xp-recompensa'));
 }
-function soloXPInicio(r){soloResumoXP=r.xp;soloRecursos(r);pintarXP($('solo-xp'),r.xp,r.campanha.progressao);const sel=$('solo-xp-ficha');sel.replaceChildren(new Option('Escolha uma ficha',''));for(const p of soloPersonagens)sel.add(new Option(p.nome,String(p.id)));$('solo-xp-vincular').hidden=Boolean(r.campanha.personagem_id)||!soloPersonagens.length;}
+function soloXPInicio(r){soloResumoModo=r.campanha.progressao;soloResumoXP=r.xp;soloRecursos(r);soloCarregarAvatar(r.campanha.personagem_id,r.xp?.personagem);pintarXP($('solo-xp'),r.xp,r.campanha.progressao);const sel=$('solo-xp-ficha');sel.replaceChildren(new Option('Escolha uma ficha',''));for(const p of soloPersonagens)sel.add(new Option(p.nome,String(p.id)));$('solo-xp-vincular').hidden=Boolean(r.campanha.personagem_id)||!soloPersonagens.length;}
 $('solo-xp-confirmar').onclick=async()=>{const id=soloCampanhaId,p=$('solo-xp-ficha').value;if(!id||!p||soloOcupado)return;const b=$('solo-xp-confirmar');b.disabled=true;try{await api('/api/solo/campanhas/'+id+'/personagem','POST',{personagemId:Number(p)});await soloAbrir(id);}catch(e){soloEstado(e.message,true);}finally{b.disabled=false;}};
 function soloMensagem(papel,texto,tipo='acao',teste=null,numero=null){
  const art=el('article','','solo-mensagem '+(papel==='mestre'?'mestre':'jogador'));
@@ -766,16 +767,46 @@ function soloAdicionarTeste(art,teste,numero){
  };
  caixa.appendChild(botao);art.appendChild(caixa);
 }
-function soloAtualizarResumo(){
- const alvo=$('solo-resumo-recursos');alvo.replaceChildren();alvo.hidden=!soloResumoXP&&!soloResumoEstado;
- if(alvo.hidden)return;
- const e=soloResumoEstado,x=soloResumoXP;
- const ficha=el('span',x?.personagem||'Personagem','solo-resumo-nome');alvo.append(ficha);
- const chip=(nome,valor,classe)=>{const p=el('span','','solo-chip '+classe);p.append(el('strong',nome),el('span',valor));alvo.append(p);};
- if(e){chip('Nível',String(e.nivel),'nivel');chip('PV',e.pv+'/'+e.pvMax,'pv');if(e.manaMax)chip('MP',e.mana+'/'+e.manaMax,'mana');}
- else if(x?.nivel!=null)chip('Nível',String(x.nivel),'nivel');
- if(x)chip('XP',x.total.toLocaleString('pt-BR')+(x.proximo==null?'':'/'+x.proximo.toLocaleString('pt-BR')),'xp');
+function soloLimparAvatar(){
+ soloAvatarVersao++;if(soloAvatarPedido){soloAvatarPedido.abort();soloAvatarPedido=null;}
+ if(soloAvatarUrl){URL.revokeObjectURL(soloAvatarUrl);soloAvatarUrl=null;}
+ const img=$('solo-avatar-img');img.hidden=true;img.removeAttribute('src');$('solo-avatar-iniciais').hidden=false;
 }
+async function soloCarregarAvatar(id,nome){
+ soloLimparAvatar();const versao=soloAvatarVersao;
+ const iniciais=String(nome||'').trim().split(/\s+/).filter(Boolean).slice(0,2).map(n=>Array.from(n)[0]).join('').toUpperCase();
+ $('solo-avatar-iniciais').textContent=iniciais||'♙';
+ if(!id)return;
+ const pedido=new AbortController();soloAvatarPedido=pedido;
+ try{
+  const resp=await fetch(API_BASE_URL+'/api/personagens/'+encodeURIComponent(String(id))+'/avatar',{credentials:'include',cache:'no-store',signal:pedido.signal});
+  if(!resp.ok||!(resp.headers.get('content-type')||'').includes('image/webp'))return;
+  const blob=await resp.blob();if(versao!==soloAvatarVersao||blob.size>393216||!blob.size)return;
+  const url=URL.createObjectURL(blob);soloAvatarUrl=url;
+  const img=$('solo-avatar-img');
+  img.onload=()=>{if(versao===soloAvatarVersao&&soloAvatarUrl===url){img.hidden=false;$('solo-avatar-iniciais').hidden=true;}};
+  img.onerror=()=>{if(versao===soloAvatarVersao&&soloAvatarUrl===url){img.hidden=true;$('solo-avatar-iniciais').hidden=false;URL.revokeObjectURL(url);soloAvatarUrl=null;}};
+  img.src=url;
+ }catch(e){if(e.name!=='AbortError')console.warn('Mesa: retrato do Solo indisponível');}
+ finally{if(soloAvatarPedido===pedido)soloAvatarPedido=null;}
+}
+function soloAtualizarResumo(){
+ const alvo=$('solo-resumo-recursos'),e=soloResumoEstado,x=soloResumoXP,barras=$('solo-hud-barras'),xp=$('solo-hud-xp');
+ alvo.hidden=!x&&!e;barras.replaceChildren();xp.replaceChildren();if(alvo.hidden)return;
+ $('solo-hud-nome').textContent=x?.personagem||'Personagem';
+ const nivel=e?.nivel??x?.nivel;$('solo-hud-nivel').textContent=nivel==null?'Perfil narrativo':'Nível '+nivel;
+ if(x){xp.append(el('strong',Number(x.total).toLocaleString('pt-BR')+' XP'));if(soloResumoModo==='xp'&&x.proximo!=null){const p=el('progress');p.max=Math.max(1,x.proximo-x.base);p.value=Math.max(0,x.total-x.base);p.setAttribute('aria-label','Experiência para o próximo nível');xp.append(p);}else if(soloResumoModo!=='xp')xp.append(el('small',soloResumoModo==='marcos'?'Marcos':'XP manual'));}
+ const barra=(nome,atual,max,classe)=>{
+  const bloco=el('div','','solo-hud-recurso '+classe),linha=el('div','','solo-hud-valores'),p=el('progress');
+  const seguro=Math.max(0,Math.min(max,atual)),fracao=max>0?seguro/max:0;
+  linha.append(el('strong',nome),el('span',seguro+'/'+max));p.max=Math.max(1,max);p.value=seguro;p.setAttribute('aria-label',nome);p.setAttribute('aria-valuetext',seguro+' de '+max);
+  if(classe==='pv')bloco.dataset.vida=fracao<=.25?'critica':fracao<=.5?'baixa':'normal';
+  bloco.append(linha,p);barras.append(bloco);
+ };
+ if(e){barra('Vida (PV)',e.pv,e.pvMax,'pv');if(e.manaMax>0)barra('Mana (MP)',e.mana,e.manaMax,'mana');}
+ barras.hidden=!e;
+}
+$('solo-avatar-botao').onclick=()=>{soloFecharPaineis();$('solo-personagem-dialog').showModal();};
 function soloFecharPaineis(){for(const id of ['solo-personagem-dialog','solo-ajustes-dialog']){const d=$(id);if(d?.open)d.close();}}
 for(const [botao,painel] of [['solo-personagem-abrir','solo-personagem-dialog'],['solo-ajustes-abrir','solo-ajustes-dialog']]){
  $(botao).onclick=()=>{soloFecharPaineis();$(painel).showModal();};

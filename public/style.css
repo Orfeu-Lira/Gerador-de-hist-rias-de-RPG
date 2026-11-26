@@ -1228,3 +1228,31 @@ body.mesa-alto-contraste #solo-jogo .solo-mensagem.jogador{background:#073e2a;co
 @keyframes cinema-tempo{from{transform:scaleX(1)}to{transform:scaleX(0)}}
 .mesa-cinema.sem-movimento .mesa-dragao,.mesa-cinema.sem-movimento .mesa-fenomeno,.mesa-cinema.sem-movimento .mesa-fogo{opacity:1;transform:none}
 @media(max-height:480px){#campanha-cinema-arte{height:34dvh;min-height:75px}.mesa-cinema{padding:9px;gap:5px}#campanha-cinema-texto{max-height:20dvh}}
+
+/* Solo HUD: retrato com recursos sempre visíveis, sem ocupar a conversa inteira. */
+#solo-resumo-recursos.solo-hud{display:grid;gap:5px;padding:7px 10px;background:linear-gradient(110deg,#173a32,#102d29);border:1px solid #bfa36a66;border-radius:11px;line-height:1.2}
+.solo-hud-identidade{display:flex;align-items:center;gap:9px;min-width:0}
+.solo-avatar-botao{width:44px;height:44px;min-width:44px;display:grid;place-items:center;overflow:hidden;padding:0;border:1px solid #d8b879;border-radius:10px;color:#f3deab;background:#2c4c40;cursor:pointer;font-size:1rem;font-weight:800}
+.solo-avatar-botao img{width:100%;height:100%;object-fit:cover;display:block}
+.solo-hud-nome{flex:1;min-width:0;display:grid;gap:3px}
+.solo-hud-nome strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#f8e9ca;font-size:.87rem}
+.solo-hud-nome>span{font-size:.73rem;color:#d7c6a2}
+.solo-hud-xp{display:grid;gap:4px;text-align:right;min-width:60px;max-width:35%;color:#e9cf92;font-size:.76rem}
+.solo-hud-xp progress{width:100%;height:5px;border:0;accent-color:#c4a568}
+.solo-hud-xp small{font-size:.65rem}
+.solo-hud-barras{display:flex;gap:12px;align-items:center}
+.solo-hud-recurso{flex:1;min-width:0;display:grid;gap:3px}
+.solo-hud-valores{display:flex;justify-content:space-between;gap:4px;font-size:.71rem;color:#f5e8d0;font-variant-numeric:tabular-nums;line-height:1.1}
+.solo-hud-valores strong{font-size:inherit}
+.solo-hud-recurso progress{width:100%;height:7px;border:0;border-radius:99px;overflow:hidden;appearance:none;background:#ffffff1c}
+.solo-hud-recurso progress::-webkit-progress-bar{background:#ffffff1c;border-radius:99px}
+.solo-hud-recurso progress::-webkit-progress-value{background:var(--solo-barra,#6dbd83);border-radius:99px;transition:width .28s ease}
+.solo-hud-recurso progress::-moz-progress-bar{background:var(--solo-barra,#6dbd83);border-radius:99px}
+.solo-hud-recurso.pv{--solo-barra:#69bb82;accent-color:#69bb82}
+.solo-hud-recurso.pv[data-vida=baixa]{--solo-barra:#e0b35b;accent-color:#e0b35b}
+.solo-hud-recurso.pv[data-vida=critica]{--solo-barra:#e16b68;accent-color:#e16b68}
+.solo-hud-recurso.mana{--solo-barra:#7b9ee9;accent-color:#7b9ee9}
+@media(max-width:850px){#solo-resumo-recursos.solo-hud{padding:6px 8px;gap:4px}.solo-hud-barras{gap:9px}.solo-avatar-botao{width:40px;height:40px;min-width:40px}.solo-hud-valores{font-size:.69rem}}
+@media(prefers-reduced-motion:reduce){.solo-hud-recurso progress::-webkit-progress-value{transition:none}}
+body.mesa-alto-contraste #solo-resumo-recursos.solo-hud{background:#080808;border:2px solid white}
+body.mesa-alto-contraste .solo-hud :is(strong,span,small){color:white}
