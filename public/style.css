@@ -1052,3 +1052,7 @@ body.mesa-alto-contraste .mesa-fonte-amostra{background:#fff;color:#000;border-c
 
 /* Comunidade */
 .mesa-amigo-linha{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid #bcaa8650}.mesa-amigo-linha strong{overflow-wrap:anywhere}.mesa-amigo-acoes{display:flex;gap:8px;flex-wrap:wrap}.mesa-amigo-acoes button{font-size:.85rem;min-height:44px}.mesa-amigo-linha:last-child{border-bottom:0}#amigos-status{min-height:1.5em}
+
+/* Confirmação persistente das sugestões de ficha. */
+#p-aplicar-sugestao.mesa-sugestao-aplicada:disabled,#p-gerar-kit.mesa-sugestao-aplicada:disabled{opacity:1;cursor:default;background:#e3efdf;color:#21543a;border:1px solid #648568;box-shadow:none;transform:none}
+body.mesa-alto-contraste #p-aplicar-sugestao.mesa-sugestao-aplicada:disabled,body.mesa-alto-contraste #p-gerar-kit.mesa-sugestao-aplicada:disabled{background:#fff;color:#000;border:2px solid #000}
