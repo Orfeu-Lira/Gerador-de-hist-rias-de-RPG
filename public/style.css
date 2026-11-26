@@ -1193,3 +1193,38 @@ body.mesa-alto-contraste #solo-jogo .solo-mensagem.jogador{background:#073e2a;co
 }
 @media(max-width:370px){.solo-topo-acoes .solo-icone-botao span{display:none}.solo-controle-tipo{max-width:45%}.solo-compositor-rodape{font-size:.65rem}}
 @media(max-height:550px){#solo-jogo{min-height:420px;height:auto}.solo-conversa{height:240px;flex:none}}
+
+.mesa-cinema{gap:12px;background:radial-gradient(ellipse at center,#29413f,#0b171e 75%);overflow-y:auto;box-sizing:border-box}
+#campanha-cinema-titulo{color:#f5dfae;font-size:clamp(1.1rem,4vw,1.8rem);margin:0}
+#campanha-cinema-arte{height:min(48dvh,390px);min-height:120px;flex:0 1 auto}
+#campanha-cinema-texto{margin:0;max-height:22dvh;overflow:auto;font-size:clamp(.9rem,2.1vw,1.12rem)}
+.mesa-dragao,.mesa-fenomeno{width:100%;height:100%;max-height:100%;opacity:1;animation:cinema-entrada .75s ease-out both;overflow:visible}
+.mesa-fogo{animation:cinema-sopro 4.8s ease-in-out 1.1s both}
+.mesa-fenomeno{filter:drop-shadow(0 8px 18px #0008)}
+.cinema-nuvem{animation:cinema-nuvens 3.8s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:center}
+.cinema-raio{opacity:.85;animation:cinema-raio 2.9s ease-in-out infinite alternate;filter:drop-shadow(0 0 9px #9fcbff)}
+.cinema-raio-1{animation-delay:.7s}
+.cinema-chuva{animation:cinema-chuva 1.3s linear infinite}
+.cinema-chuva:nth-child(3n){animation-delay:.4s}.cinema-chuva:nth-child(3n+1){animation-delay:.8s}
+.cinema-runa{transform-origin:300px 160px;animation:cinema-runa 16s linear infinite}
+.cinema-nucleo{animation:cinema-brilho 2.2s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:center}
+.cinema-brasa{animation:cinema-brilho 2.2s ease-in-out infinite alternate}
+.cinema-onda{transform-origin:300px 160px;animation:cinema-onda 3.4s ease-out infinite}
+.cinema-tempo{height:4px;width:min(72vw,360px);background:#ffffff26;border-radius:99px;overflow:hidden;flex:none}
+.cinema-tempo span{display:block;background:#d8bd83;height:100%;transform-origin:left;animation:cinema-tempo var(--cinema-duracao,7s) linear both}
+.cinema-pausado *{animation-play-state:paused!important}
+.cinema-botoes{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.cinema-botoes button{min-height:44px;padding:8px 16px;border-radius:10px}
+#campanha-cinema-pular-todos{background:#263f3a;color:#fff2d8;border:1px solid #ad966b}
+.solo-cinema-replay{display:block;margin:9px 0 0;padding:7px 12px;min-height:38px;color:#493d27;background:#f0dfbd;border:1px solid #c3a66c;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer}
+@keyframes cinema-entrada{from{transform:translateY(8px) scale(.9);opacity:.35}to{transform:translateY(0) scale(1);opacity:1}}
+@keyframes cinema-sopro{0%{opacity:0;transform:scaleX(.03)}17%,77%{opacity:1;transform:scaleX(1)}100%{opacity:0;transform:scaleX(.7)}}
+@keyframes cinema-nuvens{from{transform:translateX(-8px)}to{transform:translateX(8px)}}
+@keyframes cinema-raio{from{opacity:.55}to{opacity:1}}
+@keyframes cinema-chuva{from{transform:translateY(-30px);opacity:.25}to{transform:translateY(50px);opacity:.8}}
+@keyframes cinema-runa{to{transform:rotate(360deg)}}
+@keyframes cinema-brilho{from{opacity:.75;filter:brightness(.92)}to{opacity:1;filter:brightness(1.12)}}
+@keyframes cinema-onda{from{transform:scale(.7);opacity:.85}to{transform:scale(1.12);opacity:.18}}
+@keyframes cinema-tempo{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+.mesa-cinema.sem-movimento .mesa-dragao,.mesa-cinema.sem-movimento .mesa-fenomeno,.mesa-cinema.sem-movimento .mesa-fogo{opacity:1;transform:none}
+@media(max-height:480px){#campanha-cinema-arte{height:34dvh;min-height:75px}.mesa-cinema{padding:9px;gap:5px}#campanha-cinema-texto{max-height:20dvh}}

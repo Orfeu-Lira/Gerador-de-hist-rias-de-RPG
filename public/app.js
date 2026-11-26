@@ -758,7 +758,7 @@ function soloAdicionarTeste(art,teste,numero){
      (v.passou===null?'':v.passou?' · Sucesso!':' · Falha');
    soloMensagem('jogador',resultado,'acao');
    const acompanhar=soloPertoDoFim();const art=soloMensagem('mestre',r.narracao,'acao',r.teste,r.numero);soloXP(r.xp,art);soloRecursos(r,art);if(acompanhar)soloFimLista(art);else soloBotaoFim();
-   if(mesaTelaVisivel==='solo')cinemaSolo(r.narracao);
+   if(mesaTelaVisivel==='solo')cinemaSolo(r.narracao,art);
    botao.remove();texto.textContent='Resultado registrado nesta campanha.';
    soloEstado('');
   }catch(e){animacao.cancelar();palco.replaceChildren();texto.textContent=e.message;botao.disabled=false;soloEstado('Não foi possível concluir a rolagem: '+e.message,true);}
@@ -817,7 +817,7 @@ async function soloAbrir(id){
 function soloMostrarTrilha(genero,tom,sugestao=''){$('solo-trilha').replaceChildren();playerDaHistoria($('solo-trilha'),genero,tom,sugestao);}
 $('solo-voltar').onclick=()=>{
  if(soloOcupado)return;
- soloAtualizarInicio();
+ fecharCinema();soloAtualizarInicio();
 };
 $('solo-form').onsubmit=async ev=>{
  ev.preventDefault();if(soloOcupado)return;
@@ -842,10 +842,10 @@ async function soloAbrirDepoisCriar(r){
  soloCampanhaId=r.campanha.id;
  $('solo-jogo-titulo').textContent=r.campanha.titulo;
  $('solo-mensagens').replaceChildren();
- soloXPInicio(r);soloMensagem('mestre',r.mestre,'inicio',r.teste,0);
+ soloXPInicio(r);const art=soloMensagem('mestre',r.mestre,'inicio',r.teste,0);
   soloMostrarTrilha($('solo-genero').value,$('solo-tom').value,soloOrigens.find(a=>String(a.id)===$('solo-aventura').value)?.conteudo?.trilha||'');
  soloFecharPaineis();$('solo-entrada').hidden=true;$('solo-jogo').hidden=false;soloEstado('');
- $('solo-acao').value='';$('solo-tipo').value='acao';soloAtualizarCompositor();soloFimLista($('solo-mensagens').lastElementChild);window.scrollTo(0,0);if(mesaTelaVisivel==='solo')cinemaSolo(r.mestre);
+ $('solo-acao').value='';$('solo-tipo').value='acao';soloAtualizarCompositor();soloFimLista($('solo-mensagens').lastElementChild);window.scrollTo(0,0);if(mesaTelaVisivel==='solo')cinemaSolo(r.mestre,art);
 }
 $('solo-acao-form').onsubmit=async ev=>{
  ev.preventDefault();if(soloOcupado||!soloCampanhaId)return;
@@ -860,7 +860,7 @@ $('solo-acao-form').onsubmit=async ev=>{
  try{
   const r=await api('/api/solo/campanhas/'+soloCampanhaId+'/turnos','POST',{acao,tipo,uso:tipo==='acao'?$('solo-uso').value||null:null});
   const acompanhar=soloPertoDoFim();esperando.classList.remove('solo-escrevendo');esperando.querySelector('p').textContent=r.narracao;soloXP(r.xp,esperando);soloRecursos(r,esperando);
-  if(mesaTelaVisivel==='solo')cinemaSolo(r.narracao);
+  if(mesaTelaVisivel==='solo')cinemaSolo(r.narracao,esperando);
   if(r.teste)soloAdicionarTeste(esperando,r.teste,r.numero);
   $('solo-acao').value='';soloEstado('');if(acompanhar)soloFimLista(esperando);else soloBotaoFim();
  }catch(e){
@@ -2201,21 +2201,36 @@ let campanhaId=null,campanhaVersao=0,campanhaTimer=null,campanhaCursor=null,camp
 const campanhaBase='/api/comunidade/campanhas';
 const mesaXPPendente=new Map();
 const campanhaStatus=t=>{$('campanha-status').textContent=t;};
-function fecharCinema(){clearTimeout(cinemaTimer);$('campanha-cinema').hidden=true;$('campanha-cinema-arte').replaceChildren();for(const n of cinemaNos){try{n.stop();}catch{}}cinemaNos=[];}
-$('campanha-cinema-fechar').onclick=fecharCinema;
+const cinemaDuracoes={dragao:8000,dragao_fogo:10000,trovao:6500,explosao:7000,magia:7500,tempestade:8500};
+const cinemaTitulos={dragao:'Aparição de dragão',dragao_fogo:'Sopro de fogo',trovao:'Trovão',explosao:'Explosão',magia:'Manifestação mágica',tempestade:'Tempestade'};
+let cinemaFila=[],cinemaAtual=null,cinemaGeracao=0,cinemaRestante=0,cinemaInicio=0,cinemaFoco=null;
+function cinemaPreferencia(tipo,tela=mesaTelaVisivel){return $(tela==='solo'?'solo-cinema-'+tipo:'campanha-'+tipo).checked;}
+function cinemaPararSom(){for(const n of cinemaNos){try{n.stop();}catch{}try{n.disconnect();}catch{}}cinemaNos=[];}
+function cinemaLimpar(){clearTimeout(cinemaTimer);cinemaTimer=null;cinemaGeracao++;cinemaInicio=0;cinemaPararSom();$('campanha-cinema').hidden=true;$('campanha-cinema-arte').replaceChildren();cinemaAtual=null;cinemaRestante=0;}
+function cinemaRestaurarFoco(){if(cinemaFoco?.isConnected&&!cinemaFoco.closest('[hidden]')){try{cinemaFoco.focus({preventScroll:true});}catch{}}cinemaFoco=null;}
+function fecharCinema(){cinemaFila=[];cinemaLimpar();cinemaRestaurarFoco();}
+function cinemaProximo(){cinemaLimpar();if(cinemaFila.length&&!document.hidden)cinemaIniciar(cinemaFila.shift());else if(!cinemaFila.length)cinemaRestaurarFoco();}
+$('campanha-cinema-fechar').onclick=cinemaProximo;
+$('campanha-cinema-pular-todos').onclick=fecharCinema;
 for(const id of ['campanha-visual','solo-cinema-visual'])$(id).onchange=()=>{if(!$(id).checked)fecharCinema();};
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('campanha-cinema').hidden)fecharCinema();});
-for(const id of ['campanha-som','solo-cinema-som'])$(id).onchange=async()=>{if(!$(id).checked){fecharCinema();return;}try{cinemaAudio=cinemaAudio||new(window.AudioContext||window.webkitAudioContext)();await cinemaAudio.resume();aviso('Sons cinematográficos ativados.',true);}catch{$(id).checked=false;aviso('Não foi possível ativar o áudio.');}};
-function cinemaSolo(texto){if(typeof texto!=='string')return;const d=detectarCinema(texto);if(d.efeito!=='nenhum')exibirCinema({...d,texto});}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('campanha-cinema').hidden){e.preventDefault();fecharCinema();}});
+document.addEventListener('visibilitychange',()=>{
+ if(document.hidden&&cinemaAtual){if(cinemaInicio)cinemaRestante=Math.max(0,cinemaRestante-(performance.now()-cinemaInicio));clearTimeout(cinemaTimer);cinemaTimer=null;cinemaInicio=0;cinemaGeracao++;cinemaPararSom();$('campanha-cinema').classList.add('cinema-pausado');}
+ else if(!document.hidden&&cinemaAtual){$('campanha-cinema').classList.remove('cinema-pausado');cinemaAgendar();}
+ else if(!document.hidden&&cinemaFila.length)cinemaProximo();
+});
+for(const id of ['campanha-som','solo-cinema-som'])$(id).onchange=async()=>{if(!$(id).checked){cinemaPararSom();return;}try{cinemaAudio=cinemaAudio||new(window.AudioContext||window.webkitAudioContext)();await cinemaAudio.resume();aviso('Sons cinematográficos ativados.',true);}catch{$(id).checked=false;aviso('Não foi possível ativar o áudio.');}};
+function cinemaReplay(art,e){if(!art||!Object.hasOwn(cinemaDuracoes,e.efeito))return;const b=el('button','▶ Rever cena · '+cinemaTitulos[e.efeito],'solo-cinema-replay');b.type='button';b.onclick=()=>{if(!cinemaPreferencia('visual')&&!cinemaPreferencia('som')){aviso('Ative os efeitos em Som e efeitos para rever a cena.');return;}exibirCinema(e);};art.append(b);}
+function cinemaSolo(texto,art=null){if(typeof texto!=='string')return;const d=detectarCinema(texto);if(d.efeito!=='nenhum'){const e={...d,texto:d.trecho||texto};cinemaReplay(art,e);exibirCinema(e);}}
 function somCinema(efeito){
  if(!$(mesaTelaVisivel==='solo'?'solo-cinema-som':'campanha-som').checked||!cinemaAudio||cinemaAudio.state!=='running')return;
  const ctx=cinemaAudio,t=ctx.currentTime;
- const dur=efeito==='dragao_fogo'?2.8:efeito==='dragao'?1.7:efeito==='tempestade'?2.2:1.3;
+ const dur=efeito==='dragao_fogo'?4.6:efeito==='dragao'?3:efeito==='tempestade'?4:efeito==='magia'?3.2:2.3;
  const gain=ctx.createGain();gain.gain.setValueAtTime(.001,t);gain.gain.exponentialRampToValueAtTime(.13,t+.09);gain.gain.exponentialRampToValueAtTime(.001,t+dur);gain.connect(ctx.destination);
  const buf=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*dur),ctx.sampleRate),arr=buf.getChannelData(0);for(let i=0;i<arr.length;i++)arr[i]=Math.random()*2-1;
  const noise=ctx.createBufferSource();noise.buffer=buf;
- const filter=ctx.createBiquadFilter();filter.type='lowpass';filter.frequency.setValueAtTime(efeito==='dragao_fogo'?1500:efeito==='magia'?2400:240,t);filter.frequency.exponentialRampToValueAtTime(efeito==='dragao_fogo'?300:80,t+dur);noise.connect(filter);filter.connect(gain);noise.start(t);cinemaNos.push(noise);
- const osc=ctx.createOscillator();osc.type=efeito==='magia'?'sine':'sawtooth';osc.frequency.setValueAtTime(efeito==='magia'?280:95,t);osc.frequency.exponentialRampToValueAtTime(efeito==='magia'?880:35,t+dur);const g=ctx.createGain();g.gain.value=.15;osc.connect(g);g.connect(gain);osc.start(t);osc.stop(t+dur);cinemaNos.push(osc);
+ const filter=ctx.createBiquadFilter();filter.type='lowpass';filter.frequency.setValueAtTime(efeito==='dragao_fogo'?1500:efeito==='magia'?2400:240,t);filter.frequency.exponentialRampToValueAtTime(efeito==='dragao_fogo'?300:80,t+dur);noise.connect(filter);filter.connect(gain);noise.start(t);noise.onended=()=>{try{noise.disconnect();filter.disconnect();}catch{}};cinemaNos.push(noise);
+ const osc=ctx.createOscillator();osc.type=efeito==='magia'?'sine':'sawtooth';osc.frequency.setValueAtTime(efeito==='magia'?280:95,t);osc.frequency.exponentialRampToValueAtTime(efeito==='magia'?880:35,t+dur);const g=ctx.createGain();g.gain.value=.15;osc.connect(g);g.connect(gain);osc.start(t);osc.stop(t+dur);osc.onended=()=>{try{osc.disconnect();g.disconnect();gain.disconnect();}catch{}};cinemaNos.push(osc);
 }
 function arteDragao(cor,fogo){
  const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 600 300');svg.setAttribute('class','mesa-dragao');
@@ -2231,22 +2246,77 @@ function arteDragao(cor,fogo){
  if(fogo){path('M433 118 Q477 82 526 122 L591 112 548 145 588 163 Q503 180 433 130Z','#ea7332','mesa-fogo');path('M439 123 Q478 109 545 139 Q501 154 439 129Z','#ffe090','mesa-fogo nucleo');}
  return svg;
 }
-function exibirCinema(e){
- if(e.efeito==='nenhum'||document.hidden)return;
- fecharCinema();somCinema(e.efeito);
- if(!$(mesaTelaVisivel==='solo'?'solo-cinema-visual':'campanha-visual').checked){cinemaTimer=setTimeout(fecharCinema,4200);return;}
+function arteFenomeno(efeito){
+ const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 600 320');svg.setAttribute('class','mesa-fenomeno');
+ function add(tag,attr){const n=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attr))n.setAttribute(k,v);svg.append(n);return n;}
+ if(efeito==='trovao'||efeito==='tempestade'){
+  for(const [cx,cy,rx,ry] of [[150,92,106,40],[245,66,120,55],[360,85,125,47],[456,109,95,43]])add('ellipse',{cx,cy,rx,ry,fill:'#536479',class:'cinema-nuvem'});
+  for(const [i,d] of ['M285 100 L235 198 290 183 255 283 370 155 302 170 335 100Z','M440 116 L405 179 437 168 410 231 485 145 450 156Z'].entries())add('path',{d,fill:'#d1ebff',stroke:'#92caff','stroke-width':3,class:'cinema-raio cinema-raio-'+i});
+  if(efeito==='tempestade')for(let i=0;i<26;i++)add('line',{x1:90+i*17,y1:125+(i%4)*15,x2:70+i*17,y2:160+(i%4)*15,stroke:'#a4d2ef','stroke-width':2,'stroke-linecap':'round',class:'cinema-chuva'});
+ }else if(efeito==='magia'){
+  for(const rad of [62,94,132])add('circle',{cx:300,cy:160,r:rad,fill:'none',stroke:rad===94?'#c5b1ff':'#e9d49c','stroke-width':3,'stroke-dasharray':rad===94?'10 8':'none',class:'cinema-runa'});
+  add('path',{d:'M300 32 L411 224 189 224 Z M300 288 L189 96 411 96 Z',fill:'none',stroke:'#d0bcff','stroke-width':3,class:'cinema-runa'});
+  add('path',{d:'M300 105 Q310 145 355 160 Q310 174 300 215 Q287 174 245 160 Q287 145 300 105Z',fill:'#fff4cf',class:'cinema-nucleo'});
+ }else{
+  for(let i=0;i<12;i++){const t=i*Math.PI/6;add('ellipse',{cx:300+Math.cos(t)*62,cy:160+Math.sin(t)*62,rx:48,ry:22,fill:i%2?'#ed833d':'#d65a29',transform:'rotate('+i*30+' '+(300+Math.cos(t)*62)+' '+(160+Math.sin(t)*62)+')',class:'cinema-brasa'});}
+  for(const [rad,cor] of [[84,'#ffb052'],[53,'#f8d57b'],[25,'#fff4d6']])add('circle',{cx:300,cy:160,r:rad,fill:cor,class:'cinema-nucleo'});
+  add('circle',{cx:300,cy:160,r:126,fill:'none',stroke:'#e7a56b','stroke-width':6,class:'cinema-onda'});
+ }
+ return svg;
+}
+function cinemaAgendar(){
+ if(!cinemaAtual||document.hidden)return;
+ const token=++cinemaGeracao;cinemaInicio=0;
+ requestAnimationFrame(()=>requestAnimationFrame(()=>{
+  if(token!==cinemaGeracao||!cinemaAtual||document.hidden)return;
+  cinemaInicio=performance.now();
+  cinemaTimer=setTimeout(()=>{if(token===cinemaGeracao)cinemaProximo();},Math.max(150,cinemaRestante));
+ }));
+}
+function cinemaIniciar(e){
+ if(e.tela!==mesaTelaVisivel||(!cinemaPreferencia('visual',e.tela)&&!cinemaPreferencia('som',e.tela))){cinemaProximo();return;}
+ cinemaAtual=e;cinemaRestante=cinemaDuracoes[e.efeito]||7000;
  const painel=$('campanha-cinema'),arte=$('campanha-cinema-arte');
- painel.className='mesa-cinema efeito-'+e.efeito+((mesaMovimentoReduzido()||acessibilidadeMovimentoReduzido())?' sem-movimento':'');
- if(e.efeito.startsWith('dragao'))arte.append(arteDragao(e.cor,e.efeito==='dragao_fogo'));
- else {const simbolo=el('div',{trovao:'ϟ',explosao:'✹',magia:'✧',tempestade:'☁'}[e.efeito]||'✦','mesa-cinema-simbolo');arte.append(simbolo);}
- $('campanha-cinema-texto').textContent=e.texto.slice(0,300);painel.hidden=false;cinemaTimer=setTimeout(fecharCinema,4200);
+ if(cinemaPreferencia('visual',e.tela)){
+  painel.className='mesa-cinema efeito-'+e.efeito+((mesaMovimentoReduzido()||acessibilidadeMovimentoReduzido())?' sem-movimento':'');
+  painel.style.setProperty('--cinema-duracao',cinemaRestante+'ms');
+  arte.replaceChildren(e.efeito.startsWith('dragao')?arteDragao(e.cor,e.efeito==='dragao_fogo'):arteFenomeno(e.efeito));
+  $('campanha-cinema-titulo').textContent=cinemaTitulos[e.efeito]||'Evento cinematográfico';
+  $('campanha-cinema-texto').textContent=String(e.texto||'').slice(0,360);
+  $('campanha-cinema-pular-todos').hidden=cinemaFila.length===0;
+  painel.hidden=false;$('campanha-cinema-fechar').focus({preventScroll:true});
+ }else cinemaRestante=5000;
+ try{somCinema(e.efeito);}catch(err){console.warn('Mesa: efeito sonoro indisponível',err.name);}
+ cinemaAgendar();
+}
+function exibirCinema(e){
+ if(!Object.hasOwn(cinemaDuracoes,e.efeito)||!['solo','campanhas'].includes(mesaTelaVisivel))return;
+ if(!cinemaPreferencia('visual')&&!cinemaPreferencia('som'))return;
+ const novo={...e,tela:mesaTelaVisivel};
+ if(cinemaAtual||document.hidden){if(cinemaFila.length<8)cinemaFila.push(novo);$('campanha-cinema-pular-todos').hidden=!cinemaFila.length;return;}
+ cinemaFoco=document.activeElement;cinemaIniciar(novo);
 }
 function detectarCinema(texto){
- const t=texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
- const dragao=/\bdrag(?:ao|oes)\b/.test(t),fogo=/\b(cospe|cuspiu|cuspindo|sopro|sopra|lanca)\b.{0,45}\b(fogo|chamas)\b/.test(t);
- let efeito=dragao?(fogo?'dragao_fogo':'dragao'):/\btrovao\b/.test(t)?'trovao':/\bexplosao\b/.test(t)?'explosao':/\btempestade\b/.test(t)?'tempestade':/\b(magia|feitico)\b/.test(t)?'magia':'nenhum';
- const cor=[['vermelh','vermelho'],['verd','verde'],['azul','azul'],['negr|pret','preto'],['branc','branco'],['dourad','dourado']].find(([k])=>new RegExp(k).test(t))?.[1]||'vermelho';
- return {efeito,cor};
+ const trechos=String(texto||'').split(/(?<=[.!?])\s+|\n+/).filter(Boolean);
+ const normal=t=>t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+ const cores=[['vermelh','vermelho'],['verd','verde'],['azul','azul'],['negr|pret','preto'],['branc','branco'],['dourad','dourado']];
+ const candidatos=[];
+ for(let i=0;i<trechos.length;i++){
+  const t=normal(trechos[i]);if(/\b(nao ha|nao havia|nenhum|nenhuma|sem sinal de|historia de|lenda de|imagin[ao]|sonh[ao])\b.{0,45}\b(dragao|dragoes|explosao|tempestade|trovao|magia|feitico)\b/.test(t))continue;
+  const dragao=/\bdrag(?:ao|oes)\b/.test(t),fogo=/\b(cosp\w*|sopr\w*|lanc\w*|expel\w*|exal\w*|vomit\w*)\b.{0,65}\b(fogo|chamas|labaredas)\b/.test(t);
+  const contexto=normal(trechos[i-1]||'');
+  const ativo=/\b(surg\w*|aparec\w*|emerg\w*|aterriss\w*|rug\w*|vo[ao]\w*|pous\w*|desc\w*|avanc\w*|abre|abriu|ergu\w*|enorm\w*|gigant\w*|asas|sobrevo\w*)\b/.test(t);
+  let efeito='nenhum',prioridade=0;
+  if(fogo&&(dragao||/\bdrag(?:ao|oes)\b/.test(contexto))){efeito='dragao_fogo';prioridade=6;}
+  else if(dragao&&ativo){efeito='dragao';prioridade=5;}
+  else if(/\b(explos(?:ao|oes)|explod\w*|detona\w*)\b/.test(t)){efeito='explosao';prioridade=4;}
+  else if(/\btempestade\b/.test(t)&&!/\bprevisao\b/.test(t)){efeito='tempestade';prioridade=3;}
+  else if(/\b(trov(?:ao|oes)|relampag\w*|raio)\b/.test(t)){efeito='trovao';prioridade=2;}
+  else if(/\b(magia|feitico|encantamento|energia arcana)\b/.test(t)&&/\b(conjur\w*|brilh\w*|lanc\w*|invoc\w*|eman\w*|surg\w*|manifest\w*|explod\w*|ativ\w*)\b/.test(t)){efeito='magia';prioridade=1;}
+  if(prioridade){const cor=cores.find(([k])=>new RegExp(k).test(t+' '+contexto))?.[1]||'vermelho';candidatos.push({efeito,cor,trecho:trechos[i],prioridade});}
+ }
+ candidatos.sort((a,b)=>b.prioridade-a.prioridade);
+ return candidatos[0]||{efeito:'nenhum',cor:'vermelho'};
 }
 function limparCampanha(){
  clearInterval(campanhaTimer);campanhaTimer=null;campanhaVersao++;campanhaId=null;campanhaCursor=null;campanhaCarregando=false;campanhaPendente=null;campanhaPersonagemAtual='';$('campanha-personagem').replaceChildren(new Option('Sem personagem vinculado',''));
@@ -2304,12 +2374,12 @@ async function atualizarCampanha(){
  if(d.minha&&!m.eu&&!d.encerrada&&m.estado==='ativo'&&m.personagem){const xp=el('button','Conceder XP');xp.type='button';xp.onclick=async()=>{const id=campanhaId,entrada=prompt('XP para '+m.personagem+' (1 a 1000):');if(entrada===null)return;const quantidade=Number(entrada);if(!Number.isInteger(quantidade)||quantidade<1||quantidade>1000){campanhaStatus('Informe um XP inteiro de 1 a 1000.');return;}const a=id+':'+m.apelido+':'+quantidade;const chave=mesaXPPendente.get(a)||crypto.randomUUID();mesaXPPendente.set(a,chave);xp.disabled=true;try{const r=await api(campanhaBase+'/'+id+'/xp','POST',{apelido:m.apelido,quantidade,chave});mesaXPPendente.delete(a);campanhaStatus(r.duplicado?'Recompensa já registrada.':r.ganho+' XP concedido.');}catch(e){campanhaStatus(e.message);}finally{xp.disabled=false;}};linha.append(xp);}
  if(d.minha&&!m.eu&&!d.encerrada){const b=el('button','Remover');b.type='button';b.onclick=()=>acaoMembroCampanha('remover',m.apelido);linha.append(b);}membros.append(linha);}
  const h=$('campanha-historico'),nomes={narracao:'Narração',acao:'Ação',fala:'Fala',dado:'Dado'};
- let cinema=null;
+ const cinema=[];
  for(const e of d.eventos){const item=el('article','','mesa-chat-bolha'+(e.tipo==='narracao'?' narracao':''));item.append(el('strong',e.apelido+(e.personagem_nome?' · '+e.personagem_nome:'')+' · '+nomes[e.tipo]),el('p',e.texto),el('small',new Date(e.criado_em).toLocaleTimeString('pt-BR')));if(e.pratica){const status=el('p','Prática: '+e.pratica.nome+' · '+({pendente:'aguardando mestre',aprovada:'aprovada',recusada:'recusada',limite:'limite atingido'}[e.pratica.status]||e.pratica.status),'suave');item.append(status);if(d.minha&&!d.encerrada&&e.pratica.status==='pendente'){const controles=el('div','','item-ficha-linha');for(const aprovar of [true,false]){const b=el('button',aprovar?'Aprovar +5':'Recusar');b.type='button';b.onclick=async()=>{for(const x of controles.querySelectorAll('button'))x.disabled=true;try{const r=await api(campanhaBase+'/'+id+'/pratica','POST',{evento:e.id,aprovar});status.textContent='Prática: '+e.pratica.nome+' · '+r.status;controles.remove();campanhaStatus(r.ganho?'Proficiência concedida.':'Prática avaliada.');await atualizarCampanha();}catch(err){campanhaStatus(err.message);for(const x of controles.querySelectorAll('button'))x.disabled=false;}};controles.append(b);}item.append(controles);}}h.append(item);campanhaCursor=e.id;
- if(cursor&&e.efeito!=='nenhum')cinema=e;}
+ if(e.efeito!=='nenhum'&&Object.hasOwn(cinemaDuracoes,e.efeito)){cinemaReplay(item,e);if(cursor)cinema.push(e);}}
  // Uma sala vazia não deve reproduzir efeitos históricos ao entrar.
  if(!campanhaCursor)campanhaCursor='0';
- if(cinema)exibirCinema(cinema);
+ for(const e of cinema)exibirCinema(e);
  if(d.eventos.length){while(h.children.length>300)h.firstChild.remove();h.scrollTop=h.scrollHeight;}
  }catch(e){if(v===campanhaVersao){campanhaStatus(e.message);if([403,404].includes(e.status)){limparCampanha();campanhaStatus(e.message);iniciarCampanhas();}}}
  finally{if(v===campanhaVersao)campanhaCarregando=false;}
