@@ -4,3 +4,5 @@ test('compartilha apenas campos autorizados',()=>{a.equal(g.ficha(p,{},'mana',fa
 test('origem limita dados',()=>{const x=g.origem({conteudo:{titulo:'Jornada',trilha:'Mistério',email:'privado'}});a.equal(x.titulo,'Jornada');a.equal(x.trilha,'Mistério');a.equal(x.email,undefined);});
 test('abertura e teste pendente sem recompensa',()=>{const x={narracao:'Uma longa cena começa diante do grupo.',resumo:'Começou',conquista:'combate',efeitos:{pv:-3}};a.equal(g.resultado(x,true).conquista,null);a.equal(g.resultado({...x,testePendente:true},false).efeitos,null);a.equal(g.resultado(x,false).conquista,'combate');});
 test('recursos disponíveis',()=>{a.equal(g.opcoes(null,{},'mana').length,0);a.equal(g.opcoes(p,{},'mana')[0].id,'socorro');});
+
+test('rolagem usa dados do servidor e modificador',()=>{a.equal(g.rolar(20,2,3,()=>10),'Rolou 2d20+3: [10, 10] · modificador 3 · total 23');});

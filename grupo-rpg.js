@@ -17,4 +17,9 @@ async function narrar(contexto){
  const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(modelo)+':generateContent',{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':process.env.GEMINI_API_KEY},signal:AbortSignal.timeout(35000),body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{responseMimeType:'application/json',maxOutputTokens:2400}})});
  if(!r.ok)throw Error('IA indisponível');const d=await r.json();return resultado(JSON.parse((d.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('')),contexto.inicio);
 }
-module.exports={origem,ficha,opcoes,resultado,ocupado,narrar};
+function rolar(faces,quantidade,modificador,random){
+ if(![4,6,8,10,12,20,100].includes(faces)||!Number.isInteger(quantidade)||quantidade<1||quantidade>5||!Number.isInteger(modificador)||Math.abs(modificador)>20)throw Error('Rolagem inválida');
+ const dados=Array.from({length:quantidade},()=>random(faces)),total=dados.reduce((a,b)=>a+b,modificador);
+ return 'Rolou '+quantidade+'d'+faces+(modificador===0?'':modificador>0?'+'+modificador:String(modificador))+': ['+dados.join(', ')+']'+(modificador?' · modificador '+modificador:'')+' · total '+total;
+}
+module.exports={origem,ficha,opcoes,resultado,ocupado,narrar,rolar};

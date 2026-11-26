@@ -585,7 +585,7 @@ app.get('/api/comunidade/campanhas/:id',asyncHandler(async(req,res)=>{
  const fichas=(await client.query("SELECT f.id,f.nome,f.dados,f.xp,f.aquisicoes_rpg,m.recursos,m.compartilhar_ficha,m.usuario_id=$2 AS eu,p.apelido FROM public.mesa_campanha_membros m JOIN public.mesa_perfis p ON p.usuario_id=m.usuario_id JOIN public.personagens_dnd f ON f.id=m.personagem_id AND f.usuario_id=m.usuario_id WHERE m.campanha_id=$1 AND m.estado='ativo' AND (m.usuario_id=$2 OR m.compartilhar_ficha)",[s.id,u.id])).rows;
  const minhaFicha=fichas.find(f=>f.eu),grupo=fichas.map(f=>({apelido:f.apelido,eu:f.eu,...grupoRpg.ficha(f,f.recursos,s.modo_recursos,true)}));
  const pendentes=s.modo_mestre==='ia'?(await client.query("SELECT count(*)::int AS n FROM public.mesa_campanha_eventos WHERE campanha_id=$1 AND id>$2 AND NOT narrador_ia AND tipo IN ('acao','fala','dado')",[s.id,s.ia_cursor])).rows[0].n:0;
- return {dados:{titulo:s.titulo,descricao:s.descricao,minha:s.minha,encerrada:s.encerrada,membros:membros.rows,eventos:depois?eventos.rows:eventos.rows.reverse(),modoMestre:s.modo_mestre,modoRecursos:s.modo_recursos,origem:s.origem_historia,iaIniciada:s.ia_iniciada,iaOcupada:grupoRpg.ocupado(s),pendentes,grupo,compartilhar:!!minhaFicha?.compartilhar_ficha,opcoes:grupoRpg.opcoes(minhaFicha,minhaFicha?.recursos,s.modo_recursos),grimorio:minhaFicha?recursosRpg.estado(minhaFicha,minhaFicha.recursos,s.modo_recursos).grimorio:null}};
+ return {dados:{titulo:s.titulo,descricao:s.descricao,minha:s.minha,encerrada:s.encerrada,membros:membros.rows,eventos:depois?eventos.rows:eventos.rows.reverse(),modoMestre:s.modo_mestre,modoRecursos:s.modo_recursos,origem:s.minha&&s.modo_mestre==='humano'?s.origem_historia:{titulo:s.origem_historia?.titulo,trilha:s.origem_historia?.trilha},iaIniciada:s.ia_iniciada,iaOcupada:grupoRpg.ocupado(s),pendentes,grupo,compartilhar:!!minhaFicha?.compartilhar_ficha,opcoes:grupoRpg.opcoes(minhaFicha,minhaFicha?.recursos,s.modo_recursos),grimorio:minhaFicha?recursosRpg.estado(minhaFicha,minhaFicha.recursos,s.modo_recursos).grimorio:null}};
  });
 }));
 app.post('/api/comunidade/campanhas/:id/membros',asyncHandler(async(req,res)=>{
@@ -625,7 +625,8 @@ app.post('/api/comunidade/campanhas/:id/personagem',asyncHandler(async(req,res)=
  });
 }));
 app.post('/api/comunidade/campanhas/:id/eventos',asyncHandler(async(req,res)=>{
- const {tipo,texto='',efeito='nenhum',cor='vermelho',chave,faces,habilidadeId,usoRecurso=null}=req.body||{};
+ const {tipo,texto='',efeito='nenhum',cor='vermelho',chave,faces,habilidadeId,usoRecurso=null,quantidade=1,modificador=0}=req.body||{};
+ if(tipo==='dado'&&(!Number.isInteger(quantidade)||quantidade<1||quantidade>5||!Number.isInteger(modificador)||modificador< -20||modificador>20))return res.status(400).json({erro:'Rolagem inválida.'});
  if(usoRecurso!==null&&(tipo!=='acao'||typeof usoRecurso!=='string'||usoRecurso.length>1100))return res.status(400).json({erro:'Recurso inválido.'});
  if(habilidadeId!=null&&(tipo!=='acao'||typeof habilidadeId!=='string'||habilidadeId.length>1100))return res.status(400).json({erro:'Habilidade inválida.'});
  if(!['narracao','acao','fala','dado'].includes(tipo)||typeof texto!=='string'||texto.length>2000||(tipo!=='dado'&&!texto.trim())||!campanhaEfeitos.includes(efeito)||!campanhaCores.includes(cor)||typeof chave!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(chave)||(tipo==='dado'&&![4,6,8,10,12,20,100].includes(faces)))return res.status(400).json({erro:'Evento inválido.'});
@@ -638,7 +639,7 @@ app.post('/api/comunidade/campanhas/:id/eventos',asyncHandler(async(req,res)=>{
  const p=(await client.query('SELECT f.id,f.nome,f.dados,f.xp,f.aquisicoes_rpg,m.recursos FROM public.mesa_campanha_membros m JOIN public.personagens_dnd f ON f.id=m.personagem_id AND f.usuario_id=m.usuario_id WHERE m.campanha_id=$1 AND m.usuario_id=$2',[s.id,u.id])).rows[0];try{recursosRpg.preparar(recursosRpg.estado(p,p?.recursos,s.modo_recursos),usoRecurso,tipo);}catch(e){return campanhaErro(e.message,409);}}
  const n=await client.query("SELECT count(*)::int AS n FROM public.mesa_campanha_eventos WHERE autor=$1 AND criado_em>now()-interval '1 minute'",[u.id]);
  if(n.rows[0].n>=20)return campanhaErro('Aguarde um minuto antes de enviar mais eventos.',429);
- const conteudo=tipo==='dado'?'Rolou d'+faces+': '+require('crypto').randomInt(1,faces+1):texto.trim();
+ const conteudo=tipo==='dado'?grupoRpg.rolar(faces,quantidade,modificador,n=>crypto.randomInt(1,n+1)):texto.trim();
  const f=tipo==='narracao'?null:(await client.query('SELECT p.nome FROM public.mesa_campanha_membros m JOIN public.personagens_dnd p ON p.id=m.personagem_id AND p.usuario_id=m.usuario_id WHERE m.campanha_id=$1 AND m.usuario_id=$2',[s.id,u.id])).rows[0];
  let pratica=null;
  if(habilidadeId){
@@ -711,7 +712,7 @@ app.post('/api/comunidade/campanhas/:id/ficha-nova',asyncHandler(async(req,res)=
  await client.query('UPDATE public.mesa_campanha_membros SET personagem_id=$3,compartilhar_ficha=$4,recursos=$5::jsonb WHERE campanha_id=$1 AND usuario_id=$2',[s.id,u.id,p.rows[0].id,req.body?.compartilhar===true,'{}']);return {dados:{id:p.rows[0].id}};
  });
 }));
-app.post('/api/comunidade/campanhas/:id/narrar',modoManutencao,asyncHandler(async(req,res)=>{
+app.post('/api/comunidade/campanhas/:id/narrar',(req,res,next)=>modoManutencao(req,res,next),asyncHandler(async(req,res)=>{
  const u=await socialUsuario(req,res);if(!u)return;const id=String(req.params.id);if(!/^[1-9][0-9]{0,17}$/.test(id))return res.status(400).json({erro:'Campanha inválida.'});
  const {pool}=require('./postgres'),trava=crypto.randomUUID();let c,evento,contexto,quota=null,confirmado=false;
  const cl=await pool.connect();
@@ -730,21 +731,21 @@ app.post('/api/comunidade/campanhas/:id/narrar',modoManutencao,asyncHandler(asyn
  await cl.query('UPDATE public.mesa_campanhas_online SET ia_trava=$2,ia_trava_em=now() WHERE id=$1',[id,trava]);await cl.query('COMMIT');
  }catch(e){await cl.query('ROLLBACK').catch(()=>{});throw e;}finally{cl.release();}
  try{
- quota=await soloCota(u);const resposta=await grupoRpg.narrar(contexto);
+ quota=await soloCota(u);const {atorId,...contextoIA}=contexto;const resposta=await grupoRpg.narrar(contextoIA);
  const client=await pool.connect();
  try{await client.query('BEGIN');
  const s=(await client.query('SELECT * FROM public.mesa_campanhas_online WHERE id=$1 FOR UPDATE',[id])).rows[0];
  if(!s||s.encerrada||s.ia_trava!==trava)throw Object.assign(Error('A narração perdeu a reserva. Tente novamente.'),{status:409});
  const acesso=(await client.query("SELECT 1 FROM public.mesa_campanha_membros m WHERE m.campanha_id=$1 AND m.usuario_id=$2 AND m.estado='ativo' AND NOT EXISTS(SELECT 1 FROM public.mesa_campanha_membros a JOIN public.mesa_bloqueios b ON (b.autor=$2 AND b.alvo=a.usuario_id) OR(b.alvo=$2 AND b.autor=a.usuario_id) WHERE a.campanha_id=$1 AND a.estado='ativo')",[id,u.id])).rowCount;if(!acesso)throw Object.assign(Error('Acesso mudou durante a narração.'),{status:409});
  let resultados=[];
- if(evento&&contexto.atorId){const p=(await client.query("SELECT f.id,f.nome,f.dados,f.xp,f.aquisicoes_rpg,m.recursos FROM public.mesa_campanha_membros m JOIN public.personagens_dnd f ON f.id=m.personagem_id AND f.usuario_id=m.usuario_id WHERE m.campanha_id=$1 AND m.usuario_id=$2 AND m.estado='ativo' AND f.id=$3 FOR UPDATE OF f",[id,evento.autor,contexto.atorId])).rows[0];
+ if(evento&&contexto.atorId){const p=(await client.query("SELECT f.id,f.nome,f.dados,f.xp,f.aquisicoes_rpg,m.recursos,m.compartilhar_ficha FROM public.mesa_campanha_membros m JOIN public.personagens_dnd f ON f.id=m.personagem_id AND f.usuario_id=m.usuario_id WHERE m.campanha_id=$1 AND m.usuario_id=$2 AND m.estado='ativo' AND f.id=$3 FOR UPDATE OF f",[id,evento.autor,contexto.atorId])).rows[0];
  if(!p)throw Object.assign(Error('Ficha vinculada mudou durante a narração.'),{status:409});
- const e=recursosRpg.estado(p,p.recursos,s.modo_recursos),uso=recursosRpg.preparar(e,evento.uso_recurso,evento.tipo),categoria=resposta.conquista;
+ const e=recursosRpg.estado(p,p.recursos,s.modo_recursos),uso=recursosRpg.preparar(e,evento.uso_recurso,evento.tipo);let categoria=resposta.conquista;if(categoria&&(await client.query("SELECT 1 FROM public.mesa_xp_historico WHERE personagem_id=$1 AND origem='multiplayer' AND campanha_id=$2 AND categoria=$3 AND criado_em>now()-interval '60 seconds' LIMIT 1",[p.id,id,categoria])).rowCount)categoria=null;
  const r=recursosRpg.aplicar(p,p.recursos,s.modo_recursos,uso,resposta.efeitos,categoria,evento.tipo==='dado'?'rolagem':evento.tipo,Number(evento.id),'grupo-'+id,{testePendente:resposta.testePendente});
  await client.query('UPDATE public.personagens_dnd SET aquisicoes_rpg=$2::jsonb WHERE id=$1',[p.id,JSON.stringify(recursosRpg.armazenamento(r.aquisicoes))]);
  await client.query('UPDATE public.mesa_campanha_membros SET recursos=$3::jsonb WHERE campanha_id=$1 AND usuario_id=$2',[id,evento.autor,JSON.stringify({...p.recursos,...recursosRpg.persistir(r.estado)})]);
- resultados=r.eventos.map(x=>p.nome+' · '+x);
- if(categoria){const xp=await xpMesa.conceder(client,{personagemId:p.id,usuarioId:evento.autor,origem:'multiplayer',campanhaId:id,chave:'ia-'+evento.id,categoria,quantidade:xpMesa.categorias[categoria]});if(xp?.ganho)resultados.push(p.nome+' · +'+xp.ganho+' XP'+(xp.subiu?' · nível '+xp.nivelNovo:''));}
+ resultados=p.compartilhar_ficha?r.eventos.map(x=>p.nome+' · '+x):[];
+ if(categoria){const xp=await xpMesa.conceder(client,{personagemId:p.id,usuarioId:evento.autor,origem:'multiplayer',campanhaId:id,chave:'ia-'+evento.id,categoria,quantidade:xpMesa.categorias[categoria]});if(xp?.ganho&&p.compartilhar_ficha)resultados.push(p.nome+' · +'+xp.ganho+' XP'+(xp.subiu?' · nível '+xp.nivelNovo:''));}
  }
  await client.query("INSERT INTO public.mesa_campanha_eventos(campanha_id,autor,chave,tipo,texto,efeito,cor,narrador_ia,resultados) VALUES($1,$2,$3,'narracao',$4,'nenhum','vermelho',true,$5::jsonb)",[id,u.id,crypto.randomUUID(),resposta.narracao,JSON.stringify(resultados)]);
  await client.query('UPDATE public.mesa_campanhas_online SET ia_iniciada=true,ia_cursor=$2,ia_resumo=$3,ia_trava=NULL,ia_trava_em=NULL WHERE id=$1',[id,evento?.id||s.ia_cursor,resposta.resumo]);
